@@ -1,0 +1,32 @@
+{
+  "name": "openlaunch-sdk",
+  "version": "0.1.0",
+  "description": "A typed, runtime-agnostic TypeScript SDK for spaceflight data from Launch Library 2.",
+  "keywords": ["space", "spaceflight", "rocket", "launch", "launch-library", "typescript", "sdk"],
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist-cjs/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist-cjs/index.js"
+    }
+  },
+  "files": ["dist", "dist-cjs", "README.md", "LICENSE", "CHANGELOG.md"],
+  "sideEffects": false,
+  "scripts": {
+    "clean": "node scripts/clean.mjs",
+    "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "check": "npm run typecheck && npm test",
+    "prepublishOnly": "npm run check"
+  },
+  "engines": {"node": ">=18"},
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
