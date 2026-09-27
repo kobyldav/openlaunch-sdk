@@ -1,8 +1,8 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.1.0",
-  "description": "A typed, runtime-agnostic TypeScript SDK for spaceflight data from Launch Library 2.",
-  "keywords": ["space", "spaceflight", "rocket", "launch", "launch-library", "typescript", "sdk"],
+  "version": "0.5.0",
+  "description": "A zero-runtime-dependency TypeScript spaceflight and mission-engineering SDK: Launch Library 2, NASA, CelesTrak, orbital mechanics, rockets, navigation, communications, thermal, EDL and mission utilities.",
+  "keywords": ["space", "spaceflight", "rocket", "launch", "mars", "orbital-mechanics", "nasa", "celestrak", "launch-library", "mission", "typescript", "sdk"],
   "license": "MIT",
   "type": "module",
   "main": "./dist-cjs/index.js",
@@ -13,20 +13,30 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "require": "./dist-cjs/index.js"
+    },
+    "./science": {
+      "types": "./dist/science/index.d.ts",
+      "import": "./dist/science/index.js",
+      "require": "./dist-cjs/science/index.js"
+    },
+    "./providers": {
+      "types": "./dist/providers/index.d.ts",
+      "import": "./dist/providers/index.js",
+      "require": "./dist-cjs/providers/index.js"
     }
   },
-  "files": ["dist", "dist-cjs", "README.md", "LICENSE", "CHANGELOG.md"],
+  "files": ["dist", "dist-cjs", "README.md", "LICENSE", "CHANGELOG.md", "docs"],
   "sideEffects": false,
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
     "test": "npm run build && node --test tests/*.test.mjs",
+    "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm test",
-    "prepublishOnly": "npm run check"
+    "pack:check": "npm pack --dry-run",
+    "prepublishOnly": "npm run check && npm run pack:check"
   },
-  "engines": {"node": ">=18"},
-  "devDependencies": {
-    "typescript": "^5.8.3"
-  }
+  "engines": { "node": ">=18" },
+  "devDependencies": { "typescript": "^5.8.3" }
 }

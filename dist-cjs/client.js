@@ -11,8 +11,12 @@ const generic_js_1 = require("./resources/generic.js");
 const launches_js_1 = require("./resources/launches.js");
 const pads_js_1 = require("./resources/pads.js");
 const rockets_js_1 = require("./resources/rockets.js");
-exports.PRODUCTION_BASE_URL = "https://ll.thespacedevs.com/2.3.0/";
-exports.DEVELOPMENT_BASE_URL = "https://lldev.thespacedevs.com/2.3.0/";
+const raw_js_1 = require("./resources/raw.js");
+const celestrak_js_1 = require("./providers/celestrak.js");
+const nasa_js_1 = require("./providers/nasa.js");
+const ll2_js_1 = require("./providers/ll2.js");
+exports.PRODUCTION_BASE_URL = ll2_js_1.LL2_PRODUCTION_BASE_URL;
+exports.DEVELOPMENT_BASE_URL = ll2_js_1.LL2_DEVELOPMENT_BASE_URL;
 class OpenLaunch {
     launches;
     rockets;
@@ -20,6 +24,7 @@ class OpenLaunch {
     astronauts;
     events;
     pads;
+    /** Backwards-compatible normalized generic resources. */
     spacecraft;
     spaceStations;
     celestialBodies;
@@ -27,6 +32,12 @@ class OpenLaunch {
     expeditions;
     payloads;
     programs;
+    /** Complete LL2 raw surface, including every primary 2.3.0 collection. */
+    ll2;
+    /** Complete LL2 configuration/reference tables. */
+    config;
+    nasa;
+    celestrak;
     http;
     constructor(options = {}) {
         const fetchImpl = options.fetch ?? globalThis.fetch;
@@ -35,7 +46,7 @@ class OpenLaunch {
         const headers = { ...(options.headers ?? {}) };
         if (options.apiKey)
             headers.Authorization = `Token ${options.apiKey}`;
-        const cache = options.cache === false ? undefined : (options.cache ?? new cache_js_1.MemoryCache());
+        const cache = options.cache === false ? undefined : (options.cache ?? new cache_js_1.MemoryCache(2_000));
         this.http = new http_js_1.HttpClient({
             baseUrl: options.baseUrl ?? exports.PRODUCTION_BASE_URL,
             fetchImpl,
@@ -43,7 +54,13 @@ class OpenLaunch {
             cacheTtlMs: options.cacheTtlMs ?? 5 * 60_000,
             retries: options.retries ?? 2,
             retryDelayMs: options.retryDelayMs ?? 500,
+            timeoutMs: options.timeoutMs ?? 30_000,
+            maxConcurrency: options.maxConcurrency ?? 6,
+            minRequestIntervalMs: options.minRequestIntervalMs ?? 0,
+            deduplicate: true,
+            circuitBreaker: { failureThreshold: 5, cooldownMs: 30_000 },
             headers,
+            ...(options.onTelemetry ? { onTelemetry: options.onTelemetry } : {}),
         });
         this.launches = new launches_js_1.LaunchesResource(this.http);
         this.rockets = new rockets_js_1.RocketsResource(this.http);
@@ -58,8 +75,16 @@ class OpenLaunch {
         this.expeditions = new generic_js_1.GenericResource(this.http, "expeditions");
         this.payloads = new generic_js_1.GenericResource(this.http, "payloads");
         this.programs = new generic_js_1.GenericResource(this.http, "programs");
+        this.ll2 = Object.fromEntries(Object.entries(ll2_js_1.LL2_ENDPOINTS).map(([key, endpoint]) => [key, new raw_js_1.RawResource(this.http, endpoint)]));
+        this.config = Object.fromEntries(Object.entries(ll2_js_1.LL2_CONFIG_ENDPOINTS).map(([key, endpoint]) => [key, new raw_js_1.ConfigResource(this.http, endpoint)]));
+        const sharedProviderOptions = { fetch: fetchImpl, ...(options.cache === false ? { cache: false } : cache ? { cache } : {}), ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}), ...(options.onTelemetry ? { onTelemetry: options.onTelemetry } : {}) };
+        this.nasa = new nasa_js_1.NasaClient({ ...sharedProviderOptions, ...(options.nasaApiKey ? { apiKey: options.nasaApiKey } : {}) });
+        this.celestrak = new celestrak_js_1.CelesTrakClient(sharedProviderOptions);
     }
     raw(path, query = {}) { return this.http.get(path, query); }
+    resource(endpoint) { return new raw_js_1.RawResource(this.http, endpoint.replace(/^\/+|\/+$/g, "")); }
+    root() { return this.http.get(""); }
+    starshipDashboard() { return this.http.get("dashboard/starship/"); }
     async throttle() {
         const raw = await this.http.get("api-throttle/");
         const entry = Array.isArray(raw) ? raw[0] : raw;

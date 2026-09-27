@@ -1,11 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.ParseError = exports.RateLimitError = exports.HttpError = exports.OpenLaunchError = void 0;
+exports.ValidationError = exports.CircuitOpenError = exports.TimeoutError = exports.ParseError = exports.RateLimitError = exports.HttpError = exports.OpenLaunchError = void 0;
 class OpenLaunchError extends Error {
-    constructor(message, options) {
-        super(message, options);
-        this.name = "OpenLaunchError";
-    }
+    constructor(message, options) { super(message, options); this.name = new.target.name; }
 }
 exports.OpenLaunchError = OpenLaunchError;
 class HttpError extends OpenLaunchError {
@@ -19,7 +16,6 @@ class HttpError extends OpenLaunchError {
         this.statusText = statusText;
         this.url = url;
         this.body = body;
-        this.name = "HttpError";
     }
 }
 exports.HttpError = HttpError;
@@ -28,17 +24,41 @@ class RateLimitError extends HttpError {
     constructor(statusText, url, body, retryAfterSeconds) {
         super(429, statusText, url, body);
         this.retryAfterSeconds = retryAfterSeconds;
-        this.name = "RateLimitError";
     }
 }
 exports.RateLimitError = RateLimitError;
 class ParseError extends OpenLaunchError {
-    payload;
-    constructor(message, payload) {
+    raw;
+    constructor(message, raw) {
         super(message);
-        this.payload = payload;
-        this.name = "ParseError";
+        this.raw = raw;
     }
 }
 exports.ParseError = ParseError;
+class TimeoutError extends OpenLaunchError {
+    timeoutMs;
+    url;
+    constructor(timeoutMs, url) {
+        super(`Request timed out after ${timeoutMs} ms${url ? `: ${url}` : ""}`);
+        this.timeoutMs = timeoutMs;
+        this.url = url;
+    }
+}
+exports.TimeoutError = TimeoutError;
+class CircuitOpenError extends OpenLaunchError {
+    retryAt;
+    constructor(retryAt) {
+        super(`Circuit breaker is open until ${retryAt.toISOString()}`);
+        this.retryAt = retryAt;
+    }
+}
+exports.CircuitOpenError = CircuitOpenError;
+class ValidationError extends OpenLaunchError {
+    field;
+    constructor(message, field) {
+        super(field ? `${field}: ${message}` : message);
+        this.field = field;
+    }
+}
+exports.ValidationError = ValidationError;
 //# sourceMappingURL=errors.js.map

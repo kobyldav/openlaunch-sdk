@@ -1,0 +1,10 @@
+export const axialStressPa = (forceN: number, areaM2: number): number => forceN / areaM2;
+export const axialStrain = (stressPa: number, youngsModulusPa: number): number => stressPa / youngsModulusPa;
+export const axialElongationM = (forceN: number, lengthM: number, areaM2: number, youngsModulusPa: number): number => forceN * lengthM / (areaM2 * youngsModulusPa);
+export const thinWallHoopStressPa = (pressurePa: number, radiusM: number, wallThicknessM: number): number => pressurePa * radiusM / wallThicknessM;
+export const thinWallLongitudinalStressPa = (pressurePa: number, radiusM: number, wallThicknessM: number): number => pressurePa * radiusM / (2 * wallThicknessM);
+export const eulerBucklingLoadN = (youngsModulusPa: number, secondMomentM4: number, effectiveLengthM: number): number => Math.PI ** 2 * youngsModulusPa * secondMomentM4 / effectiveLengthM ** 2;
+export const rectangularSecondMoment = (widthM: number, heightM: number): number => widthM * heightM ** 3 / 12;
+export const circularSecondMoment = (radiusM: number): number => Math.PI * radiusM ** 4 / 4;
+export const tubeSecondMoment = (outerRadiusM: number, innerRadiusM: number): number => Math.PI * (outerRadiusM ** 4 - innerRadiusM ** 4) / 4;
+export const factorOfSafety = (allowable: number, applied: number): number => allowable / applied;
