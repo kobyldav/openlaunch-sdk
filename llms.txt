@@ -1,0 +1,38 @@
+# OpenLaunch SDK
+
+> Open-source TypeScript SDK for spaceflight data, astrodynamics, mission analysis and spacecraft engineering.
+
+## Start here
+- README.md — package overview and API guide
+- examples/README.md — categorized cookbook with self-contained examples
+- examples/catalog.json — machine-readable example metadata
+- examples/AI_INDEX.md — AI-oriented usage rules, units and modeling assumptions
+- docs/EXPORTS.md — public export inventory
+- docs/ARCHITECTURE.md — SDK architecture
+- docs/PROVIDERS.md — LL2, NASA and CelesTrak provider notes
+- docs/VALIDATION.md — validation boundaries
+
+## Canonical source
+- src/index.ts — root public exports
+- src/client.ts — OpenLaunch client and provider/resource wiring
+- src/providers/ — LL2/NASA/CelesTrak integrations
+- src/resources/ — high-level and raw resources
+- src/science/ — deterministic engineering and math helpers
+
+## Examples by task
+- examples/00-getting-started/ — client basics
+- examples/01-launch-library/ — LL2 launch/agency/astronaut/event/pad/raw/config use
+- examples/02-nasa/ — NASA Open APIs
+- examples/03-celestrak/ — OMM/catalog access
+- examples/04-orbital-mechanics/ — orbital and transfer calculations
+- examples/05-rocket-engineering/ — rocket equation, staging and delta-v
+- examples/06-spacecraft-engineering/ — power, RF, thermal, structures, reliability, life support, data and radiation
+- examples/07-gnc-math/ — vectors, matrices, quaternions, PID, Kalman and numerics
+- examples/08-geodesy-visibility/ — WGS84, ECEF/ECI and visibility
+- examples/09-atmosphere-edl/ — atmosphere, aerodynamics and entry/descent helpers
+- examples/10-astronomy-time-units/ — unit conversion, Julian/sidereal time and astronomy
+- examples/11-integrated-missions/ — multi-module architecture examples
+- examples/12-sdk-infrastructure/ — cache and telemetry patterns
+
+## Important limitations
+OpenLaunch is not flight-qualified software. Do not treat two-body propagation as SGP4/high-fidelity orbit propagation, or preliminary mission/EDL/RF/thermal calculations as certified operational products. Validate independently for safety-critical use.

@@ -1,8 +1,21 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "A zero-runtime-dependency TypeScript spaceflight and mission-engineering SDK: Launch Library 2, NASA, CelesTrak, orbital mechanics, rockets, navigation, communications, thermal, EDL and mission utilities.",
-  "keywords": ["space", "spaceflight", "rocket", "launch", "mars", "orbital-mechanics", "nasa", "celestrak", "launch-library", "mission", "typescript", "sdk"],
+  "keywords": [
+    "space",
+    "spaceflight",
+    "rocket",
+    "launch",
+    "mars",
+    "orbital-mechanics",
+    "nasa",
+    "celestrak",
+    "launch-library",
+    "mission",
+    "typescript",
+    "sdk"
+  ],
   "license": "MIT",
   "type": "module",
   "main": "./dist-cjs/index.js",
@@ -25,7 +38,16 @@
       "require": "./dist-cjs/providers/index.js"
     }
   },
-  "files": ["dist", "dist-cjs", "README.md", "LICENSE", "CHANGELOG.md", "docs"],
+  "files": [
+    "dist",
+    "dist-cjs",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "docs",
+    "examples",
+    "llms.txt"
+  ],
   "sideEffects": false,
   "scripts": {
     "clean": "node scripts/clean.mjs",
@@ -33,10 +55,15 @@
     "test": "npm run build && node --test tests/*.test.mjs",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "npm run typecheck && npm test",
+    "check": "npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "npm run check && npm run pack:check"
+    "prepublishOnly": "npm run check && npm run pack:check",
+    "examples:check": "tsc -p tsconfig.examples.json --noEmit"
   },
-  "engines": { "node": ">=18" },
-  "devDependencies": { "typescript": "^5.8.3" }
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
 }

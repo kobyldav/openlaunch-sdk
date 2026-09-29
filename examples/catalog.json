@@ -1,0 +1,1060 @@
+{
+  "schemaVersion": 1,
+  "package": "openlaunch-sdk",
+  "purpose": "Self-contained examples for humans, code search, documentation tooling, and AI/LLM indexing.",
+  "conventions": {
+    "imports": "Examples import from ../../src/index.js so repository type-checking validates public exports.",
+    "network": "network=true examples call external public APIs and can be rate-limited.",
+    "units": "SI units are used unless the symbol or comment explicitly states otherwise.",
+    "safety": "Engineering examples are educational/architectural and are not flight-qualified analyses."
+  },
+  "examples": [
+    {
+      "path": "00-getting-started/01-next-launch.ts",
+      "title": "Fetch the next launch",
+      "category": "getting-started",
+      "symbols": [
+        "OpenLaunch",
+        "launches.next"
+      ],
+      "network": true,
+      "description": "Smallest useful LL2 example: create a client and fetch the next normalized launch."
+    },
+    {
+      "path": "00-getting-started/02-upcoming-launches.ts",
+      "title": "List upcoming launches",
+      "category": "getting-started",
+      "symbols": [
+        "OpenLaunch",
+        "launches.upcoming"
+      ],
+      "network": true,
+      "description": "Fetch a small page of upcoming launches and print stable normalized fields."
+    },
+    {
+      "path": "00-getting-started/03-search.ts",
+      "title": "Search normalized resources",
+      "category": "getting-started",
+      "symbols": [
+        "OpenLaunch",
+        "launches.search",
+        "rockets.search"
+      ],
+      "network": true,
+      "description": "Use high-level search helpers instead of constructing raw query parameters."
+    },
+    {
+      "path": "00-getting-started/04-client-options.ts",
+      "title": "Configure the client",
+      "category": "getting-started",
+      "symbols": [
+        "OpenLaunch",
+        "MemoryCache",
+        "HttpTelemetryEvent"
+      ],
+      "network": false,
+      "description": "Configure caching, retry, timeouts, concurrency and telemetry. Keys are intentionally omitted from the example."
+    },
+    {
+      "path": "00-getting-started/05-spaceclient-alias.ts",
+      "title": "Use the SpaceClient alias",
+      "category": "getting-started",
+      "symbols": [
+        "SpaceClient"
+      ],
+      "network": true,
+      "description": "OpenLaunch is also exported as SpaceClient for compatibility and descriptive naming."
+    },
+    {
+      "path": "00-getting-started/06-error-handling.ts",
+      "title": "Handle typed SDK errors",
+      "category": "getting-started",
+      "symbols": [
+        "OpenLaunch",
+        "RateLimitError",
+        "TimeoutError",
+        "HttpError"
+      ],
+      "network": false,
+      "description": "Pattern for distinguishing rate limits, timeouts and other HTTP failures."
+    },
+    {
+      "path": "01-launch-library/01-countdown-and-webcast.ts",
+      "title": "Launch countdown and webcast helpers",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "launches.countdown",
+        "launches.hasWebcast",
+        "launches.isLive"
+      ],
+      "network": true,
+      "description": "Derive countdown, webcast availability and a simple live-window indicator from a normalized launch."
+    },
+    {
+      "path": "01-launch-library/02-filter-date-window.ts",
+      "title": "Filter launches by date window",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "launches.upcoming"
+      ],
+      "network": true,
+      "description": "Ask LL2 for launches inside a concrete time window using Date values."
+    },
+    {
+      "path": "01-launch-library/03-crewed-launches.ts",
+      "title": "Filter crewed launches",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "launches.upcoming"
+      ],
+      "network": true,
+      "description": "Fetch only upcoming launches marked as crewed by LL2."
+    },
+    {
+      "path": "01-launch-library/04-previous-launches.ts",
+      "title": "Read launch history",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "launches.previous"
+      ],
+      "network": true,
+      "description": "Retrieve recent launches in reverse chronological order."
+    },
+    {
+      "path": "01-launch-library/05-pagination-iterator.ts",
+      "title": "Stream pages with an async iterator",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "BaseResource.iterate"
+      ],
+      "network": true,
+      "description": "Iterate across LL2 pages without manually managing offsets. maxItems prevents accidental large downloads."
+    },
+    {
+      "path": "01-launch-library/06-collect-all-bounded.ts",
+      "title": "Collect a bounded result set",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "BaseResource.all"
+      ],
+      "network": true,
+      "description": "Collect multiple pages into one array while using maxItems as a safety boundary."
+    },
+    {
+      "path": "01-launch-library/07-agencies.ts",
+      "title": "Browse launch agencies",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "agencies.list"
+      ],
+      "network": true,
+      "description": "Read normalized agency metadata."
+    },
+    {
+      "path": "01-launch-library/08-astronauts.ts",
+      "title": "Search astronauts",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "astronauts.search"
+      ],
+      "network": true,
+      "description": "Search normalized astronaut records and use optional career fields safely."
+    },
+    {
+      "path": "01-launch-library/09-events.ts",
+      "title": "Upcoming space events",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "events.upcoming"
+      ],
+      "network": true,
+      "description": "Fetch upcoming non-launch spaceflight events."
+    },
+    {
+      "path": "01-launch-library/10-pads.ts",
+      "title": "Search launch pads",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "pads.search"
+      ],
+      "network": true,
+      "description": "Find launch pads and print geospatial fields when available."
+    },
+    {
+      "path": "01-launch-library/11-generic-resources.ts",
+      "title": "Use generic normalized resources",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "spacecraft",
+        "payloads",
+        "programs"
+      ],
+      "network": true,
+      "description": "Use stable id/name wrappers for LL2 entities that do not yet have dedicated rich OpenLaunch types."
+    },
+    {
+      "path": "01-launch-library/12-raw-endpoints.ts",
+      "title": "Access the complete raw LL2 surface",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "ll2",
+        "RawResource"
+      ],
+      "network": true,
+      "description": "Use raw resources when LL2 exposes a field or collection not normalized by the high-level SDK yet."
+    },
+    {
+      "path": "01-launch-library/13-config-tables.ts",
+      "title": "Read LL2 configuration tables",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "config",
+        "ConfigResource"
+      ],
+      "network": true,
+      "description": "Configuration resources expose reference tables such as launch statuses, orbit types and mission types."
+    },
+    {
+      "path": "01-launch-library/14-query-builder.ts",
+      "title": "Build advanced LL2 queries",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "query",
+        "QueryBuilder"
+      ],
+      "network": true,
+      "description": "Compose Django-style filters without losing access to new LL2 filter names."
+    },
+    {
+      "path": "01-launch-library/15-throttle-status.ts",
+      "title": "Inspect LL2 throttle status",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "throttle"
+      ],
+      "network": true,
+      "description": "Read LL2 request-limit information before a data-heavy workflow."
+    },
+    {
+      "path": "01-launch-library/16-custom-resource.ts",
+      "title": "Create a custom raw resource",
+      "category": "launch-library",
+      "symbols": [
+        "OpenLaunch",
+        "resource"
+      ],
+      "network": true,
+      "description": "Create a RawResource for a current or future LL2 endpoint without waiting for a new SDK release."
+    },
+    {
+      "path": "02-nasa/01-neows-feed.ts",
+      "title": "NASA NeoWs date feed",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.neoFeed"
+      ],
+      "network": true,
+      "description": "Fetch NASA near-Earth-object data for a date range. Response is left raw because NASA schemas evolve independently."
+    },
+    {
+      "path": "02-nasa/02-neows-browse.ts",
+      "title": "Browse NASA near-Earth objects",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.neoBrowse"
+      ],
+      "network": true,
+      "description": "Browse paginated NeoWs objects using NASA DEMO_KEY by default."
+    },
+    {
+      "path": "02-nasa/03-donki-space-weather.ts",
+      "title": "NASA DONKI space weather",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.donki"
+      ],
+      "network": true,
+      "description": "Query NASA DONKI for coronal mass ejections or other supported event types."
+    },
+    {
+      "path": "02-nasa/04-epic-earth-images.ts",
+      "title": "NASA EPIC natural imagery metadata",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.epicNatural",
+        "nasa.epicEnhanced"
+      ],
+      "network": true,
+      "description": "Fetch EPIC image metadata. This SDK returns the provider payload without inventing a second schema."
+    },
+    {
+      "path": "02-nasa/05-technology-transfer.ts",
+      "title": "Search NASA technology transfer",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.techTransfer"
+      ],
+      "network": true,
+      "description": "Search NASA patent/technology-transfer data."
+    },
+    {
+      "path": "02-nasa/06-raw-nasa-request.ts",
+      "title": "Use the raw NASA provider",
+      "category": "nasa",
+      "symbols": [
+        "OpenLaunch",
+        "nasa.raw"
+      ],
+      "network": true,
+      "description": "Call a NASA Open API path that does not yet have a convenience method. api_key is added automatically."
+    },
+    {
+      "path": "03-celestrak/01-iss-by-catalog.ts",
+      "title": "Fetch ISS OMM by catalog number",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak.byCatalogNumber"
+      ],
+      "network": true,
+      "description": "Retrieve current OMM mean elements for NORAD catalog 25544 (ISS)."
+    },
+    {
+      "path": "03-celestrak/02-by-name.ts",
+      "title": "Search CelesTrak by satellite name",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak.byName"
+      ],
+      "network": true,
+      "description": "Retrieve OMM records using CelesTrak name matching."
+    },
+    {
+      "path": "03-celestrak/03-stations-group.ts",
+      "title": "Fetch the stations group",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak.stations"
+      ],
+      "network": true,
+      "description": "Fetch CelesTrak STATIONS group as OMM JSON."
+    },
+    {
+      "path": "03-celestrak/04-operational-gnss.ts",
+      "title": "Fetch operational GPS satellites",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak.gpsOperational"
+      ],
+      "network": true,
+      "description": "Read the GPS-OPS group. Useful for catalog exploration, not precision navigation."
+    },
+    {
+      "path": "03-celestrak/05-tle-text.ts",
+      "title": "Request legacy TLE text",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak.text"
+      ],
+      "network": true,
+      "description": "Request text-format orbital elements when a downstream legacy tool explicitly needs TLE."
+    },
+    {
+      "path": "03-celestrak/06-omm-to-state.ts",
+      "title": "Convert OMM to approximate two-body state",
+      "category": "celestrak",
+      "symbols": [
+        "OpenLaunch",
+        "ommToOrbitalElements",
+        "ommToApproximateState"
+      ],
+      "network": true,
+      "description": "Convert mean elements to Keplerian elements and an approximate state vector. This is intentionally not SGP4."
+    },
+    {
+      "path": "04-orbital-mechanics/01-leo-reference.ts",
+      "title": "LEO reference orbit",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "leoReference"
+      ],
+      "network": false,
+      "description": "Compute a simple circular LEO reference around Earth."
+    },
+    {
+      "path": "04-orbital-mechanics/02-circular-and-escape.ts",
+      "title": "Circular and escape velocity",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "circularVelocity",
+        "escapeVelocity"
+      ],
+      "network": false,
+      "description": "Compare circular-orbit and escape speeds at a selected Earth altitude."
+    },
+    {
+      "path": "04-orbital-mechanics/03-state-elements-roundtrip.ts",
+      "title": "State vector and orbital elements round trip",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "stateToOrbitalElements",
+        "orbitalElementsToState"
+      ],
+      "network": false,
+      "description": "Convert an inertial state to Keplerian elements and back."
+    },
+    {
+      "path": "04-orbital-mechanics/04-two-body-propagation.ts",
+      "title": "Two-body orbit propagation",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "stateToOrbitalElements",
+        "propagateTwoBody"
+      ],
+      "network": false,
+      "description": "Propagate Keplerian elements forward under an ideal two-body model."
+    },
+    {
+      "path": "04-orbital-mechanics/05-hohmann-transfer.ts",
+      "title": "Hohmann transfer between circular Earth orbits",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "hohmannTransfer"
+      ],
+      "network": false,
+      "description": "Estimate ideal impulsive delta-v and transfer time between two circular radii."
+    },
+    {
+      "path": "04-orbital-mechanics/06-earth-mars-hohmann.ts",
+      "title": "Earth to Mars Hohmann reference",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "earthMarsHohmann"
+      ],
+      "network": false,
+      "description": "Compute a first-order heliocentric Earth\u2013Mars transfer reference."
+    },
+    {
+      "path": "04-orbital-mechanics/07-patched-conic-departure.ts",
+      "title": "Patched-conic Earth departure",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "patchedConicDeparture"
+      ],
+      "network": false,
+      "description": "Estimate injection from a circular Earth parking orbit onto an Earth-to-Mars heliocentric transfer."
+    },
+    {
+      "path": "04-orbital-mechanics/08-lambert.ts",
+      "title": "Solve a Lambert transfer",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "solveLambertUniversal"
+      ],
+      "network": false,
+      "description": "Solve a single-revolution Lambert boundary-value problem with inertial position vectors."
+    },
+    {
+      "path": "04-orbital-mechanics/09-plane-change.ts",
+      "title": "Plane-change delta-v",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "planeChangeDeltaV",
+        "toRadians"
+      ],
+      "network": false,
+      "description": "Estimate an ideal instantaneous plane-change maneuver at a known orbital speed."
+    },
+    {
+      "path": "04-orbital-mechanics/10-spheres-of-influence.ts",
+      "title": "Sphere of influence and Hill sphere",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "sphereOfInfluence",
+        "hillSphere"
+      ],
+      "network": false,
+      "description": "Estimate Earth gravitational influence scales relative to the Sun."
+    },
+    {
+      "path": "04-orbital-mechanics/11-kepler-equation.ts",
+      "title": "Solve Kepler equation",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "solveKepler",
+        "trueAnomalyFromEccentric"
+      ],
+      "network": false,
+      "description": "Convert mean anomaly to eccentric anomaly, then to true anomaly for an elliptic orbit."
+    },
+    {
+      "path": "04-orbital-mechanics/12-j2-precession.ts",
+      "title": "Estimate J2 nodal precession",
+      "category": "orbital-mechanics",
+      "symbols": [
+        "BODIES",
+        "nodalPrecessionJ2",
+        "toRadians"
+      ],
+      "network": false,
+      "description": "Estimate secular RAAN drift from Earth J2 for a simplified orbit."
+    },
+    {
+      "path": "05-rocket-engineering/01-rocket-equation.ts",
+      "title": "Tsiolkovsky rocket equation",
+      "category": "rocket-engineering",
+      "symbols": [
+        "rocketEquationDeltaV",
+        "propellantRequired"
+      ],
+      "network": false,
+      "description": "Compute ideal delta-v and reverse-calculate propellant requirement for a single idealized stage."
+    },
+    {
+      "path": "05-rocket-engineering/02-staging.ts",
+      "title": "Multi-stage ideal delta-v",
+      "category": "rocket-engineering",
+      "symbols": [
+        "stagedRocketDeltaV",
+        "RocketStage"
+      ],
+      "network": false,
+      "description": "Estimate ideal total delta-v for stacked stages with a payload above them."
+    },
+    {
+      "path": "05-rocket-engineering/03-thrust-flow-burn.ts",
+      "title": "Thrust, mass flow and burn time",
+      "category": "rocket-engineering",
+      "symbols": [
+        "thrustToWeight",
+        "massFlowRate",
+        "burnTime"
+      ],
+      "network": false,
+      "description": "Connect engine thrust and specific impulse to mass flow, T/W and approximate burn time."
+    },
+    {
+      "path": "05-rocket-engineering/04-mass-fractions.ts",
+      "title": "Rocket mass fractions",
+      "category": "rocket-engineering",
+      "symbols": [
+        "propellantMassFraction",
+        "structuralCoefficient",
+        "payloadFraction"
+      ],
+      "network": false,
+      "description": "Compute simple structural, propellant and payload fractions."
+    },
+    {
+      "path": "05-rocket-engineering/05-delta-v-budget.ts",
+      "title": "Mission delta-v budget with reserves",
+      "category": "rocket-engineering",
+      "symbols": [
+        "totalDeltaVBudget"
+      ],
+      "network": false,
+      "description": "Aggregate named maneuver budgets and reserve fractions."
+    },
+    {
+      "path": "06-spacecraft-engineering/01-solar-and-battery.ts",
+      "title": "Solar array and battery sizing",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "solarArrayPower",
+        "requiredSolarArea",
+        "requiredBatteryWh"
+      ],
+      "network": false,
+      "description": "First-order spacecraft power sizing using solar flux, efficiency and eclipse duration."
+    },
+    {
+      "path": "06-spacecraft-engineering/02-link-budget.ts",
+      "title": "Deep-space style link margin",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "antennaGainDb",
+        "linkMarginDb",
+        "lightTimeSeconds"
+      ],
+      "network": false,
+      "description": "Build a first-order RF link budget and compute one-way light time."
+    },
+    {
+      "path": "06-spacecraft-engineering/03-doppler-and-capacity.ts",
+      "title": "Doppler shift and Shannon capacity",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "dopplerShiftHz",
+        "shannonCapacityBps",
+        "dbToLinear"
+      ],
+      "network": false,
+      "description": "Estimate first-order Doppler shift and theoretical channel capacity."
+    },
+    {
+      "path": "06-spacecraft-engineering/04-thermal-balance.ts",
+      "title": "Radiative thermal balance",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "solarFluxAtDistance",
+        "absorbedSolarPower",
+        "radiativeEquilibriumTemperature",
+        "blackbodyRadiativePower"
+      ],
+      "network": false,
+      "description": "Estimate absorbed solar power, equilibrium temperature and emitted radiative power."
+    },
+    {
+      "path": "06-spacecraft-engineering/05-propellant-tank.ts",
+      "title": "Propellant mixture and tank volume",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "mixtureComponentMasses",
+        "tankVolumeM3",
+        "pressurantMoles"
+      ],
+      "network": false,
+      "description": "Split bipropellant mass, estimate tank volume with ullage, and ideal-gas pressurant requirement."
+    },
+    {
+      "path": "06-spacecraft-engineering/06-cryogenic-boiloff.ts",
+      "title": "Cryogenic boil-off estimate",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "boiloffMassKg",
+        "remainingAfterBoiloffKg"
+      ],
+      "network": false,
+      "description": "Use a simple constant daily fractional boil-off model for architecture trades."
+    },
+    {
+      "path": "06-spacecraft-engineering/07-structures.ts",
+      "title": "Thin-wall pressure vessel and buckling checks",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "thinWallHoopStressPa",
+        "thinWallLongitudinalStressPa",
+        "eulerBucklingLoadN",
+        "factorOfSafety"
+      ],
+      "network": false,
+      "description": "First-order structural calculations for architecture and sanity checks."
+    },
+    {
+      "path": "06-spacecraft-engineering/08-reliability.ts",
+      "title": "Series, parallel and k-of-n reliability",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "seriesReliability",
+        "parallelReliability",
+        "kOfNReliability",
+        "availability"
+      ],
+      "network": false,
+      "description": "Compare reliability architectures and steady-state availability."
+    },
+    {
+      "path": "06-spacecraft-engineering/09-life-support-and-data.ts",
+      "title": "Crew consumables and data budget",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "consumablesForMission",
+        "metabolicHeatW",
+        "dailyDataBudget",
+        "downlinkBalance"
+      ],
+      "network": false,
+      "description": "Estimate crew consumables and a simple daily instrument/downlink data balance."
+    },
+    {
+      "path": "06-spacecraft-engineering/10-radiation.ts",
+      "title": "Radiation and single-event estimates",
+      "category": "spacecraft-engineering",
+      "symbols": [
+        "shieldingTransmission",
+        "accumulatedDoseSv",
+        "singleEventProbability"
+      ],
+      "network": false,
+      "description": "Simple attenuation, accumulated dose and Poisson single-event probability helpers."
+    },
+    {
+      "path": "07-gnc-math/01-vectors.ts",
+      "title": "3D vector operations",
+      "category": "gnc-math",
+      "symbols": [
+        "vec3",
+        "dot3",
+        "cross3",
+        "normalize3",
+        "angle3"
+      ],
+      "network": false,
+      "description": "Basic vector primitives used throughout orbital and attitude calculations."
+    },
+    {
+      "path": "07-gnc-math/02-matrices.ts",
+      "title": "Matrix solve and inverse",
+      "category": "gnc-math",
+      "symbols": [
+        "matrixMul",
+        "inverse",
+        "solveLinear",
+        "identity"
+      ],
+      "network": false,
+      "description": "Solve a small linear system and verify matrix inversion utilities."
+    },
+    {
+      "path": "07-gnc-math/03-quaternions.ts",
+      "title": "Quaternion attitude rotations",
+      "category": "gnc-math",
+      "symbols": [
+        "quatFromAxisAngle",
+        "quatRotateVector",
+        "quatSlerp",
+        "quatIdentity"
+      ],
+      "network": false,
+      "description": "Rotate a vector with a quaternion and interpolate attitude with SLERP."
+    },
+    {
+      "path": "07-gnc-math/04-pid.ts",
+      "title": "PID controller loop",
+      "category": "gnc-math",
+      "symbols": [
+        "PIDController"
+      ],
+      "network": false,
+      "description": "Run a minimal PID loop against a toy first-order plant."
+    },
+    {
+      "path": "07-gnc-math/05-kalman.ts",
+      "title": "Linear Kalman filter",
+      "category": "gnc-math",
+      "symbols": [
+        "LinearKalmanFilter",
+        "identity"
+      ],
+      "network": false,
+      "description": "Perform one constant-velocity predict/update cycle with a 2-state linear Kalman filter."
+    },
+    {
+      "path": "07-gnc-math/06-filters.ts",
+      "title": "Complementary and low/high-pass filters",
+      "category": "gnc-math",
+      "symbols": [
+        "complementaryFilter",
+        "lowPass",
+        "highPass"
+      ],
+      "network": false,
+      "description": "Apply simple filters to sensor-like scalar values."
+    },
+    {
+      "path": "07-gnc-math/07-numerics.ts",
+      "title": "Root finding and numerical integration",
+      "category": "gnc-math",
+      "symbols": [
+        "bisection",
+        "newtonRaphson",
+        "integrateSimpson",
+        "derivativeCentral"
+      ],
+      "network": false,
+      "description": "Use general numerical primitives on deterministic scalar functions."
+    },
+    {
+      "path": "07-gnc-math/08-monte-carlo.ts",
+      "title": "Monte Carlo scalar summary",
+      "category": "gnc-math",
+      "symbols": [
+        "monteCarloScalar"
+      ],
+      "network": false,
+      "description": "Run a deterministic-seed-free uncertainty sketch and summarize percentiles. Use a seeded RNG in reproducible engineering workflows."
+    },
+    {
+      "path": "08-geodesy-visibility/01-geodetic-ecef.ts",
+      "title": "Geodetic and ECEF conversion",
+      "category": "geodesy-visibility",
+      "symbols": [
+        "geodeticToEcef",
+        "ecefToGeodetic"
+      ],
+      "network": false,
+      "description": "Round-trip a WGS-84 latitude/longitude/altitude position through ECEF."
+    },
+    {
+      "path": "08-geodesy-visibility/02-look-angles.ts",
+      "title": "Ground-station look angles",
+      "category": "geodesy-visibility",
+      "symbols": [
+        "lookAngles",
+        "geodeticToEcef"
+      ],
+      "network": false,
+      "description": "Compute azimuth, elevation and range from a ground observer to an ECEF target."
+    },
+    {
+      "path": "08-geodesy-visibility/03-great-circle.ts",
+      "title": "Great-circle distance and bearing",
+      "category": "geodesy-visibility",
+      "symbols": [
+        "haversineDistanceM",
+        "initialBearingDeg",
+        "destinationPoint"
+      ],
+      "network": false,
+      "description": "Compute spherical distance/bearing and project a destination point."
+    },
+    {
+      "path": "08-geodesy-visibility/04-earth-rotation.ts",
+      "title": "ECI/ECEF rotation and sidereal time",
+      "category": "geodesy-visibility",
+      "symbols": [
+        "eciToEcef",
+        "ecefToEci",
+        "gmstDegrees"
+      ],
+      "network": false,
+      "description": "Rotate vectors between simple Earth-fixed and inertial frames using GMST."
+    },
+    {
+      "path": "08-geodesy-visibility/05-line-of-sight-and-eclipse.ts",
+      "title": "Line of sight and cylindrical eclipse",
+      "category": "geodesy-visibility",
+      "symbols": [
+        "BODIES",
+        "hasLineOfSight",
+        "inCylindricalEclipse"
+      ],
+      "network": false,
+      "description": "Check spherical-body line of sight and a simple cylindrical shadow approximation."
+    },
+    {
+      "path": "09-atmosphere-edl/01-isa-atmosphere.ts",
+      "title": "ISA 1976 atmosphere sample",
+      "category": "atmosphere-edl",
+      "symbols": [
+        "isa1976"
+      ],
+      "network": false,
+      "description": "Sample the built-in standard-atmosphere model at several geometric altitudes."
+    },
+    {
+      "path": "09-atmosphere-edl/02-aerodynamic-loads.ts",
+      "title": "Dynamic pressure, drag and Reynolds number",
+      "category": "atmosphere-edl",
+      "symbols": [
+        "isa1976",
+        "dynamicPressure",
+        "dragForce",
+        "reynoldsNumber",
+        "sutherlandViscosity"
+      ],
+      "network": false,
+      "description": "Combine atmospheric state with first-order aerodynamic loads."
+    },
+    {
+      "path": "09-atmosphere-edl/03-parachute-sizing.ts",
+      "title": "First-order parachute sizing",
+      "category": "atmosphere-edl",
+      "symbols": [
+        "parachuteAreaM2",
+        "parachuteDiameterM"
+      ],
+      "network": false,
+      "description": "Estimate ideal parachute area and equivalent circular diameter from a target terminal speed."
+    },
+    {
+      "path": "09-atmosphere-edl/04-entry-heating.ts",
+      "title": "Sutton-Graves convective heating estimate",
+      "category": "atmosphere-edl",
+      "symbols": [
+        "suttonGravesHeatFluxWm2",
+        "kineticEnergyJ",
+        "ballisticCoefficientKgM2"
+      ],
+      "network": false,
+      "description": "Compute first-order stagnation-region heat flux, kinetic energy and ballistic coefficient."
+    },
+    {
+      "path": "10-astronomy-time-units/01-units.ts",
+      "title": "Unit conversion engine",
+      "category": "astronomy-time-units",
+      "symbols": [
+        "convert",
+        "supportedUnits"
+      ],
+      "network": false,
+      "description": "Convert across dimensions and enumerate supported velocity units."
+    },
+    {
+      "path": "10-astronomy-time-units/02-julian-and-sidereal.ts",
+      "title": "Julian date and sidereal time",
+      "category": "astronomy-time-units",
+      "symbols": [
+        "toJulianDate",
+        "fromJulianDate",
+        "gmstDegrees",
+        "localSiderealDegrees"
+      ],
+      "network": false,
+      "description": "Convert UTC Date to Julian date and compute Greenwich/local sidereal angle."
+    },
+    {
+      "path": "10-astronomy-time-units/03-blackbody.ts",
+      "title": "Blackbody and magnitude helpers",
+      "category": "astronomy-time-units",
+      "symbols": [
+        "blackbodyPeakWavelengthM",
+        "luminosityFromRadiusTemperature",
+        "fluxFromLuminosity",
+        "apparentMagnitude"
+      ],
+      "network": false,
+      "description": "Use simple astronomy utilities for blackbody peak wavelength, luminosity and magnitude scaling."
+    },
+    {
+      "path": "10-astronomy-time-units/04-duration-and-dates.ts",
+      "title": "Date and duration helpers",
+      "category": "astronomy-time-units",
+      "symbols": [
+        "durationParts",
+        "addSeconds",
+        "secondsBetween",
+        "dayOfYear"
+      ],
+      "network": false,
+      "description": "Work with mission durations using Date objects and second-based helpers."
+    },
+    {
+      "path": "11-integrated-missions/01-mars-architecture.ts",
+      "title": "Mars mission architecture sketch",
+      "category": "integrated-missions",
+      "symbols": [
+        "BODIES",
+        "earthMarsHohmann",
+        "marsMissionReference",
+        "solarFluxAtDistance",
+        "consumablesForMission"
+      ],
+      "network": false,
+      "description": "Combine independent first-order helpers into a human-readable Mars architecture study."
+    },
+    {
+      "path": "11-integrated-missions/02-leo-spacecraft-sizing.ts",
+      "title": "LEO spacecraft first-order sizing",
+      "category": "integrated-missions",
+      "symbols": [
+        "leoReference",
+        "requiredBatteryWh",
+        "requiredSolarArea",
+        "dailyDataBudget",
+        "downlinkBalance"
+      ],
+      "network": false,
+      "description": "Combine orbit, power and data helpers into a small LEO spacecraft sizing workflow."
+    },
+    {
+      "path": "11-integrated-missions/03-launch-watch.ts",
+      "title": "Build a launch-watch data snapshot",
+      "category": "integrated-missions",
+      "symbols": [
+        "OpenLaunch",
+        "launches.upcoming",
+        "events.upcoming",
+        "throttle"
+      ],
+      "network": true,
+      "description": "Fetch a compact dashboard snapshot while reusing one cached client."
+    },
+    {
+      "path": "12-sdk-infrastructure/01-memory-cache.ts",
+      "title": "Use MemoryCache directly",
+      "category": "sdk-infrastructure",
+      "symbols": [
+        "MemoryCache"
+      ],
+      "network": false,
+      "description": "The cache adapter can be used and tested independently of HTTP."
+    },
+    {
+      "path": "12-sdk-infrastructure/02-prefix-cache.ts",
+      "title": "Namespace cache keys",
+      "category": "sdk-infrastructure",
+      "symbols": [
+        "MemoryCache",
+        "PrefixCache"
+      ],
+      "network": false,
+      "description": "PrefixCache creates logical namespaces on top of a shared adapter."
+    },
+    {
+      "path": "12-sdk-infrastructure/03-tiered-cache.ts",
+      "title": "Compose a tiered cache",
+      "category": "sdk-infrastructure",
+      "symbols": [
+        "MemoryCache",
+        "TieredCache"
+      ],
+      "network": false,
+      "description": "TieredCache checks fast tiers first and warms earlier tiers after a hit."
+    },
+    {
+      "path": "12-sdk-infrastructure/04-storage-cache.ts",
+      "title": "Adapt key/value storage to the SDK cache",
+      "category": "sdk-infrastructure",
+      "symbols": [
+        "JsonStorageCache",
+        "KeyValueStorage"
+      ],
+      "network": false,
+      "description": "Wrap browser-like or app storage behind JsonStorageCache without coupling OpenLaunch to a specific storage library."
+    },
+    {
+      "path": "12-sdk-infrastructure/05-telemetry.ts",
+      "title": "Collect HTTP telemetry",
+      "category": "sdk-infrastructure",
+      "symbols": [
+        "OpenLaunch",
+        "HttpTelemetryEvent"
+      ],
+      "network": true,
+      "description": "Observe requests, cache hits, retries and errors without modifying provider code."
+    }
+  ]
+}

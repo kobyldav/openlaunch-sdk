@@ -7,20 +7,20 @@ export interface RocketStage {
   specificImpulseS: number;
   thrustN?: number;
 }
-export const exhaustVelocity = (specificImpulseS: number, g0 = PHYSICS.standardGravity): number => specificImpulseS * g0;
-export const specificImpulseFromExhaustVelocity = (velocityMps: number, g0 = PHYSICS.standardGravity): number => velocityMps / g0;
-export function rocketEquationDeltaV(initialMassKg: number, finalMassKg: number, specificImpulseS: number, g0 = PHYSICS.standardGravity): number {
+export const exhaustVelocity = (specificImpulseS: number, g0: number = PHYSICS.standardGravity): number => specificImpulseS * g0;
+export const specificImpulseFromExhaustVelocity = (velocityMps: number, g0: number = PHYSICS.standardGravity): number => velocityMps / g0;
+export function rocketEquationDeltaV(initialMassKg: number, finalMassKg: number, specificImpulseS: number, g0: number = PHYSICS.standardGravity): number {
   if (!(initialMassKg > finalMassKg && finalMassKg > 0)) throw new ValidationError("Require initialMassKg > finalMassKg > 0");
   return specificImpulseS * g0 * Math.log(initialMassKg / finalMassKg);
 }
-export const massRatioForDeltaV = (deltaVMps: number, specificImpulseS: number, g0 = PHYSICS.standardGravity): number => Math.exp(deltaVMps / (specificImpulseS * g0));
-export function propellantRequired(initialMassKg: number, deltaVMps: number, specificImpulseS: number, g0 = PHYSICS.standardGravity): number { return initialMassKg * (1 - 1 / massRatioForDeltaV(deltaVMps, specificImpulseS, g0)); }
-export const thrustToWeight = (thrustN: number, massKg: number, gravityMps2 = PHYSICS.standardGravity): number => thrustN / (massKg * gravityMps2);
-export const massFlowRate = (thrustN: number, specificImpulseS: number, g0 = PHYSICS.standardGravity): number => thrustN / (specificImpulseS * g0);
-export const burnTime = (propellantKg: number, thrustN: number, specificImpulseS: number, g0 = PHYSICS.standardGravity): number => propellantKg / massFlowRate(thrustN, specificImpulseS, g0);
+export const massRatioForDeltaV = (deltaVMps: number, specificImpulseS: number, g0: number = PHYSICS.standardGravity): number => Math.exp(deltaVMps / (specificImpulseS * g0));
+export function propellantRequired(initialMassKg: number, deltaVMps: number, specificImpulseS: number, g0: number = PHYSICS.standardGravity): number { return initialMassKg * (1 - 1 / massRatioForDeltaV(deltaVMps, specificImpulseS, g0)); }
+export const thrustToWeight = (thrustN: number, massKg: number, gravityMps2: number = PHYSICS.standardGravity): number => thrustN / (massKg * gravityMps2);
+export const massFlowRate = (thrustN: number, specificImpulseS: number, g0: number = PHYSICS.standardGravity): number => thrustN / (specificImpulseS * g0);
+export const burnTime = (propellantKg: number, thrustN: number, specificImpulseS: number, g0: number = PHYSICS.standardGravity): number => propellantKg / massFlowRate(thrustN, specificImpulseS, g0);
 export const characteristicVelocity = (chamberPressurePa: number, throatAreaM2: number, massFlowKgS: number): number => chamberPressurePa * throatAreaM2 / massFlowKgS;
 export const effectiveExhaustVelocity = (thrustN: number, massFlowKgS: number): number => thrustN / massFlowKgS;
-export function stageDeltaV(stage: RocketStage, payloadAboveKg = 0, g0 = PHYSICS.standardGravity): number {
+export function stageDeltaV(stage: RocketStage, payloadAboveKg = 0, g0: number = PHYSICS.standardGravity): number {
   const initial = stage.dryMassKg + stage.propellantMassKg + payloadAboveKg;
   const final = stage.dryMassKg + payloadAboveKg;
   return rocketEquationDeltaV(initial, final, stage.specificImpulseS, g0);

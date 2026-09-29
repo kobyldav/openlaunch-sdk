@@ -14,7 +14,7 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 
 ---
 
-## What changed in v0.5.0
+## What changed in v0.5.x
 
 The original OpenLaunch wrapper has been expanded into a much broader spaceflight SDK.
 
@@ -75,6 +75,41 @@ Requirements:
 - or a browser/runtime with `fetch`
 - TypeScript is only a development dependency
 - no runtime npm dependencies
+
+---
+
+
+## Examples and AI/code indexing
+
+The repository includes **90 categorized, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
+
+```text
+examples/
+├── 00-getting-started/
+├── 01-launch-library/
+├── 02-nasa/
+├── 03-celestrak/
+├── 04-orbital-mechanics/
+├── 05-rocket-engineering/
+├── 06-spacecraft-engineering/
+├── 07-gnc-math/
+├── 08-geodesy-visibility/
+├── 09-atmosphere-edl/
+├── 10-astronomy-time-units/
+├── 11-integrated-missions/
+├── 12-sdk-infrastructure/
+├── catalog.json
+└── AI_INDEX.md
+```
+
+Useful commands:
+
+```bash
+npm run examples:check   # type-check every example; no network calls
+npm run check            # source + examples + unit tests
+```
+
+AI-oriented repository map: [`llms.txt`](./llms.txt). Machine-readable example inventory: [`examples/catalog.json`](./examples/catalog.json). These files improve discoverability but cannot guarantee indexing by any specific AI provider.
 
 ---
 
