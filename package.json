@@ -81,7 +81,8 @@
     "check": "npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "npm run check && npm run pack:check",
-    "examples:check": "tsc -p tsconfig.examples.json --noEmit"
+    "examples:check": "tsc -p tsconfig.examples.json --noEmit",
+    "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs"
   },
   "engines": {
     "node": ">=18"
