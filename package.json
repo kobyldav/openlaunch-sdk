@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.6.0",
-  "description": "A zero-runtime-dependency TypeScript SDK for spaceflight, orbital mechanics, Earth observation, geospatial intelligence, weather and mission engineering.",
+  "version": "0.7.0",
+  "description": "A TypeScript space computation SDK for launch data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, geospatial intelligence and mission engineering.",
   "keywords": [
     "space",
     "spaceflight",
@@ -22,7 +22,16 @@
     "copernicus",
     "geospatial",
     "remote-sensing",
-    "open-meteo"
+    "open-meteo",
+    "sgp4",
+    "sdp4",
+    "satellite-tracking",
+    "satellite-pass",
+    "ground-track",
+    "space-traffic",
+    "conjunction",
+    "ssa",
+    "space-situational-awareness"
   ],
   "license": "MIT",
   "type": "module",
@@ -59,6 +68,26 @@
       "types": "./dist/intelligence/index.d.ts",
       "import": "./dist/intelligence/index.js",
       "require": "./dist-cjs/intelligence/index.js"
+    },
+    "./orbit": {
+      "types": "./dist/orbit/index.d.ts",
+      "import": "./dist/orbit/index.js",
+      "require": "./dist-cjs/orbit/index.js"
+    },
+    "./traffic": {
+      "types": "./dist/traffic/index.d.ts",
+      "import": "./dist/traffic/index.js",
+      "require": "./dist-cjs/traffic/index.js"
+    },
+    "./sensors": {
+      "types": "./dist/sensors/index.d.ts",
+      "import": "./dist/sensors/index.js",
+      "require": "./dist-cjs/sensors/index.js"
+    },
+    "./scenario": {
+      "types": "./dist/scenario/index.d.ts",
+      "import": "./dist/scenario/index.js",
+      "require": "./dist-cjs/scenario/index.js"
     }
   },
   "files": [
@@ -83,12 +112,16 @@
     "prepublishOnly": "npm run check && npm run pack:check",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
-    "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs"
+    "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
+    "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "satellite.js": "6.0.2"
   }
 }
