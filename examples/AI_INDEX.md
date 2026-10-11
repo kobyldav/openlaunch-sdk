@@ -95,3 +95,4 @@ Important examples:
 - `08-sensor-access-over-czechia.ts` — sensor swath geometry over an AOI
 - `10-czml-3d-scenario.ts` — 3D Cesium export
 - `12-orbit-plus-earth-observation.ts` — orbit geometry + weather + imagery without conflating access and acquisition
+- `13-screen-sampled-trajectory.ts` — external/launch TEME trajectory interpolation and screening against SGP4 satellites
