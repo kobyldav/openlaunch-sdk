@@ -1567,16 +1567,18 @@ rk4(...)
 
 This gives more expressive power than thousands of narrow one-off wrappers.
 
-## Zero runtime dependencies
+## Deliberately small runtime dependency surface
 
-Fewer runtime dependencies means:
+OpenLaunch keeps the runtime dependency surface intentionally small. v0.7 adds one focused dependency, `satellite.js`, instead of reimplementing SGP4/SDP4 from scratch.
 
-- smaller supply-chain surface
-- easier browser/worker support
-- smaller install footprint
-- simpler long-term maintenance
+That tradeoff gives:
 
-The downside is that OpenLaunch implements more mathematical primitives itself, which makes independent validation especially important for critical applications.
+- an established GP-element propagator rather than a home-grown tracking implementation
+- preserved browser/Node usability
+- a still-small supply-chain surface
+- clearer validation boundaries between OpenLaunch orchestration and the underlying propagation algorithm
+
+The cost is that OpenLaunch is no longer a zero-runtime-dependency package. The dependency is pinned and exercised through ESM, CommonJS and numerical sanity tests.
 
 ---
 
