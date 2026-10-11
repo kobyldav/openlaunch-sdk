@@ -162,4 +162,4 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`13-earth-observation/08-spectral-indices.ts`](./13-earth-observation/08-spectral-indices.ts) — **Spectral indices**. NDVI, NDWI, NDMI, NBR, EVI and SAVI from calibrated reflectance.
 - [`13-earth-observation/09-generic-stac.ts`](./13-earth-observation/09-generic-stac.ts) — **Generic STAC connection**. Point OpenLaunch at any compatible STAC API.
 - [`13-earth-observation/10-sign-planetary-asset.ts`](./13-earth-observation/10-sign-planetary-asset.ts) — **Planetary Computer asset signing**. Turn STAC asset URLs into short-lived readable Azure URLs.
-
+- [`13-earth-observation/11-rotterdam-all-in-one-monitor.ts`](./13-earth-observation/11-rotterdam-all-in-one-monitor.ts) — **All-in-one Rotterdam monitoring brief**. Combines CelesTrak catalog metadata, Open-Meteo, Sentinel-2, Sentinel-1, Landsat history and LL2 without pretending that catalog orbit data proves a future acquisition.
