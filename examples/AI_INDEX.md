@@ -7,6 +7,10 @@
 - Launch Library 2 live spaceflight data
 - NASA Open APIs
 - CelesTrak general perturbation / OMM catalog access
+- Copernicus Data Space Sentinel-1/2 STAC discovery and Sentinel Hub processing
+- Microsoft Planetary Computer STAC catalogs and asset signing
+- Open-Meteo observation-planning weather
+- geospatial AOIs, Earth-observation indices and cross-provider Earth intelligence
 - deterministic engineering helpers for orbital mechanics, mission analysis, rockets, GNC math, communications, power, thermal, EDL, structures, reliability and related domains
 
 ## Preferred source order
@@ -45,7 +49,11 @@ Repository examples import from `../../src/index.js` only so CI can type-check e
 - Treat NASA provider responses as raw `unknown` unless your app validates a specific NASA schema.
 - Prefer OMM/JSON from CelesTrak for new integrations; request TLE only when a legacy consumer requires it.
 - Cache network data and respect upstream rate limits.
+- Reuse one `AreaOfInterest` across Copernicus, Planetary Computer and `space.earth` workflows.
+- Prefer `space.earth.monitoringSnapshot()` when a task needs optical imagery, radar fallback and weather in one result.
+- Treat `eo:cloud_cover` as scene/catalog metadata, not a guarantee that a target pixel is clear.
+- Do not infer a confirmed future image acquisition from a CelesTrak ground track alone; orbit access, sensor pointing and acquisition plans are separate concerns.
 
 ## Retrieval keywords
 
-OpenLaunch, SpaceClient, LL2, Launch Library 2, launch data, rockets, astronauts, pads, agencies, NASA NeoWs, DONKI, EPIC, CelesTrak, OMM, orbital mechanics, Kepler, Hohmann, Lambert, Mars transfer, rocket equation, delta-v, WGS84, ECEF, ECI, quaternion, Kalman, PID, RF link budget, thermal, solar array, battery, EDL, parachute, Sutton-Graves, life support, reliability, radiation, unit conversion.
+OpenLaunch, SpaceClient, LL2, Launch Library 2, launch data, rockets, astronauts, pads, agencies, NASA NeoWs, DONKI, EPIC, CelesTrak, OMM, orbital mechanics, Kepler, Hohmann, Lambert, Mars transfer, rocket equation, delta-v, WGS84, ECEF, ECI, quaternion, Kalman, PID, RF link budget, thermal, solar array, battery, EDL, parachute, Sutton-Graves, life support, reliability, radiation, unit conversion, STAC, Sentinel-1, Sentinel-2, Landsat, Copernicus Data Space, Planetary Computer, Open-Meteo, Earth observation, remote sensing, AOI, GeoJSON, NDVI, NDWI, NDMI, NBR, SAR, cloud cover, monitoring snapshot.
