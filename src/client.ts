@@ -13,6 +13,10 @@ import { ConfigResource, RawResource } from "./resources/raw.js";
 import { CelesTrakClient } from "./providers/celestrak.js";
 import { NasaClient } from "./providers/nasa.js";
 import { LL2_CONFIG_ENDPOINTS, LL2_DEVELOPMENT_BASE_URL, LL2_ENDPOINTS, LL2_PRODUCTION_BASE_URL } from "./providers/ll2.js";
+import { CopernicusClient } from "./providers/copernicus.js";
+import { PlanetaryComputerClient } from "./providers/planetary-computer.js";
+import { OpenMeteoClient } from "./providers/openmeteo.js";
+import { EarthIntelligenceClient } from "./intelligence/earth.js";
 
 export const PRODUCTION_BASE_URL = LL2_PRODUCTION_BASE_URL;
 export const DEVELOPMENT_BASE_URL = LL2_DEVELOPMENT_BASE_URL;
@@ -21,6 +25,10 @@ export interface OpenLaunchOptions {
   baseUrl?: string;
   apiKey?: string;
   nasaApiKey?: string;
+  copernicusAccessToken?: string;
+  copernicusClientId?: string;
+  copernicusClientSecret?: string;
+  planetaryComputerSubscriptionKey?: string;
   fetch?: typeof fetch;
   cache?: CacheAdapter | false;
   cacheTtlMs?: number;
@@ -57,6 +65,14 @@ export class OpenLaunch {
 
   readonly nasa: NasaClient;
   readonly celestrak: CelesTrakClient;
+
+  /** Earth-observation and environmental providers. */
+  readonly copernicus: CopernicusClient;
+  readonly planetaryComputer: PlanetaryComputerClient;
+  readonly weather: OpenMeteoClient;
+
+  /** Cross-provider Earth-observation orchestration. */
+  readonly earth: EarthIntelligenceClient;
 
   private readonly http: HttpClient;
 
@@ -99,9 +115,39 @@ export class OpenLaunch {
     this.ll2 = Object.fromEntries(Object.entries(LL2_ENDPOINTS).map(([key, endpoint]) => [key, new RawResource(this.http, endpoint)])) as Record<keyof typeof LL2_ENDPOINTS, RawResource>;
     this.config = Object.fromEntries(Object.entries(LL2_CONFIG_ENDPOINTS).map(([key, endpoint]) => [key, new ConfigResource(this.http, endpoint)])) as Record<keyof typeof LL2_CONFIG_ENDPOINTS, ConfigResource>;
 
-    const sharedProviderOptions = { fetch: fetchImpl, ...(options.cache === false ? { cache: false as const } : cache ? { cache } : {}), ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}), ...(options.onTelemetry ? { onTelemetry: options.onTelemetry } : {}) };
-    this.nasa = new NasaClient({ ...sharedProviderOptions, ...(options.nasaApiKey ? { apiKey: options.nasaApiKey } : {}) });
+    const sharedProviderOptions = {
+      fetch: fetchImpl,
+      ...(options.cache === false ? { cache: false as const } : cache ? { cache } : {}),
+      ...(options.timeoutMs !== undefined ? { timeoutMs: options.timeoutMs } : {}),
+      ...(options.onTelemetry ? { onTelemetry: options.onTelemetry } : {}),
+    };
+
+    this.nasa = new NasaClient({
+      ...sharedProviderOptions,
+      ...(options.nasaApiKey ? { apiKey: options.nasaApiKey } : {}),
+    });
     this.celestrak = new CelesTrakClient(sharedProviderOptions);
+
+    this.copernicus = new CopernicusClient({
+      fetch: fetchImpl,
+      ...(options.cache === false ? { cache: false as const } : cache ? { cache } : {}),
+      ...(options.copernicusAccessToken ? { accessToken: options.copernicusAccessToken } : {}),
+      ...(options.copernicusClientId ? { clientId: options.copernicusClientId } : {}),
+      ...(options.copernicusClientSecret ? { clientSecret: options.copernicusClientSecret } : {}),
+    });
+
+    this.planetaryComputer = new PlanetaryComputerClient({
+      ...sharedProviderOptions,
+      ...(options.planetaryComputerSubscriptionKey ? { subscriptionKey: options.planetaryComputerSubscriptionKey } : {}),
+    });
+
+    this.weather = new OpenMeteoClient(sharedProviderOptions);
+
+    this.earth = new EarthIntelligenceClient({
+      copernicus: this.copernicus,
+      planetaryComputer: this.planetaryComputer,
+      weather: this.weather,
+    });
   }
 
   raw<T = unknown>(path: string, query: Query = {}): Promise<T> { return this.http.get<T>(path, query); }
