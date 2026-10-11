@@ -1174,6 +1174,22 @@
       ],
       "network": true,
       "description": "Sign Azure-backed STAC asset URLs for temporary read access."
+    },
+    {
+      "path": "13-earth-observation/11-rotterdam-all-in-one-monitor.ts",
+      "title": "All-in-one Rotterdam monitoring brief",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "circle",
+        "earth.monitoringSnapshot",
+        "earth.opticalWeatherWindows",
+        "earth.searchLandsatHistory",
+        "celestrak.byName",
+        "launches.next"
+      ],
+      "network": true,
+      "description": "Combines orbital catalog metadata, weather, Sentinel optical/radar scenes, Landsat history and launch data into one monitoring brief while explicitly separating catalog orbit data from validated pass/acquisition prediction."
     }
   ]
 }
