@@ -2,6 +2,7 @@ import type { CelesTrakClient, OmmRecord } from "../providers/celestrak.js";
 import { OrbitEngine } from "../orbit/engine.js";
 import { Sgp4Satellite } from "../orbit/sgp4.js";
 import { closestApproach, findCloseApproaches } from "./conjunction.js";
+import { SampledTemeTrajectory, screenTrajectoryAgainstSatellites } from "./trajectory.js";
 import type {
   CatalogScreenOptions,
   CloseApproachSearchOptions,
@@ -85,6 +86,15 @@ export class TrafficEngine {
       ...options,
       maxObjects,
     });
+  }
+
+  screenTrajectory(
+    trajectory: SampledTemeTrajectory,
+    candidates: readonly Sgp4Satellite[],
+    thresholdKm: number,
+    maxResults = 100,
+  ) {
+    return screenTrajectoryAgainstSatellites(trajectory, candidates, { thresholdKm, maxResults });
   }
 
   nearestAt(
