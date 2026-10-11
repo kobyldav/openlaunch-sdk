@@ -11,6 +11,12 @@ import type {
   PassWindow,
 } from "./types.js";
 
+interface BasicLook {
+  azimuthDeg: number;
+  elevationDeg: number;
+  rangeKm: number;
+}
+
 export function lookAnglesAt(
   satellite: Sgp4Satellite,
   observer: GroundObserver,
@@ -18,28 +24,20 @@ export function lookAnglesAt(
   rangeRateSampleSeconds = 0.5,
 ): LookAngleState {
   validateObserver(observer);
-  const state = satellite.stateAt(time);
-  const observerGd = {
-    longitude: degreesToRadians(observer.longitudeDeg),
-    latitude: degreesToRadians(observer.latitudeDeg),
-    height: (observer.heightM ?? 0) / 1000,
-  };
-  const look = ecfToLookAngles(observerGd, state.positionEcfKm);
+  const look = basicLookAngles(satellite, observer, time);
 
+  const observerGd = observerGeodetic(observer);
+  const observerEcf = geodeticToEcf(observerGd);
   const dtMs = Math.max(0.05, rangeRateSampleSeconds) * 1000;
   const before = satellite.stateAt(new Date(time.getTime() - dtMs));
   const after = satellite.stateAt(new Date(time.getTime() + dtMs));
-  const observerEcf = geodeticToEcf(observerGd);
   const beforeRange = distance(observerEcf, before.positionEcfKm);
   const afterRange = distance(observerEcf, after.positionEcfKm);
-  const rangeRateKmS = (afterRange - beforeRange) / (2 * dtMs / 1000);
 
   return {
     time: new Date(time),
-    azimuthDeg: normalizeDegrees(toDegrees(look.azimuth)),
-    elevationDeg: toDegrees(look.elevation),
-    rangeKm: look.rangeSat,
-    rangeRateKmS,
+    ...look,
+    rangeRateKmS: (afterRange - beforeRange) / (2 * dtMs / 1000),
   };
 }
 
@@ -64,14 +62,14 @@ export function findPasses(
   const passes: PassWindow[] = [];
 
   let previousTime = options.start;
-  let previousElevation = lookAnglesAt(satellite, observer, previousTime).elevationDeg;
+  let previousElevation = elevationAt(satellite, observer, previousTime);
   let inside = previousElevation >= minElevationDeg;
   let aos: Date | null = inside ? options.start : null;
   let clippedAtStart = inside;
 
   for (let ms = Math.min(startMs + stepMs, endMs); ms <= endMs;) {
     const currentTime = new Date(ms);
-    const currentElevation = lookAnglesAt(satellite, observer, currentTime).elevationDeg;
+    const currentElevation = elevationAt(satellite, observer, currentTime);
 
     if (!inside && previousElevation < minElevationDeg && currentElevation >= minElevationDeg) {
       aos = refineCrossing(satellite, observer, previousTime, currentTime, minElevationDeg, true);
@@ -120,6 +118,36 @@ export function nextPass(
   return passes[0] ?? null;
 }
 
+function basicLookAngles(
+  satellite: Sgp4Satellite,
+  observer: GroundObserver,
+  time: Date,
+): BasicLook {
+  const state = satellite.stateAt(time);
+  const look = ecfToLookAngles(observerGeodetic(observer), state.positionEcfKm);
+  return {
+    azimuthDeg: normalizeDegrees(toDegrees(look.azimuth)),
+    elevationDeg: toDegrees(look.elevation),
+    rangeKm: look.rangeSat,
+  };
+}
+
+function elevationAt(
+  satellite: Sgp4Satellite,
+  observer: GroundObserver,
+  time: Date,
+): number {
+  return basicLookAngles(satellite, observer, time).elevationDeg;
+}
+
+function observerGeodetic(observer: GroundObserver) {
+  return {
+    longitude: degreesToRadians(observer.longitudeDeg),
+    latitude: degreesToRadians(observer.latitudeDeg),
+    height: (observer.heightM ?? 0) / 1000,
+  };
+}
+
 function buildPass(
   satellite: Sgp4Satellite,
   observer: GroundObserver,
@@ -129,9 +157,9 @@ function buildPass(
   clippedAtEnd: boolean,
 ): PassWindow {
   const tca = maximizeElevationTime(satellite, observer, aos, los);
-  const aosLook = lookAnglesAt(satellite, observer, aos);
-  const tcaLook = lookAnglesAt(satellite, observer, tca);
-  const losLook = lookAnglesAt(satellite, observer, los);
+  const aosLook = basicLookAngles(satellite, observer, aos);
+  const tcaLook = basicLookAngles(satellite, observer, tca);
+  const losLook = basicLookAngles(satellite, observer, los);
 
   return {
     aos,
@@ -161,7 +189,7 @@ function refineCrossing(
 
   for (let i = 0; i < 32 && hi - lo > 5; i++) {
     const mid = (lo + hi) / 2;
-    const elevation = lookAnglesAt(satellite, observer, new Date(mid)).elevationDeg;
+    const elevation = elevationAt(satellite, observer, new Date(mid));
     if (rising ? elevation >= thresholdDeg : elevation < thresholdDeg) hi = mid;
     else lo = mid;
   }
@@ -180,8 +208,8 @@ function maximizeElevationTime(
   for (let i = 0; i < 40 && hi - lo > 5; i++) {
     const m1 = lo + (hi - lo) / 3;
     const m2 = hi - (hi - lo) / 3;
-    const e1 = lookAnglesAt(satellite, observer, new Date(m1)).elevationDeg;
-    const e2 = lookAnglesAt(satellite, observer, new Date(m2)).elevationDeg;
+    const e1 = elevationAt(satellite, observer, new Date(m1));
+    const e2 = elevationAt(satellite, observer, new Date(m2));
     if (e1 < e2) lo = m1;
     else hi = m2;
   }
