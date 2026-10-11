@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.6.0 - 2026-10-11
+
+Earth Intelligence release.
+
+- added reusable WGS84 AOI primitives for points, bounds, polygons and circles
+- added a generic STAC client with Copernicus Data Space and Microsoft Planetary Computer presets
+- added Copernicus Sentinel-2 L2A optical and Sentinel-1 GRD radar search
+- added Copernicus Sentinel Hub Process API support with OAuth client-credentials token reuse
+- added true-color and NDVI server-side processing helpers
+- added Planetary Computer SAS URL, asset and item signing
+- added Landsat Collection 2 Level-2 historical search through Planetary Computer
+- added Open-Meteo cloud, visibility, precipitation and daylight forecasts for observation planning
+- added NDVI, NDWI, NDMI, NBR, EVI and SAVI helpers
+- added scene ranking and common STAC asset discovery helpers
+- added cross-provider Earth intelligence orchestration via `space.earth`
+- added weather-aware optical-window ranking and radar fallback recommendations
+- added Earth-observation tests, documentation and 10 type-checked examples
+- added package subpath exports for `openlaunch-sdk/geo`, `/eo` and `/intelligence`
+- explicitly documents that two-body OMM conversion is not operational SGP4 pass prediction
+
 ## 0.5.1 - 2026-09-29
 
 Documentation and example-library release.
