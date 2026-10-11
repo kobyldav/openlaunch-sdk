@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.5.1",
-  "description": "A zero-runtime-dependency TypeScript spaceflight and mission-engineering SDK: Launch Library 2, NASA, CelesTrak, orbital mechanics, rockets, navigation, communications, thermal, EDL and mission utilities.",
+  "version": "0.6.0",
+  "description": "A zero-runtime-dependency TypeScript SDK for spaceflight, orbital mechanics, Earth observation, geospatial intelligence, weather and mission engineering.",
   "keywords": [
     "space",
     "spaceflight",
@@ -14,7 +14,15 @@
     "launch-library",
     "mission",
     "typescript",
-    "sdk"
+    "sdk",
+    "earth-observation",
+    "stac",
+    "sentinel",
+    "landsat",
+    "copernicus",
+    "geospatial",
+    "remote-sensing",
+    "open-meteo"
   ],
   "license": "MIT",
   "type": "module",
@@ -36,6 +44,21 @@
       "types": "./dist/providers/index.d.ts",
       "import": "./dist/providers/index.js",
       "require": "./dist-cjs/providers/index.js"
+    },
+    "./geo": {
+      "types": "./dist/geo/index.d.ts",
+      "import": "./dist/geo/index.js",
+      "require": "./dist-cjs/geo/index.js"
+    },
+    "./eo": {
+      "types": "./dist/eo/index.d.ts",
+      "import": "./dist/eo/index.js",
+      "require": "./dist-cjs/eo/index.js"
+    },
+    "./intelligence": {
+      "types": "./dist/intelligence/index.d.ts",
+      "import": "./dist/intelligence/index.js",
+      "require": "./dist-cjs/intelligence/index.js"
     }
   },
   "files": [
