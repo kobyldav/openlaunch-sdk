@@ -150,3 +150,16 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`12-sdk-infrastructure/04-storage-cache.ts`](./12-sdk-infrastructure/04-storage-cache.ts) — **Adapt key/value storage to the SDK cache**. Wrap browser-like or app storage behind JsonStorageCache without coupling OpenLaunch to a specific storage library.
 - [`12-sdk-infrastructure/05-telemetry.ts`](./12-sdk-infrastructure/05-telemetry.ts) — **Collect HTTP telemetry**. Observe requests, cache hits, retries and errors without modifying provider code.
 
+### `earth-observation`
+
+- [`13-earth-observation/01-area-of-interest.ts`](./13-earth-observation/01-area-of-interest.ts) — **Reusable AOI geometry**. Build WGS84 circles/bounds once and reuse them across Earth-data providers.
+- [`13-earth-observation/02-copernicus-sentinel2-search.ts`](./13-earth-observation/02-copernicus-sentinel2-search.ts) — **Copernicus Sentinel-2 search**. Search optical scenes by AOI, time and catalog cloud cover.
+- [`13-earth-observation/03-copernicus-sentinel1-radar.ts`](./13-earth-observation/03-copernicus-sentinel1-radar.ts) — **Sentinel-1 radar search**. Discover SAR scenes for cloud/night-resilient monitoring.
+- [`13-earth-observation/04-planetary-computer-landsat-history.ts`](./13-earth-observation/04-planetary-computer-landsat-history.ts) — **Landsat history through Planetary Computer**. Query long historical time spans with STAC.
+- [`13-earth-observation/05-optical-weather-windows.ts`](./13-earth-observation/05-optical-weather-windows.ts) — **Weather-aware optical windows**. Rank upcoming daylight/low-cloud opportunities.
+- [`13-earth-observation/06-monitoring-snapshot.ts`](./13-earth-observation/06-monitoring-snapshot.ts) — **Cross-provider monitoring snapshot**. Combine Sentinel-2, Sentinel-1 and Open-Meteo into one decision object.
+- [`13-earth-observation/07-copernicus-process-true-color.ts`](./13-earth-observation/07-copernicus-process-true-color.ts) — **Server-side true-color render**. Request only the AOI through Sentinel Hub Process API.
+- [`13-earth-observation/08-spectral-indices.ts`](./13-earth-observation/08-spectral-indices.ts) — **Spectral indices**. NDVI, NDWI, NDMI, NBR, EVI and SAVI from calibrated reflectance.
+- [`13-earth-observation/09-generic-stac.ts`](./13-earth-observation/09-generic-stac.ts) — **Generic STAC connection**. Point OpenLaunch at any compatible STAC API.
+- [`13-earth-observation/10-sign-planetary-asset.ts`](./13-earth-observation/10-sign-planetary-asset.ts) — **Planetary Computer asset signing**. Turn STAC asset URLs into short-lived readable Azure URLs.
+
