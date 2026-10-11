@@ -1,6 +1,6 @@
 # OpenLaunch SDK
 
-> Open-source TypeScript SDK for spaceflight data, astrodynamics, Earth observation, geospatial intelligence, weather, mission analysis and spacecraft engineering.
+> Open-source TypeScript space-computation SDK for spaceflight data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, geospatial intelligence, weather, mission analysis and spacecraft engineering.
 
 ## Start here
 - README.md — package overview and API guide
@@ -12,6 +12,7 @@
 - docs/PROVIDERS.md — LL2, NASA and CelesTrak provider notes
 - docs/VALIDATION.md — validation boundaries
 - docs/EARTH_INTELLIGENCE.md — STAC, Copernicus, Planetary Computer, weather and EO orchestration
+- docs/ORBIT_TRAFFIC.md — SGP4/SDP4, passes, closest approach, RTN, sensor access and CZML
 
 ## Canonical source
 - src/index.ts — root public exports
@@ -20,6 +21,10 @@
 - src/geo/ — reusable WGS84 AOI primitives
 - src/eo/ — scene ranking and spectral-index helpers
 - src/intelligence/ — cross-provider Earth intelligence workflows
+- src/orbit/ — SGP4/SDP4, frame transforms, ground tracks and pass prediction
+- src/traffic/ — closest approach, RTN geometry and bounded catalog screening
+- src/sensors/ — swath/off-nadir access geometry and sensor presets
+- src/scenario/ — multi-object orbital scenarios and Cesium CZML export
 - src/resources/ — high-level and raw resources
 - src/science/ — deterministic engineering and math helpers
 
@@ -38,6 +43,7 @@
 - examples/11-integrated-missions/ — multi-module architecture examples
 - examples/12-sdk-infrastructure/ — cache and telemetry patterns
 - examples/13-earth-observation/ — STAC, Sentinel-1/2, Landsat, weather windows and cross-provider monitoring
+- examples/14-orbit-traffic/ — SGP4 states, passes, traffic screening, sensor access and 3D scenarios
 
 ## Important limitations
-OpenLaunch is not flight-qualified software. Do not treat two-body propagation as SGP4/high-fidelity orbit propagation, or preliminary mission/EDL/RF/thermal calculations as certified operational products. Validate independently for safety-critical use.
+OpenLaunch is not flight-qualified software. Use the v0.7 SGP4/SDP4 layer for GP-element tracking rather than the older two-body approximation. Miss distance is not collision probability; covariance is required for probabilistic conjunction analysis. Sensor geometry is not proof of tasking/acquisition. Validate independently for safety-critical use.
