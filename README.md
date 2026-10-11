@@ -1,16 +1,88 @@
 # OpenLaunch SDK
 
-**OpenLaunch SDK** is a zero-runtime-dependency TypeScript toolkit for spaceflight data, mission analysis, orbital mechanics and spacecraft engineering.
+**OpenLaunch SDK** is a TypeScript space-computation toolkit for spaceflight data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, mission analysis and spacecraft engineering.
 
-It combines three layers in one package:
+It combines five layers in one package:
 
 1. **Live spaceflight data** — Launch Library 2 (LL2), NASA Open APIs and CelesTrak.
-2. **Mission-engineering utilities** — orbital mechanics, interplanetary transfers, rockets, geodesy, atmosphere, communications, thermal, power, navigation, EDL, reliability, statistics and more.
-3. **Production SDK infrastructure** — typed resources, pagination, caching, request deduplication, retries, timeouts, concurrency control, telemetry and a circuit breaker.
+2. **Orbit dynamics and space traffic** — SGP4/SDP4, TEME/Earth-fixed state handling, ground tracks, passes, closest approach, RTN geometry and bounded catalog screening.
+3. **Earth observation and geospatial intelligence** — STAC, Copernicus, Sentinel-1/2, Landsat, Open-Meteo, AOIs and cross-provider workflows.
+4. **Mission-engineering utilities** — orbital mechanics, interplanetary transfers, rockets, geodesy, atmosphere, communications, thermal, power, navigation, EDL, reliability, statistics and more.
+5. **Production SDK infrastructure** — typed resources, pagination, caching, request deduplication, retries, timeouts, concurrency control, telemetry and a circuit breaker.
 
 The goal is not to hide public data behind a paywall. The goal is to provide a clean, reusable engineering layer on top of public sources and deterministic calculations.
 
 > **Important:** OpenLaunch is an engineering/development library, not flight-qualified software. Do not use its results as the sole basis for human safety, launch commit criteria, collision avoidance, flight termination, autonomous spacecraft control or other safety-critical operations without independent verification, validated models, requirements traceability and appropriate certification.
+
+---
+
+## What changed in v0.7.0 — Orbit Dynamics & Space Traffic
+
+v0.7 replaces the old gap between **"I have an OMM/TLE"** and **"where is this object, when does it pass, and how close does it get to another object?"** with a real propagation and relative-motion layer.
+
+New capabilities:
+
+- SGP4/SDP4 propagation from CelesTrak OMM or TLE through `space.orbit`
+- explicit TEME state, Earth-fixed position and geodetic latitude/longitude/height
+- source-element epoch and age carried with propagated states
+- near-Earth SGP4 vs deep-space SDP4 mode reporting
+- refined ground-station AOS / TCA / LOS pass search
+- azimuth, elevation, slant range and signed range-rate geometry
+- sampled ground tracks with allocation guards
+- pairwise closest-approach search with sub-step refinement
+- relative velocity and RTN/RIC separation
+- bounded CelesTrak group screening and nearest-object queries
+- sensor swath and optional off-nadir access geometry
+- nominal Sentinel-2, Sentinel-1 and Landsat sensor presets
+- Cesium CZML export and multi-satellite `OrbitScenario`
+- explicit CommonJS runtime smoke coverage for the SGP4 dependency
+
+Example:
+
+```ts
+import { OpenLaunch } from "openlaunch-sdk";
+
+const space = new OpenLaunch();
+const iss = await space.orbit.byCatalogNumber(25544);
+
+if (iss) {
+  const state = iss.stateAt(new Date());
+
+  const passes = space.orbit.passes(
+    iss,
+    { latitudeDeg: 50.0755, longitudeDeg: 14.4378, heightM: 250 },
+    {
+      start: new Date(),
+      end: new Date(Date.now() + 48 * 3600_000),
+      minElevationDeg: 10,
+    },
+  );
+
+  console.log(state.geodetic);
+  console.log(passes[0]);
+}
+```
+
+For relative motion:
+
+```ts
+const event = space.traffic.closestApproach(primary, secondary, {
+  start,
+  end,
+  stepSeconds: 60,
+});
+
+console.log(event.missDistanceKm);
+console.log(event.relativeSpeedKmS);
+console.log(event.rtn);
+console.log(event.quality);
+```
+
+OpenLaunch does **not** manufacture a collision probability from GP elements alone. Probability of collision needs uncertainty/covariance information and an appropriate encounter model.
+
+Sensor access is also deliberately separated from acquisition truth: a target being inside a modeled swath does not prove that the spacecraft was tasked or that an image exists.
+
+See [Orbit Dynamics and Space Traffic](./docs/ORBIT_TRAFFIC.md) and [v0.7 examples](./examples/14-orbit-traffic/).
 
 ---
 
@@ -101,7 +173,6 @@ The original OpenLaunch wrapper has been expanded into a much broader spacefligh
 - Mission consumables, data-volume and radiation utilities
 - ESM and CommonJS builds
 - Node 18/20/22 CI workflow
-- Zero runtime dependencies
 
 The package currently exposes more than **300 public exports**. It intentionally does **not** create thousands of duplicate functions such as `kmToM()`, `mToKm()`, `kmToFt()`, etc. Generic engines such as `convert()`, `QueryBuilder`, raw LL2 resources and numerical primitives cover thousands of valid operations without turning the API into an unmaintainable list of aliases.
 
@@ -125,14 +196,14 @@ Requirements:
 - Node.js 18+
 - or a browser/runtime with `fetch`
 - TypeScript is only a development dependency
-- no runtime npm dependencies
+- one focused runtime dependency, `satellite.js`, provides the established SGP4/SDP4 implementation
 
 ---
 
 
 ## Examples and AI/code indexing
 
-The repository includes **90 categorized, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
+The repository includes **110+ categorized, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
 
 ```text
 examples/
@@ -149,6 +220,8 @@ examples/
 ├── 10-astronomy-time-units/
 ├── 11-integrated-missions/
 ├── 12-sdk-infrastructure/
+├── 13-earth-observation/
+├── 14-orbit-traffic/
 ├── catalog.json
 └── AI_INDEX.md
 ```
