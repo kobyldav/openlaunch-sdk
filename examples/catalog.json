@@ -1323,6 +1323,17 @@
       ],
       "network": true,
       "description": "Combine geometric orbital access, weather and existing imagery while preserving acquisition uncertainty."
+    },
+    {
+      "path": "14-orbit-traffic/13-screen-sampled-trajectory.ts",
+      "title": "Screen a sampled external trajectory against satellites",
+      "category": "orbit-traffic",
+      "symbols": [
+        "SampledTemeTrajectory",
+        "traffic.screenTrajectory"
+      ],
+      "network": true,
+      "description": "Interpolate time-tagged TEME states with cubic Hermite and screen an external or future launch trajectory against propagated catalog objects."
     }
   ]
 }
