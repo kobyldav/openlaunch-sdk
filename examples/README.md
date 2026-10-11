@@ -163,3 +163,19 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`13-earth-observation/09-generic-stac.ts`](./13-earth-observation/09-generic-stac.ts) — **Generic STAC connection**. Point OpenLaunch at any compatible STAC API.
 - [`13-earth-observation/10-sign-planetary-asset.ts`](./13-earth-observation/10-sign-planetary-asset.ts) — **Planetary Computer asset signing**. Turn STAC asset URLs into short-lived readable Azure URLs.
 - [`13-earth-observation/11-rotterdam-all-in-one-monitor.ts`](./13-earth-observation/11-rotterdam-all-in-one-monitor.ts) — **All-in-one Rotterdam monitoring brief**. Combines CelesTrak catalog metadata, Open-Meteo, Sentinel-2, Sentinel-1, Landsat history and LL2 without pretending that catalog orbit data proves a future acquisition.
+
+### `orbit-traffic`
+
+- [`14-orbit-traffic/01-sgp4-from-omm.ts`](./14-orbit-traffic/01-sgp4-from-omm.ts) — **Live OMM -> SGP4/SDP4 state**. Propagate CelesTrak GP elements with source epoch and element-age metadata.
+- [`14-orbit-traffic/02-ground-track.ts`](./14-orbit-traffic/02-ground-track.ts) — **Ground track sampling**. Produce time-tagged latitude/longitude/altitude points with bounded allocation.
+- [`14-orbit-traffic/03-passes-over-prague.ts`](./14-orbit-traffic/03-passes-over-prague.ts) — **Refined passes over Prague**. Compute AOS/TCA/LOS, elevation, azimuth and range.
+- [`14-orbit-traffic/04-look-angles-and-range-rate.ts`](./14-orbit-traffic/04-look-angles-and-range-rate.ts) — **Look angles and range rate**. Observer-relative geometry for communications/tracking.
+- [`14-orbit-traffic/05-closest-approach.ts`](./14-orbit-traffic/05-closest-approach.ts) — **Pairwise closest approach**. Refined TCA, miss distance, relative velocity and RTN/RIC geometry.
+- [`14-orbit-traffic/06-nearest-objects.ts`](./14-orbit-traffic/06-nearest-objects.ts) — **Nearest objects at an instant**. Rank a bounded catalog group by TEME separation.
+- [`14-orbit-traffic/07-bounded-catalog-screen.ts`](./14-orbit-traffic/07-bounded-catalog-screen.ts) — **Bounded traffic screening**. Screen a CelesTrak group without accidentally launching an unbounded CPU workload.
+- [`14-orbit-traffic/08-sensor-access-over-czechia.ts`](./14-orbit-traffic/08-sensor-access-over-czechia.ts) — **Sentinel-2 swath geometry over Czechia**. Geometric access only; not a tasking claim.
+- [`14-orbit-traffic/09-off-nadir-geometry.ts`](./14-orbit-traffic/09-off-nadir-geometry.ts) — **Off-nadir reach geometry**. Convert pointing angles into approximate ground reach and back.
+- [`14-orbit-traffic/10-czml-3d-scenario.ts`](./14-orbit-traffic/10-czml-3d-scenario.ts) — **Cesium CZML orbit export**. Build a 3D time-tagged scenario from propagated states.
+- [`14-orbit-traffic/11-deep-space-sdp4.ts`](./14-orbit-traffic/11-deep-space-sdp4.ts) — **Deep-space propagation**. Demonstrate automatic SDP4 mode on a GEO object.
+- [`14-orbit-traffic/12-orbit-plus-earth-observation.ts`](./14-orbit-traffic/12-orbit-plus-earth-observation.ts) — **Orbit + EO orchestration**. Combine geometric access, weather and existing imagery while keeping acquisition truth separate.
+
