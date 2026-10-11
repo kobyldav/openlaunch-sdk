@@ -1,6 +1,50 @@
 # Runtime export inventory
 
-Generated from v0.5.0 ESM build. Runtime exports: **306**.
+The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0 adds the Earth-intelligence exports listed here; regenerate the complete numeric inventory from the final build before release tagging.
+
+## v0.6.0 additions
+
+```text
+StacClient
+STAC_ENDPOINTS
+COPERNICUS_COLLECTIONS
+createCopernicusStac
+createPlanetaryComputerStac
+CopernicusClient
+COPERNICUS_ENDPOINTS
+TRUE_COLOR_EVALSCRIPT
+NDVI_EVALSCRIPT
+buildProcessRequest
+PlanetaryComputerClient
+PLANETARY_COMPUTER_COLLECTIONS
+OpenMeteoClient
+nearestObservation
+scoreOpticalWeather
+EarthIntelligenceClient
+point
+bbox
+polygon
+circle
+centerOf
+toGeoJson
+areaKm2Approx
+normalizedDifference
+ndvi
+ndwi
+ndmi
+nbr
+evi
+savi
+indexSet
+sceneDatetime
+sceneCloudCover
+rankScenes
+latestClearScene
+assetByRole
+assetByMediaType
+commonVisualAsset
+```
+
 
 > Type-only TypeScript exports are not included in this runtime list.
 
