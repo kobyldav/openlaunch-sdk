@@ -11,6 +11,7 @@ export class SampledTemeTrajectory {
   readonly points: readonly TimedTemeState[];
   readonly start: Date;
   readonly end: Date;
+  readonly maxStepSeconds: number;
 
   constructor(points: readonly TimedTemeState[]) {
     if (points.length < 2) throw new RangeError("SampledTemeTrajectory requires at least two states");
@@ -19,19 +20,26 @@ export class SampledTemeTrajectory {
       positionTemeKm: { ...point.positionTemeKm },
       velocityTemeKmS: { ...point.velocityTemeKmS },
     }));
+
+    let maxStepSeconds = 0;
     for (let i = 0; i < copy.length; i++) {
       const current = copy[i]!;
       if (Number.isNaN(current.time.getTime())) throw new TypeError("trajectory contains an invalid Date");
       if (!finiteVec(current.positionTemeKm) || !finiteVec(current.velocityTemeKmS)) {
         throw new TypeError("trajectory contains a non-finite state vector");
       }
-      if (i > 0 && current.time.getTime() <= copy[i - 1]!.time.getTime()) {
-        throw new RangeError("trajectory times must be strictly increasing");
+      if (i > 0) {
+        const previous = copy[i - 1]!;
+        const deltaSeconds = (current.time.getTime() - previous.time.getTime()) / 1000;
+        if (!(deltaSeconds > 0)) throw new RangeError("trajectory times must be strictly increasing");
+        maxStepSeconds = Math.max(maxStepSeconds, deltaSeconds);
       }
     }
+
     this.points = copy;
     this.start = new Date(copy[0]!.time);
     this.end = new Date(copy[copy.length - 1]!.time);
+    this.maxStepSeconds = maxStepSeconds;
   }
 
   stateAt(time: Date): TimedTemeState {
@@ -74,12 +82,24 @@ export function closestApproachTrajectoryToSatellite(
   trajectory: SampledTemeTrajectory,
   satellite: Sgp4Satellite,
 ): TrajectoryClosestApproach {
-  let bestTimeMs = trajectory.start.getTime();
-  let bestDistanceSq = Number.POSITIVE_INFINITY;
+  const sampleTimes = buildCoarseTimes(trajectory);
+  let bestIndex = 0;
+  let bestDistanceSq = trajectorySatelliteDistanceSq(trajectory, satellite, sampleTimes[0]!);
 
-  for (let i = 0; i < trajectory.points.length - 1; i++) {
-    const lo = trajectory.points[i]!.time.getTime();
-    const hi = trajectory.points[i + 1]!.time.getTime();
+  for (let i = 1; i < sampleTimes.length; i++) {
+    const distanceSq = trajectorySatelliteDistanceSq(trajectory, satellite, sampleTimes[i]!);
+    if (distanceSq < bestDistanceSq) {
+      bestDistanceSq = distanceSq;
+      bestIndex = i;
+    }
+  }
+
+  let bestTimeMs = sampleTimes[bestIndex]!;
+  const intervals: Array<[number, number]> = [];
+  if (bestIndex > 0) intervals.push([sampleTimes[bestIndex - 1]!, sampleTimes[bestIndex]!]);
+  if (bestIndex < sampleTimes.length - 1) intervals.push([sampleTimes[bestIndex]!, sampleTimes[bestIndex + 1]!]);
+
+  for (const [lo, hi] of intervals) {
     const candidate = goldenSectionMinimum(
       (timeMs) => trajectorySatelliteDistanceSq(trajectory, satellite, timeMs),
       lo,
@@ -118,6 +138,17 @@ export function screenTrajectoryAgainstSatellites(
     .slice(0, options.maxResults ?? 100);
 }
 
+function buildCoarseTimes(trajectory: SampledTemeTrajectory): number[] {
+  const times: number[] = [];
+  for (let i = 0; i < trajectory.points.length - 1; i++) {
+    const a = trajectory.points[i]!.time.getTime();
+    const b = trajectory.points[i + 1]!.time.getTime();
+    if (i === 0) times.push(a);
+    times.push((a + b) / 2, b);
+  }
+  return times;
+}
+
 function buildTrajectoryApproach(
   trajectory: SampledTemeTrajectory,
   satellite: Sgp4Satellite,
@@ -139,6 +170,7 @@ function buildTrajectoryApproach(
     satelliteRtn: toRtn(relativePositionTemeKm, s.positionTemeKm, s.velocityTemeKmS),
     satelliteElementAgeHours: satellite.elementAgeHours(time),
     interpolation: "cubic-hermite",
+    maxTrajectoryStepSeconds: trajectory.maxStepSeconds,
   };
 }
 
