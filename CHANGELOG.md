@@ -14,13 +14,14 @@ Orbit Dynamics and Space Traffic release.
 - added pairwise closest-approach search with coarse bracketing and golden-section TCA refinement
 - added relative velocity and RTN/RIC separation geometry
 - added multiple-close-approach search, nearest-object queries and bounded CelesTrak group screening
+- added cubic-Hermite sampled TEME trajectory interpolation and satellite screening as the bridge for future launch-vehicle trajectories
 - added element-freshness metadata and explicit no-covariance/no-collision-probability flags
 - added spherical-Earth sensor swath and off-nadir access geometry
 - added nominal Sentinel-2 MSI, Sentinel-1 IW and Landsat OLI/TIRS sensor presets
 - added Cesium CZML export and multi-satellite `OrbitScenario`
 - added ESM and CommonJS runtime validation for the SGP4 integration
 - added `openlaunch-sdk/orbit`, `/traffic`, `/sensors` and `/scenario` subpath exports
-- added 12 type-checked orbit/traffic examples and detailed architecture documentation
+- added 13 type-checked orbit/traffic examples and detailed architecture documentation
 - added `satellite.js` 6.0.2 as a focused runtime dependency for established SGP4/SDP4 propagation
 
 ## 0.6.0 - 2026-10-11
