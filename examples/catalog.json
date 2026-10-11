@@ -461,7 +461,7 @@
         "earthMarsHohmann"
       ],
       "network": false,
-      "description": "Compute a first-order heliocentric Earth\u2013Mars transfer reference."
+      "description": "Compute a first-order heliocentric Earth–Mars transfer reference."
     },
     {
       "path": "04-orbital-mechanics/07-patched-conic-departure.ts",
@@ -1055,6 +1055,125 @@
       ],
       "network": true,
       "description": "Observe requests, cache hits, retries and errors without modifying provider code."
+    },
+    {
+      "path": "13-earth-observation/01-area-of-interest.ts",
+      "title": "Reusable AOI geometry",
+      "category": "earth-observation",
+      "symbols": [
+        "circle",
+        "centerOf",
+        "areaKm2Approx"
+      ],
+      "network": false,
+      "description": "Build one WGS84 area of interest and reuse it across Earth-data providers."
+    },
+    {
+      "path": "13-earth-observation/02-copernicus-sentinel2-search.ts",
+      "title": "Copernicus Sentinel-2 search",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "circle",
+        "copernicus.searchSentinel2",
+        "sceneCloudCover",
+        "sceneDatetime"
+      ],
+      "network": true,
+      "description": "Search Sentinel-2 L2A scenes by AOI, time and catalog cloud cover."
+    },
+    {
+      "path": "13-earth-observation/03-copernicus-sentinel1-radar.ts",
+      "title": "Copernicus Sentinel-1 radar search",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "bbox",
+        "copernicus.searchSentinel1"
+      ],
+      "network": true,
+      "description": "Search Sentinel-1 GRD radar scenes for cloud/night-resilient monitoring."
+    },
+    {
+      "path": "13-earth-observation/04-planetary-computer-landsat-history.ts",
+      "title": "Planetary Computer Landsat history",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.searchLandsatHistory"
+      ],
+      "network": true,
+      "description": "Query Landsat Collection 2 Level-2 historical imagery through Planetary Computer STAC."
+    },
+    {
+      "path": "13-earth-observation/05-optical-weather-windows.ts",
+      "title": "Weather-aware optical windows",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.opticalWeatherWindows"
+      ],
+      "network": true,
+      "description": "Rank upcoming daylight low-cloud windows using Open-Meteo."
+    },
+    {
+      "path": "13-earth-observation/06-monitoring-snapshot.ts",
+      "title": "Cross-provider monitoring snapshot",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.monitoringSnapshot"
+      ],
+      "network": true,
+      "description": "Combine Sentinel-2, Sentinel-1 and weather into one monitoring decision object."
+    },
+    {
+      "path": "13-earth-observation/07-copernicus-process-true-color.ts",
+      "title": "Copernicus server-side true color",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "copernicus.trueColor"
+      ],
+      "network": true,
+      "description": "Render only an AOI through the Sentinel Hub Process API using OAuth credentials."
+    },
+    {
+      "path": "13-earth-observation/08-spectral-indices.ts",
+      "title": "Remote-sensing spectral indices",
+      "category": "earth-observation",
+      "symbols": [
+        "ndvi",
+        "ndwi",
+        "ndmi",
+        "nbr",
+        "evi",
+        "savi"
+      ],
+      "network": false,
+      "description": "Compute common indices from already calibrated reflectance values."
+    },
+    {
+      "path": "13-earth-observation/09-generic-stac.ts",
+      "title": "Generic STAC catalog",
+      "category": "earth-observation",
+      "symbols": [
+        "StacClient"
+      ],
+      "network": true,
+      "description": "Connect to a standards-compatible STAC API directly."
+    },
+    {
+      "path": "13-earth-observation/10-sign-planetary-asset.ts",
+      "title": "Planetary Computer asset signing",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "PlanetaryComputerClient",
+        "PLANETARY_COMPUTER_COLLECTIONS"
+      ],
+      "network": true,
+      "description": "Sign Azure-backed STAC asset URLs for temporary read access."
     }
   ]
 }
