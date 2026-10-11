@@ -1,16 +1,18 @@
 /**
  * Render a server-side Sentinel-2 true-color image with Sentinel Hub Process API.
- * Requires Copernicus Data Space OAuth credentials in environment variables.
+ * Replace the placeholders with a Copernicus Data Space OAuth client before running.
+ * Never commit real client secrets to source control.
+ *
  * Uses: OpenLaunch, bbox, copernicus.trueColor
  * Network: yes
  */
 import { OpenLaunch, bbox } from "../../src/index.js";
 
-const clientId = process.env.COPERNICUS_CLIENT_ID;
-const clientSecret = process.env.COPERNICUS_CLIENT_SECRET;
+const clientId = "<copernicus-client-id>";
+const clientSecret = "<copernicus-client-secret>";
 
-if (!clientId || !clientSecret) {
-  console.log("Set COPERNICUS_CLIENT_ID and COPERNICUS_CLIENT_SECRET before running this example.");
+if (clientId.startsWith("<") || clientSecret.startsWith("<")) {
+  console.log("Replace the Copernicus OAuth placeholders before running this example.");
 } else {
   const space = new OpenLaunch({ copernicusClientId: clientId, copernicusClientSecret: clientSecret });
   const image = await space.copernicus.trueColor(
