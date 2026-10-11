@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   OrbitScenario,
+  SampledTemeTrajectory,
   SENSOR_PRESETS,
   Sgp4Satellite,
   bbox,
   closestApproach,
+  closestApproachTrajectoryToSatellite,
   findPasses,
   findSensorAccessWindows,
   offNadirGroundReachKm,
@@ -138,4 +140,29 @@ test("nominal public sensor presets remain explicit metadata, not acquisition gu
   assert.equal(SENSOR_PRESETS.sentinel2Msi.kind, "optical");
   assert.equal(SENSOR_PRESETS.sentinel1Iw.kind, "sar");
   assert.ok(SENSOR_PRESETS.sentinel2Msi.nadirSwathWidthKm > 0);
+});
+
+
+test("sampled TEME trajectory can be screened against an SGP4 satellite", () => {
+  const sat = Sgp4Satellite.fromTle(ISS_LINE1, ISS_LINE2);
+  const times = [
+    new Date("2019-06-05T12:00:00Z"),
+    new Date("2019-06-05T12:05:00Z"),
+    new Date("2019-06-05T12:10:00Z"),
+  ];
+  const trajectory = new SampledTemeTrajectory(times.map((time) => {
+    const state = sat.stateAt(time);
+    return {
+      time,
+      positionTemeKm: state.positionTemeKm,
+      velocityTemeKmS: state.velocityTemeKmS,
+    };
+  }));
+
+  const interpolated = trajectory.stateAt(new Date("2019-06-05T12:02:30Z"));
+  assert.ok(Number.isFinite(interpolated.positionTemeKm.x));
+
+  const event = closestApproachTrajectoryToSatellite(trajectory, sat);
+  assert.ok(event.missDistanceKm < 1);
+  assert.equal(event.interpolation, "cubic-hermite");
 });
