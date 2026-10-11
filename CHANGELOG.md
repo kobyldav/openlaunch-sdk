@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.7.0 - 2026-10-11
+
+Orbit Dynamics and Space Traffic release.
+
+- added SGP4/SDP4 propagation from CelesTrak OMM and TLE through a typed `Sgp4Satellite` wrapper
+- added explicit TEME state, Earth-fixed position and geodetic coordinates with element-age metadata
+- added near-Earth/deep-space propagation mode reporting
+- added explicit approximate TEME -> Earth-fixed state transforms including rotating-frame velocity
+- added refined ground-station pass prediction with AOS, TCA, LOS, maximum elevation, slant range and azimuth
+- added look-angle and signed range-rate calculations
+- added bounded ground-track sampling
+- added pairwise closest-approach search with coarse bracketing and golden-section TCA refinement
+- added relative velocity and RTN/RIC separation geometry
+- added multiple-close-approach search, nearest-object queries and bounded CelesTrak group screening
+- added element-freshness metadata and explicit no-covariance/no-collision-probability flags
+- added spherical-Earth sensor swath and off-nadir access geometry
+- added nominal Sentinel-2 MSI, Sentinel-1 IW and Landsat OLI/TIRS sensor presets
+- added Cesium CZML export and multi-satellite `OrbitScenario`
+- added ESM and CommonJS runtime validation for the SGP4 integration
+- added `openlaunch-sdk/orbit`, `/traffic`, `/sensors` and `/scenario` subpath exports
+- added 12 type-checked orbit/traffic examples and detailed architecture documentation
+- added `satellite.js` 6.0.2 as a focused runtime dependency for established SGP4/SDP4 propagation
+
 ## 0.6.0 - 2026-10-11
 
 Earth Intelligence release.
