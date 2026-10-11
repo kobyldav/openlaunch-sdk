@@ -1,6 +1,43 @@
 # Runtime export inventory
 
-The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0 adds the Earth-intelligence exports listed here; regenerate the complete numeric inventory from the final build before release tagging.
+The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0 and v0.7.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
+
+## v0.7.0 additions
+
+The main v0.7 runtime surfaces include:
+
+```text
+OrbitEngine
+Sgp4Satellite
+OrbitPropagationError
+lookAnglesAt
+findPasses
+nextPass
+normalizeOmm
+satrecEpochDate
+EARTH_ROTATION_RATE_RAD_S
+temeToEcfPositionApprox
+temeToEcfStateApprox
+temeToGeodeticApprox
+geodeticToEcfKm
+TrafficEngine
+closestApproach
+findCloseApproaches
+SampledTemeTrajectory
+closestApproachTrajectoryToSatellite
+screenTrajectoryAgainstSatellites
+SENSOR_PRESETS
+findSensorAccessWindows
+offNadirGroundReachKm
+requiredOffNadirDeg
+OrbitScenario
+satelliteToCzml
+mergeCzml
+```
+
+Type-only domain models include orbit states, pass windows, conjunction quality, RTN separation, sampled trajectory state, sensor models and scenario interfaces.
+
+The complete generated export count should be refreshed from the final release build before tagging; this document intentionally does not pretend the old v0.5 numeric baseline is the current total.
 
 ## v0.6.0 additions
 
