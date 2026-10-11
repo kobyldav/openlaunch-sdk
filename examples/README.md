@@ -179,3 +179,4 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`14-orbit-traffic/11-deep-space-sdp4.ts`](./14-orbit-traffic/11-deep-space-sdp4.ts) — **Deep-space propagation**. Demonstrate automatic SDP4 mode on a GEO object.
 - [`14-orbit-traffic/12-orbit-plus-earth-observation.ts`](./14-orbit-traffic/12-orbit-plus-earth-observation.ts) — **Orbit + EO orchestration**. Combine geometric access, weather and existing imagery while keeping acquisition truth separate.
 
+- [`14-orbit-traffic/13-screen-sampled-trajectory.ts`](./14-orbit-traffic/13-screen-sampled-trajectory.ts) — **External/launch trajectory traffic screening**. Feed time-tagged TEME states from another simulator into cubic-Hermite trajectory interpolation and screen the path against live satellites.
