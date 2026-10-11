@@ -1190,6 +1190,139 @@
       ],
       "network": true,
       "description": "Combines orbital catalog metadata, weather, Sentinel optical/radar scenes, Landsat history and launch data into one monitoring brief while explicitly separating catalog orbit data from validated pass/acquisition prediction."
+    },
+    {
+      "path": "14-orbit-traffic/01-sgp4-from-omm.ts",
+      "title": "Live OMM to SGP4/SDP4 state",
+      "category": "orbit-traffic",
+      "symbols": [
+        "OpenLaunch",
+        "orbit.byCatalogNumber",
+        "Sgp4Satellite.stateAt"
+      ],
+      "network": true,
+      "description": "Propagate live CelesTrak OMM GP elements with source epoch, geodetic state and propagation mode."
+    },
+    {
+      "path": "14-orbit-traffic/02-ground-track.ts",
+      "title": "SGP4 ground track",
+      "category": "orbit-traffic",
+      "symbols": [
+        "Sgp4Satellite.groundTrack"
+      ],
+      "network": true,
+      "description": "Sample a bounded time-tagged satellite ground track."
+    },
+    {
+      "path": "14-orbit-traffic/03-passes-over-prague.ts",
+      "title": "Refined passes over Prague",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.passes",
+        "findPasses"
+      ],
+      "network": true,
+      "description": "Compute AOS, TCA, LOS, maximum elevation, azimuth and range for a ground observer."
+    },
+    {
+      "path": "14-orbit-traffic/04-look-angles-and-range-rate.ts",
+      "title": "Look angles and range rate",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.lookAngles",
+        "lookAnglesAt"
+      ],
+      "network": true,
+      "description": "Calculate observer-relative azimuth, elevation, slant range and signed range rate."
+    },
+    {
+      "path": "14-orbit-traffic/05-closest-approach.ts",
+      "title": "Pairwise closest approach",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.closestApproach",
+        "closestApproach"
+      ],
+      "network": true,
+      "description": "Refine TCA and expose miss distance, relative velocity, RTN geometry and element freshness."
+    },
+    {
+      "path": "14-orbit-traffic/06-nearest-objects.ts",
+      "title": "Nearest catalog objects",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.nearestAt",
+        "orbit.group"
+      ],
+      "network": true,
+      "description": "Rank bounded CelesTrak objects by instantaneous TEME separation."
+    },
+    {
+      "path": "14-orbit-traffic/07-bounded-catalog-screen.ts",
+      "title": "Bounded catalog conjunction screen",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.screenGroup"
+      ],
+      "network": true,
+      "description": "Screen a bounded CelesTrak group for close approaches with explicit CPU/window limits."
+    },
+    {
+      "path": "14-orbit-traffic/08-sensor-access-over-czechia.ts",
+      "title": "Sensor access over Czechia",
+      "category": "orbit-traffic",
+      "symbols": [
+        "findSensorAccessWindows",
+        "SENSOR_PRESETS",
+        "bbox"
+      ],
+      "network": true,
+      "description": "Compute geometric Sentinel-2 swath access over a Czech Republic AOI without claiming acquisition."
+    },
+    {
+      "path": "14-orbit-traffic/09-off-nadir-geometry.ts",
+      "title": "Off-nadir pointing geometry",
+      "category": "orbit-traffic",
+      "symbols": [
+        "offNadirGroundReachKm",
+        "requiredOffNadirDeg"
+      ],
+      "network": false,
+      "description": "Convert sensor off-nadir angle to spherical-Earth ground reach and back."
+    },
+    {
+      "path": "14-orbit-traffic/10-czml-3d-scenario.ts",
+      "title": "Cesium CZML 3D orbit scenario",
+      "category": "orbit-traffic",
+      "symbols": [
+        "OrbitScenario",
+        "satelliteToCzml"
+      ],
+      "network": true,
+      "description": "Export propagated Earth-fixed trajectories as Cesium CZML."
+    },
+    {
+      "path": "14-orbit-traffic/11-deep-space-sdp4.ts",
+      "title": "Deep-space SDP4 propagation",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.group",
+        "Sgp4Satellite.stateAt"
+      ],
+      "network": true,
+      "description": "Demonstrate automatic deep-space propagation on a GEO catalog object."
+    },
+    {
+      "path": "14-orbit-traffic/12-orbit-plus-earth-observation.ts",
+      "title": "Orbit plus Earth observation planning",
+      "category": "orbit-traffic",
+      "symbols": [
+        "findSensorAccessWindows",
+        "weather.conditionsAt",
+        "copernicus.searchSentinel2"
+      ],
+      "network": true,
+      "description": "Combine geometric orbital access, weather and existing imagery while preserving acquisition uncertainty."
     }
   ]
 }
