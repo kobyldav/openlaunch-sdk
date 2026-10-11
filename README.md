@@ -14,6 +14,57 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 
 ---
 
+## What changed in v0.6.0 — Earth Intelligence
+
+OpenLaunch now connects **spaceflight data, Earth-observation catalogs, geospatial areas of interest and weather** under one TypeScript API.
+
+New first-class capabilities:
+
+- generic STAC client for standards-compatible Earth-observation catalogs
+- Copernicus Data Space STAC presets
+- Sentinel-2 L2A optical search with cloud filtering
+- Sentinel-1 GRD radar search
+- Copernicus Sentinel Hub Process API with OAuth token reuse
+- server-side true-color and NDVI rendering helpers
+- Microsoft Planetary Computer STAC access
+- Planetary Computer SAS URL / asset / item signing
+- Landsat Collection 2 Level-2 historical search
+- Open-Meteo cloud, visibility, precipitation and daylight forecasts
+- reusable WGS84 AOI primitives: point, bbox, polygon and circle
+- STAC scene ranking and common asset discovery
+- NDVI, NDWI, NDMI, NBR, EVI and SAVI utilities
+- cross-provider `space.earth.monitoringSnapshot()`
+- weather-aware `space.earth.opticalWeatherWindows()`
+- explicit provenance and limitations in orchestration results
+
+Example:
+
+```ts
+import { OpenLaunch, circle } from "openlaunch-sdk";
+
+const space = new OpenLaunch();
+const target = circle([4.1453, 51.9475], 5);
+
+const snapshot = await space.earth.monitoringSnapshot({
+  area: target,
+  lookbackDays: 30,
+  maxCloudCoverPercent: 20,
+});
+
+console.log(snapshot.recommendedSensor);
+console.log(snapshot.optical[0]?.item.id);
+console.log(snapshot.radar.length);
+console.log(snapshot.recommendationReasons);
+```
+
+The goal is not to call five APIs and dump five incompatible JSON payloads. The goal is to make the **same AOI, time window, metadata and decision workflow reusable across providers**.
+
+See [Earth Intelligence architecture](./docs/EARTH_INTELLIGENCE.md) and [Earth-observation examples](./examples/13-earth-observation/).
+
+> OpenLaunch deliberately does **not** claim operational satellite pass prediction from simple OMM/two-body propagation. Accurate future access windows require validated SGP4/SDP4 or higher-fidelity propagation plus sensor/acquisition-plan constraints.
+
+---
+
 ## What changed in v0.5.x
 
 The original OpenLaunch wrapper has been expanded into a much broader spaceflight SDK.
