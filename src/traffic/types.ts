@@ -73,6 +73,7 @@ export interface TrajectoryClosestApproach {
   satelliteRtn: RtnSeparation;
   satelliteElementAgeHours: number;
   interpolation: "cubic-hermite";
+  maxTrajectoryStepSeconds: number;
 }
 
 export interface TrajectoryScreenOptions {
