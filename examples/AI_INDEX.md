@@ -57,3 +57,21 @@ Repository examples import from `../../src/index.js` only so CI can type-check e
 ## Retrieval keywords
 
 OpenLaunch, SpaceClient, LL2, Launch Library 2, launch data, rockets, astronauts, pads, agencies, NASA NeoWs, DONKI, EPIC, CelesTrak, OMM, orbital mechanics, Kepler, Hohmann, Lambert, Mars transfer, rocket equation, delta-v, WGS84, ECEF, ECI, quaternion, Kalman, PID, RF link budget, thermal, solar array, battery, EDL, parachute, Sutton-Graves, life support, reliability, radiation, unit conversion, STAC, Sentinel-1, Sentinel-2, Landsat, Copernicus Data Space, Planetary Computer, Open-Meteo, Earth observation, remote sensing, AOI, GeoJSON, NDVI, NDWI, NDMI, NBR, SAR, cloud cover, monitoring snapshot.
+
+
+## Cross-provider Earth Intelligence reference example
+
+For a single example that demonstrates the intended v0.6 orchestration model, use:
+
+`examples/13-earth-observation/11-rotterdam-all-in-one-monitor.ts`
+
+It combines:
+- one reusable AOI,
+- CelesTrak satellite catalog metadata,
+- Open-Meteo weather,
+- Copernicus Sentinel-2 optical discovery,
+- Copernicus Sentinel-1 radar fallback,
+- Planetary Computer Landsat historical context,
+- Launch Library 2 launch data.
+
+Do not reinterpret its CelesTrak lookup as a pass or acquisition forecast. Future observation timing requires validated SGP4/SDP4 propagation plus sensor and acquisition constraints.
