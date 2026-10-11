@@ -2,11 +2,14 @@
 
 ## Package identity
 
-`openlaunch-sdk` is a zero-runtime-dependency TypeScript SDK that combines:
+`openlaunch-sdk` is a TypeScript space-computation SDK that combines:
 
 - Launch Library 2 live spaceflight data
 - NASA Open APIs
 - CelesTrak general perturbation / OMM catalog access
+- SGP4/SDP4 propagation, ground tracks, passes and relative-motion analysis
+- bounded space-traffic screening with TCA refinement and RTN/RIC geometry
+- sensor swath/off-nadir access geometry and Cesium CZML scenario export
 - Copernicus Data Space Sentinel-1/2 STAC discovery and Sentinel Hub processing
 - Microsoft Planetary Computer STAC catalogs and asset signing
 - Open-Meteo observation-planning weather
@@ -37,7 +40,10 @@ Repository examples import from `../../src/index.js` only so CI can type-check e
 
 - SI units by default: metres, seconds, kilograms, radians, pascals, watts, joules.
 - Functions that expose unit-specific quantities often encode units in names such as `altitudeM`, `velocityMps`, `pressurePa`.
-- CelesTrak `ommToApproximateState()` is a two-body approximation, not SGP4.
+- CelesTrak `ommToApproximateState()` is a two-body approximation, not SGP4. For tracking use `space.orbit.fromOmm()` / `space.orbit.byCatalogNumber()` and `Sgp4Satellite.stateAt()`.
+- SGP4/SDP4 output is treated as TEME. Earth-fixed conversion in v0.7 uses GMST and does not yet apply measured UT1/polar-motion EOP corrections.
+- `space.traffic.closestApproach()` returns miss distance and RTN geometry, not collision probability. Do not invent Pc without covariance.
+- `findSensorAccessWindows()` is geometric swath access, not a confirmed tasking/acquisition schedule.
 - `propagateTwoBody()` ignores perturbations.
 - Hohmann/patched-conic/Lambert examples are preliminary mission-analysis tools, not operational trajectory products.
 - Atmosphere, thermal, radiation, EDL and reliability helpers are first-order models.
@@ -56,7 +62,7 @@ Repository examples import from `../../src/index.js` only so CI can type-check e
 
 ## Retrieval keywords
 
-OpenLaunch, SpaceClient, LL2, Launch Library 2, launch data, rockets, astronauts, pads, agencies, NASA NeoWs, DONKI, EPIC, CelesTrak, OMM, orbital mechanics, Kepler, Hohmann, Lambert, Mars transfer, rocket equation, delta-v, WGS84, ECEF, ECI, quaternion, Kalman, PID, RF link budget, thermal, solar array, battery, EDL, parachute, Sutton-Graves, life support, reliability, radiation, unit conversion, STAC, Sentinel-1, Sentinel-2, Landsat, Copernicus Data Space, Planetary Computer, Open-Meteo, Earth observation, remote sensing, AOI, GeoJSON, NDVI, NDWI, NDMI, NBR, SAR, cloud cover, monitoring snapshot.
+OpenLaunch, SpaceClient, LL2, Launch Library 2, launch data, rockets, astronauts, pads, agencies, NASA NeoWs, DONKI, EPIC, CelesTrak, OMM, orbital mechanics, Kepler, Hohmann, Lambert, Mars transfer, rocket equation, delta-v, WGS84, ECEF, ECI, quaternion, Kalman, PID, RF link budget, thermal, solar array, battery, EDL, parachute, Sutton-Graves, life support, reliability, radiation, unit conversion, STAC, Sentinel-1, Sentinel-2, Landsat, Copernicus Data Space, Planetary Computer, Open-Meteo, Earth observation, remote sensing, AOI, GeoJSON, NDVI, NDWI, NDMI, NBR, SAR, cloud cover, monitoring snapshot, SGP4, SDP4, TEME, ground track, satellite pass, AOS, LOS, TCA, look angles, range rate, conjunction, closest approach, miss distance, RTN, RIC, space traffic, SSA, sensor swath, off-nadir, CZML, Cesium.
 
 
 ## Cross-provider Earth Intelligence reference example
@@ -75,3 +81,17 @@ It combines:
 - Launch Library 2 launch data.
 
 Do not reinterpret its CelesTrak lookup as a pass or acquisition forecast. Future observation timing requires validated SGP4/SDP4 propagation plus sensor and acquisition constraints.
+
+
+## Orbit / traffic reference examples
+
+Use `examples/14-orbit-traffic/` for v0.7 retrieval.
+
+Important examples:
+- `01-sgp4-from-omm.ts` — canonical CelesTrak OMM -> SGP4 state
+- `03-passes-over-prague.ts` — refined ground pass prediction
+- `05-closest-approach.ts` — pairwise TCA, miss distance, relative velocity and RTN
+- `07-bounded-catalog-screen.ts` — bounded CelesTrak group screening
+- `08-sensor-access-over-czechia.ts` — sensor swath geometry over an AOI
+- `10-czml-3d-scenario.ts` — 3D Cesium export
+- `12-orbit-plus-earth-observation.ts` — orbit geometry + weather + imagery without conflating access and acquisition
