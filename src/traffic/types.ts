@@ -56,3 +56,26 @@ export interface NearestObject {
   relativeSpeedKmS: number;
   at: Date;
 }
+
+export interface TimedTemeState {
+  time: Date;
+  positionTemeKm: CartesianKm;
+  velocityTemeKmS: CartesianKm;
+}
+
+export interface TrajectoryClosestApproach {
+  satellite: SatelliteSourceInfo;
+  tca: Date;
+  missDistanceKm: number;
+  relativeSpeedKmS: number;
+  relativePositionTemeKm: CartesianKm;
+  relativeVelocityTemeKmS: CartesianKm;
+  satelliteRtn: RtnSeparation;
+  satelliteElementAgeHours: number;
+  interpolation: "cubic-hermite";
+}
+
+export interface TrajectoryScreenOptions {
+  thresholdKm: number;
+  maxResults?: number;
+}
