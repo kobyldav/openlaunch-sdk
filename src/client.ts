@@ -17,6 +17,8 @@ import { CopernicusClient } from "./providers/copernicus.js";
 import { PlanetaryComputerClient } from "./providers/planetary-computer.js";
 import { OpenMeteoClient } from "./providers/openmeteo.js";
 import { EarthIntelligenceClient } from "./intelligence/earth.js";
+import { OrbitEngine } from "./orbit/engine.js";
+import { TrafficEngine } from "./traffic/engine.js";
 
 export const PRODUCTION_BASE_URL = LL2_PRODUCTION_BASE_URL;
 export const DEVELOPMENT_BASE_URL = LL2_DEVELOPMENT_BASE_URL;
@@ -73,6 +75,12 @@ export class OpenLaunch {
 
   /** Cross-provider Earth-observation orchestration. */
   readonly earth: EarthIntelligenceClient;
+
+  /** Validated SGP4/SDP4 propagation, ground tracks and pass prediction. */
+  readonly orbit: OrbitEngine;
+
+  /** Relative-motion, closest-approach and bounded catalog screening. */
+  readonly traffic: TrafficEngine;
 
   private readonly http: HttpClient;
 
@@ -148,6 +156,9 @@ export class OpenLaunch {
       planetaryComputer: this.planetaryComputer,
       weather: this.weather,
     });
+
+    this.orbit = new OrbitEngine(this.celestrak);
+    this.traffic = new TrafficEngine(this.celestrak, this.orbit);
   }
 
   raw<T = unknown>(path: string, query: Query = {}): Promise<T> { return this.http.get<T>(path, query); }
