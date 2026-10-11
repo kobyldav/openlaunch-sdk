@@ -339,6 +339,29 @@ For high-consequence use, independently validate:
 - object identity
 - sensor acquisition constraints
 
+## Screening an external or launch trajectory
+
+The traffic layer is not limited to two SGP4 satellites.
+
+`SampledTemeTrajectory` accepts time-tagged TEME position and velocity states from an external dynamics model:
+
+```ts
+const trajectory = new SampledTemeTrajectory(states);
+
+const events = space.traffic.screenTrajectory(
+  trajectory,
+  catalog,
+  100, // threshold km
+  50,  // max results
+);
+```
+
+Between supplied states OpenLaunch uses cubic Hermite interpolation, preserving both position and velocity at sample boundaries. The satellite side is still propagated with SGP4/SDP4, and closest approach is numerically refined inside every trajectory segment.
+
+This is the bridge needed for launch-vehicle screening: a future 3DOF/6DOF ascent model only needs to output time-tagged TEME states, and the existing traffic engine can screen them against the satellite catalog.
+
+The frame contract is strict: do not feed ECEF, GCRF or arbitrary local-frame states into `SampledTemeTrajectory` without transforming them to the documented TEME frame.
+
 ## Next layer: launch trajectories
 
 The orbital/traffic engine is intentionally built before launch-vehicle corridor simulation.
