@@ -105,3 +105,5 @@ For 3DOF point-mass ascent use `space.dynamics.simulate()`; for LL2 pad/time ada
 Reference examples: `examples/15-launch-dynamics/01-single-stage-3dof.ts`, `02-multistage-events.ts`, `03-wind-j2-atmosphere.ts`, `04-ll2-launch-metadata.ts`, `05-traffic-screening.ts`, `06-cesium-czml-geojson.ts`, `07-osculating-orbit-diagnostics.ts`.
 
 Accuracy: this is fixed-step RK4 3DOF, not 6DOF, not real Falcon 9 telemetry, no uncertainty corridor, not full IERS TEME/ITRF and not a launch clearance system.
+
+- `15-launch-dynamics/08-target-inclination-azimuth.ts` — `candidateLaunchAzimuths()` for approximate target inclination/heading feasibility.
