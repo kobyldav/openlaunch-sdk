@@ -13,6 +13,7 @@
 - docs/VALIDATION.md — validation boundaries
 - docs/EARTH_INTELLIGENCE.md — STAC, Copernicus, Planetary Computer, weather and EO orchestration
 - docs/ORBIT_TRAFFIC.md — SGP4/SDP4, passes, closest approach, RTN, sensor access and CZML
+- docs/LAUNCH_DYNAMICS.md — 3DOF multistage ascent equations, RK4, LL2 input limits and traffic integration
 
 ## Canonical source
 - src/index.ts — root public exports
@@ -23,6 +24,7 @@
 - src/intelligence/ — cross-provider Earth intelligence workflows
 - src/orbit/ — SGP4/SDP4, frame transforms, ground tracks and pass prediction
 - src/traffic/ — closest approach, RTN geometry and bounded catalog screening
+- src/launch/ — 3DOF ascent, staging, guidance, environment, orbital diagnostics, CZML/GeoJSON
 - src/sensors/ — swath/off-nadir access geometry and sensor presets
 - src/scenario/ — multi-object orbital scenarios and Cesium CZML export
 - src/resources/ — high-level and raw resources
@@ -44,6 +46,7 @@
 - examples/12-sdk-infrastructure/ — cache and telemetry patterns
 - examples/13-earth-observation/ — STAC, Sentinel-1/2, Landsat, weather windows and cross-provider monitoring
 - examples/14-orbit-traffic/ — SGP4 states, passes, traffic screening, sensor access and 3D scenarios
+- examples/15-launch-dynamics/ — RK4 3DOF, multistage flight, LL2 pad adapter, traffic and CZML
 
 ## Important limitations
-OpenLaunch is not flight-qualified software. Use the v0.7 SGP4/SDP4 layer for GP-element tracking rather than the older two-body approximation. Miss distance is not collision probability; covariance is required for probabilistic conjunction analysis. Sensor geometry is not proof of tasking/acquisition. Validate independently for safety-critical use.
+OpenLaunch is not flight-qualified software. v0.8 launch trajectories need explicit vehicle/guidance; never infer real Falcon 9 flight profiles from LL2 clock and pad metadata. Use the v0.7 SGP4/SDP4 layer for GP-element tracking rather than the older two-body approximation. Miss distance is not collision probability; covariance is required for probabilistic conjunction analysis. Sensor geometry is not proof of tasking/acquisition. Validate independently for safety-critical use.
