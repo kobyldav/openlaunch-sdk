@@ -78,6 +78,10 @@ console.log(event.rtn);
 console.log(event.quality);
 ```
 
+`space.traffic.nearestAt()` marks identical propagated catalog states as `indistinguishable-ephemeris`. This avoids treating a reported `0 km` between different entries (such as ISS modules sharing GP elements) as a measurement of physical clearance. Use `{ includeIndistinguishable: false }` to show only independently resolved model states in nearest-object rankings.
+
+The `example:rotterdam` demo now includes SGP4 passes and nominal MSI swath-access windows, while keeping actual acquisition status unknown.
+
 OpenLaunch does **not** manufacture a collision probability from GP elements alone. Probability of collision needs uncertainty/covariance information and an appropriate encounter model.
 
 Sensor access is also deliberately separated from acquisition truth: a target being inside a modeled swath does not prove that the spacecraft was tasked or that an image exists.
