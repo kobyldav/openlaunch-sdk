@@ -173,7 +173,7 @@ export class LaunchDynamicsEngine {
     const first=vehicle.stages[0]!;
     const seaAtStart=engineAt(first,101325);
     const initialControl=guidanceAt(guidance,0);
-    if(!(seaAtStart.thrustN*initialControl.throttle>originalMassKg*STANDARD_G0*0.8))
+    if(!(seaAtStart.thrustN*initialControl.throttle>originalMassKg*STANDARD_G0))
       throw new RangeError("Insufficient initial thrust for this ascent scenario (relative to nominal g0)");
     recordEvent("liftoff","Illustrative/user-specified vehicle model; not a published flight path");
     recordEvent("stage-ignition",undefined,first.name);
@@ -251,12 +251,20 @@ export class LaunchDynamicsEngine {
       times(toVector(final.positionTemeKm),1000),
       times(toVector(final.velocityTemeKmS),1000),
     );
+    // Aggregate in a single pass: spreading up to 100,000 array elements into
+    // Math.max() can overflow the JS argument count limit.
+    let maxProperAccelerationMps2=0;
+    let maxAltitudeM=-Infinity;
+    let maxInertialSpeedMps=0;
+    for(const s of samples){
+      maxProperAccelerationMps2=Math.max(maxProperAccelerationMps2,s.accelerationProperMps2);
+      maxAltitudeM=Math.max(maxAltitudeM,s.altitudeM);
+      maxInertialSpeedMps=Math.max(maxInertialSpeedMps,s.speedInertialMps);
+    }
     const summary:AscentSummary={
       initialMassKg:originalMassKg,finalMassKg:final.massKg,
       elapsedSeconds:t,maxDynamicPressurePa:peakQ.dynamicPressurePa,
-      maxProperAccelerationMps2:Math.max(...samples.map(x=>x.accelerationProperMps2)),
-      maxAltitudeM:Math.max(...samples.map(x=>x.altitudeM)),
-      maxInertialSpeedMps:Math.max(...samples.map(x=>x.speedInertialMps)),
+      maxProperAccelerationMps2,maxAltitudeM,maxInertialSpeedMps,
       finalOrbit:estimate,terminatedBy:termination,
     };
     return {
@@ -271,9 +279,18 @@ export class LaunchDynamicsEngine {
         "Earth-fixed to TEME-like conversion uses GMST approximation without EOP/polar motion; encounter screening is exploratory.",
         "No verified vehicle profiles, uncertainty corridor, tasking, collision probability or flight qualification.",
       ],
-      toTrajectory:()=>new SampledTemeTrajectory(samples.map(s=>({
-        time:s.time,positionTemeKm:s.positionTemeKm,velocityTemeKmS:s.velocityTemeKmS,
-      }))),
+      // Date has millisecond precision: collapse any sub-ms RK4 event samples
+      // onto the last state at that instant before cubic-Hermite interpolation.
+      toTrajectory:()=>{
+        const points:Array<{time:Date;positionTemeKm:AscentSample["positionTemeKm"];velocityTemeKmS:AscentSample["velocityTemeKmS"]}>=[];
+        for(const s of samples){
+          const p={time:s.time,positionTemeKm:s.positionTemeKm,velocityTemeKmS:s.velocityTemeKmS};
+          if(points.length && points[points.length-1]!.time.getTime()===s.time.getTime()){
+            points[points.length-1]=p;
+          }else points.push(p);
+        }
+        return new SampledTemeTrajectory(points);
+      },
     };
   }
 
