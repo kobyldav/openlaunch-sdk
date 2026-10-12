@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  OpenLaunch,
   OrbitScenario,
   SampledTemeTrajectory,
   SENSOR_PRESETS,
@@ -165,4 +166,63 @@ test("sampled TEME trajectory can be screened against an SGP4 satellite", () => 
   const event = closestApproachTrajectoryToSatellite(trajectory, sat);
   assert.ok(event.missDistanceKm < 1);
   assert.equal(event.interpolation, "cubic-hermite");
+});
+
+test("nearestAt marks coincident propagated GP states and retains independent objects", () => {
+  const primary = Sgp4Satellite.fromTle(ISS_LINE1, ISS_LINE2, {
+    noradCatalogId: 25544,
+    name: "ISS",
+  });
+  const sharedGpState = Sgp4Satellite.fromTle(ISS_LINE1, ISS_LINE2, {
+    noradCatalogId: 99901,
+    name: "ISS module with shared GP state",
+  });
+  const distinct = Sgp4Satellite.fromTle(NEARBY_LINE1, NEARBY_LINE2, {
+    noradCatalogId: 25545,
+    name: "Nearby independent orbit",
+  });
+  const at = new Date("2019-06-05T12:30:00Z");
+  const traffic = new OpenLaunch().traffic;
+
+  const raw = traffic.nearestAt(primary, [sharedGpState, distinct], at, 2);
+  assert.equal(raw.length, 2);
+  assert.equal(raw[0].distanceKm, 0);
+  assert.equal(raw[0].separation, "indistinguishable-ephemeris");
+  assert.equal(raw[1].separation, "resolved");
+  assert.ok(raw[1].distanceKm > 0);
+
+  const resolved = traffic.nearestAt(
+    primary,
+    [sharedGpState, distinct],
+    at,
+    2,
+    { includeIndistinguishable: false },
+  );
+  assert.deepEqual(resolved.map((item) => item.satellite.noradCatalogId), [25545]);
+
+  const sameCatalog = Sgp4Satellite.fromTle(ISS_LINE1, ISS_LINE2, { noradCatalogId: 25544 });
+  assert.equal(traffic.nearestAt(primary, [sameCatalog], at).length, 0);
+});
+
+test("Rotterdam-style SGP4 and nominal MSI access can be composed from an offline TLE", () => {
+  const sat = Sgp4Satellite.fromTle(ISS_LINE1, ISS_LINE2);
+  const space = new OpenLaunch();
+  const start = new Date("2019-06-05T00:00:00Z");
+  const end = new Date("2019-06-07T00:00:00Z");
+  const area = bbox(4.07, 51.90, 4.22, 51.99);
+  const passes = space.orbit.passes(sat, { latitudeDeg: 51.9475, longitudeDeg: 4.1453 }, {
+    start,
+    end,
+    minElevationDeg: 10,
+    stepSeconds: 60,
+  });
+  const access = findSensorAccessWindows(sat, SENSOR_PRESETS.sentinel2Msi, {
+    area,
+    start,
+    end,
+    stepSeconds: 60,
+  });
+  assert.ok(Array.isArray(passes));
+  assert.ok(Array.isArray(access));
+  assert.ok(sat.stateAt(start).sourceAgeHours >= 0);
 });
