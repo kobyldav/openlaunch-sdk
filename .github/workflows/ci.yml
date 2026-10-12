@@ -22,4 +22,5 @@ jobs:
           cache: npm
       - run: npm install --no-audit --no-fund
       - run: npm run check
+      - run: node scripts/launch-dynamics-demo.mjs
       - run: npm pack --dry-run
