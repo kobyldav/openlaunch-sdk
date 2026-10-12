@@ -96,3 +96,12 @@ Important examples:
 - `10-czml-3d-scenario.ts` — 3D Cesium export
 - `12-orbit-plus-earth-observation.ts` — orbit geometry + weather + imagery without conflating access and acquisition
 - `13-screen-sampled-trajectory.ts` — external/launch TEME trajectory interpolation and screening against SGP4 satellites
+
+
+## v0.8 Launch Dynamics
+
+For 3DOF point-mass ascent use `space.dynamics.simulate()`; for LL2 pad/time adapter use `space.dynamics.fromLaunch()` together with independently supplied vehicle/guidance. For satellite conjunction exploration use `simulation.toTrajectory()` and `space.traffic.screenTrajectory()`. For visualization use `launchToCzml()` and `launchGroundTrackGeoJson()`.
+
+Reference examples: `examples/15-launch-dynamics/01-single-stage-3dof.ts`, `02-multistage-events.ts`, `03-wind-j2-atmosphere.ts`, `04-ll2-launch-metadata.ts`, `05-traffic-screening.ts`, `06-cesium-czml-geojson.ts`, `07-osculating-orbit-diagnostics.ts`.
+
+Accuracy: this is fixed-step RK4 3DOF, not 6DOF, not real Falcon 9 telemetry, no uncertainty corridor, not full IERS TEME/ITRF and not a launch clearance system.
