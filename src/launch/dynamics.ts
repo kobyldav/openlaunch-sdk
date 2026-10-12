@@ -40,7 +40,7 @@ export class LaunchDynamicsEngine {
     let y:IntegrationState={p:launchSiteEcefM(site),v:[0,0,0],propKg:vehicle.stages[0]!.propellantMassKg};
     let t=0;
     let stageIndex=0;
-    let mode:"powered"|"coast"|"complete"="powered";
+    const flight:{current:"powered"|"coast"|"complete"}={current:"powered"};
     let fairingAttached=(vehicle.fairingMassKg??0)>0;
     let nextIgnitionTime=Number.POSITIVE_INFINITY;
     let termination:"duration"|"impact"="duration";
@@ -65,14 +65,14 @@ export class LaunchDynamicsEngine {
       const aero=aerodynamics(y,environment);
       const stage=vehicle.stages[stageIndex]!;
       const control=guidanceAt(guidance,t);
-      const thrust=mode==="powered"?engineAt(stage,aero.pressurePa).thrustN*control.throttle:0;
+      const thrust=flight.current==="powered"?engineAt(stage,aero.pressurePa).thrustN*control.throttle:0;
       const inertial=ecefToTemeApprox(y.p,y.v,at);
       const totalMassKg=massNow();
-      const proper=mode==="powered"?
+      const proper=flight.current==="powered"?
         Math.hypot(thrust,vehicle.dragCoefficient*vehicle.referenceAreaM2*aero.qPa)/totalMassKg:
         vehicle.dragCoefficient*vehicle.referenceAreaM2*aero.qPa/totalMassKg;
       return {
-        time:at,tSeconds:t,stageIndex,flightMode:mode,
+        time:at,tSeconds:t,stageIndex,flightMode:flight.current,
         massKg:totalMassKg,propellantRemainingKg:Math.max(0,y.propKg),
         positionEcefM:{x:y.p[0],y:y.p[1],z:y.p[2]},
         velocityEcefMps:{x:y.v[0],y:y.v[1],z:y.v[2]},
@@ -149,15 +149,15 @@ export class LaunchDynamicsEngine {
       const stage=vehicle.stages[stageIndex]!;
       y={...y,propKg:0};
       recordEvent("stage-burnout",undefined,stage.name);
-      mode=stageIndex+1<vehicle.stages.length?"coast":"complete";
-      if(mode==="coast")nextIgnitionTime=t+(stage.coastAfterBurnSeconds??0);
+      flight.current=stageIndex+1<vehicle.stages.length?"coast":"complete";
+      if(flight.current==="coast")nextIgnitionTime=t+(stage.coastAfterBurnSeconds??0);
     };
     const igniteNextStage=()=>{
       const previous=vehicle.stages[stageIndex]!;
       recordEvent("stage-separation",undefined,previous.name);
       stageIndex++;
       y={...y,propKg:vehicle.stages[stageIndex]!.propellantMassKg};
-      mode="powered";
+      flight.current="powered";
       recordEvent("stage-ignition",undefined,vehicle.stages[stageIndex]!.name);
       nextIgnitionTime=Number.POSITIVE_INFINITY;
     };
@@ -173,32 +173,32 @@ export class LaunchDynamicsEngine {
 
     while(t<finalT-1e-10){
       if(samples.length>=maxSamples)throw new RangeError("Exceeded maxSamples; increase stepSeconds or maxSamples");
-      if(mode==="coast" && nextIgnitionTime<=t+1e-8){
+      if(flight.current==="coast" && nextIgnitionTime<=t+1e-8){
         igniteNextStage();
         continue;
       }
       const stage=vehicle.stages[stageIndex]!;
-      if(mode==="powered" && y.propKg<=EPS){
+      if(flight.current==="powered" && y.propKg<=EPS){
         burnout();
         continue;
       }
 
       let h=Math.min(dtMax,finalT-t);
-      if(mode==="coast")h=Math.min(h,Math.max(0,nextIgnitionTime-t));
+      if(flight.current==="coast")h=Math.min(h,Math.max(0,nextIgnitionTime-t));
       if(fairingAttached && vehicle.fairingJettisonAtSeconds!==undefined && t<vehicle.fairingJettisonAtSeconds-1e-9)
         h=Math.min(h,vehicle.fairingJettisonAtSeconds-t);
       for(const knot of guidance.program){
         if(knot.tSeconds>t+1e-9){h=Math.min(h,knot.tSeconds-t);break;}
       }
       if(!(h>1e-9)){
-        if(mode==="coast" && nextIgnitionTime<=t+1e-8){igniteNextStage();continue;}
+        if(flight.current==="coast" && nextIgnitionTime<=t+1e-8){igniteNextStage();continue;}
         throw new Error("Simulation step underflow");
       }
 
-      const ctx:StageContext={stageIndex,powered:mode==="powered",fairingAttached};
+      const ctx:StageContext={stageIndex,powered:flight.current==="powered",fairingAttached};
       let candidate=rk4(y,t,h,ctx);
       let exhausted=false;
-      if(mode==="powered" && candidate.propKg<=0){
+      if(flight.current==="powered" && candidate.propKg<=0){
         // Solve exact depletion boundary to submillisecond resolution.
         let lo=0,hi=h;
         for(let i=0;i<38 && hi-lo>1e-7;i++){
@@ -219,7 +219,7 @@ export class LaunchDynamicsEngine {
         recordEvent("fairing-jettison");
       }
       if(exhausted)burnout();
-      if(mode==="coast" && nextIgnitionTime<=t+1e-8)igniteNextStage();
+      if(flight.current==="coast" && nextIgnitionTime<=t+1e-8)igniteNextStage();
 
       const location=ecefToGeodetic(y.p);
       if((options.stopAtImpact??true) && t>1 && location.altitudeM<site.altitudeM-1){
