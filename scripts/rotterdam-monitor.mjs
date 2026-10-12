@@ -1,5 +1,7 @@
 import {
   OpenLaunch,
+  SENSOR_PRESETS,
+  findSensorAccessWindows,
   circle,
   sceneCloudCover,
   sceneDatetime,
@@ -90,7 +92,51 @@ console.log("\nSentinel-2C catalog:", sentinel ? {
   meanMotionRevPerDay: sentinel.MEAN_MOTION,
 } : null);
 
-console.log("\nPass prediction:", "NOT computed — validated SGP4/SDP4 + sensor/acquisition constraints are required.");
+// Reuse the already downloaded CelesTrak OMM record. A future geometric
+// access window is NOT evidence of a scheduled optical acquisition.
+const orbitalSatellite = sentinel ? space.orbit.fromOmm(sentinel) : null;
+const rotterdamObserver = { latitudeDeg: 51.9475, longitudeDeg: 4.1453, heightM: 0 };
+const horizon = new Date(now.getTime() + 48 * 3_600_000);
+const opticalHorizon = new Date(now.getTime() + 7 * 86_400_000);
+
+const groundPasses = orbitalSatellite
+  ? space.orbit.passes(orbitalSatellite, rotterdamObserver, {
+      start: now,
+      end: horizon,
+      minElevationDeg: 10,
+      stepSeconds: 30,
+      maxPasses: 20,
+    })
+  : [];
+
+const sensorAccess = orbitalSatellite
+  ? findSensorAccessWindows(orbitalSatellite, SENSOR_PRESETS.sentinel2Msi, {
+      area: target,
+      start: now,
+      end: opticalHorizon,
+      stepSeconds: 30,
+      maxWindows: 20,
+    })
+  : [];
+
+console.log("\nSentinel-2C SGP4 geometry:", orbitalSatellite ? {
+  elementEpoch: orbitalSatellite.sourceInfo.epoch.toISOString(),
+  elementAgeHours: orbitalSatellite.elementAgeHours(now),
+  nextGroundPassesAbove10Deg: groundPasses.slice(0, 3).map((pass) => ({
+    aos: pass.aos.toISOString(),
+    tca: pass.tca.toISOString(),
+    los: pass.los.toISOString(),
+    maxElevationDeg: pass.maxElevationDeg,
+  })),
+  nextMsiGeometricAccessWindows: sensorAccess.slice(0, 3).map((window) => ({
+    start: window.start.toISOString(),
+    closest: window.closest.toISOString(),
+    end: window.end.toISOString(),
+    minGroundDistanceKm: window.minGroundDistanceKm,
+  })),
+  acquisitionConfirmed: false,
+  model: "SGP4 orbital states + spherical-Earth nominal MSI swath",
+} : "No current CelesTrak OMM record; orbital access not computed.");
 
 console.log("\nLandsat history:", {
   returnedScenes: landsatHistory.features.length,
@@ -112,3 +158,6 @@ console.log("\nNext LL2 launch:", nextLaunch ? {
 console.log("\nProvenance:", monitoring.provenance);
 console.log("\nLimitations:");
 for (const limitation of monitoring.limitations) console.log("-", limitation);
+console.log("- Ground-station line-of-sight passes and nominal swath access are different geometries.");
+console.log("- A geometric swath window does not prove daylight, instrument tasking, actual acquisition or published imagery.");
+console.log("- Orbit accuracy depends on the age and quality of CelesTrak GP elements.");
