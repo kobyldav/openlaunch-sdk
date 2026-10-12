@@ -62,3 +62,15 @@ Earth-data workflows must also distinguish:
 - optical imagery from SAR imagery.
 
 The older `ommToApproximateState()` helper remains educational/first-order and must not be promoted into an operational pass predictor now that the SGP4/SDP4 layer exists.
+
+
+## v0.8 launch dynamics verification
+
+- Preserve SI units across WGS84/ECEF dynamics; distinguish ECEF velocities from inertial/TEME-like velocities.
+- RK4 is fixed-step with event segmentation; check convergence by decreasing `stepSeconds` for each model.
+- Track stage fuel, fairing dry-mass drops, stage burnout and coast chronology without negative propellant.
+- Treat the standard atmosphere, upper-atmosphere tail and uniform winds as approximations.
+- Use LL2 only for pad and NET; never infer an authoritative launch profile from it.
+- The ECEF->TEME-like bridge uses GMST, not IERS EOP; traffic screening is exploratory and not a flight-safety determination.
+- Orbital insertion requires a verified orbit/vehicle/guidance; final two-body osculating elements are only diagnostics.
+- Validate any high-consequence use with independent numerical models, measured states, covariances, requirements and certified software.

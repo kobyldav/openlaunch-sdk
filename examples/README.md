@@ -180,3 +180,15 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`14-orbit-traffic/12-orbit-plus-earth-observation.ts`](./14-orbit-traffic/12-orbit-plus-earth-observation.ts) — **Orbit + EO orchestration**. Combine geometric access, weather and existing imagery while keeping acquisition truth separate.
 
 - [`14-orbit-traffic/13-screen-sampled-trajectory.ts`](./14-orbit-traffic/13-screen-sampled-trajectory.ts) — **External/launch trajectory traffic screening**. Feed time-tagged TEME states from another simulator into cubic-Hermite trajectory interpolation and screen the path against live satellites.
+
+
+### `launch-dynamics`
+
+- [`15-launch-dynamics/01-single-stage-3dof.ts`](./15-launch-dynamics/01-single-stage-3dof.ts) — **3DOF numerical single-stage ascent**. WGS84 pad, air drag, thrust, fuel and altitude.
+- [`15-launch-dynamics/02-multistage-events.ts`](./15-launch-dynamics/02-multistage-events.ts) — **Staging chronology**. Stage depletion, coasts, separation and fairing events.
+- [`15-launch-dynamics/03-wind-j2-atmosphere.ts`](./15-launch-dynamics/03-wind-j2-atmosphere.ts) — **Atmosphere + wind + J2**. Compare deterministic runs under different approximations.
+- [`15-launch-dynamics/04-ll2-launch-metadata.ts`](./15-launch-dynamics/04-ll2-launch-metadata.ts) — **LL2 integration**. Combine published NET/pad with user-defined, non-authoritative vehicle parameters.
+- [`15-launch-dynamics/05-traffic-screening.ts`](./15-launch-dynamics/05-traffic-screening.ts) — **3DOF / SGP4 traffic**. Sample a simulated rocket path against a bounded satellite group.
+- [`15-launch-dynamics/06-cesium-czml-geojson.ts`](./15-launch-dynamics/06-cesium-czml-geojson.ts) — **3D visualization**. Export Cesium CZML and GeoJSON.
+- [`15-launch-dynamics/07-osculating-orbit-diagnostics.ts`](./15-launch-dynamics/07-osculating-orbit-diagnostics.ts) — **Final orbital geometry**. Analyze suborbital versus bound two-body estimated state.
+- [`15-launch-dynamics/08-target-inclination-azimuth.ts`](./15-launch-dynamics/08-target-inclination-azimuth.ts) — **Initial inclination feasibility**. Calculate northbound/southbound candidate launch azimuths using pad location and Earth rotation (not mission guidance).

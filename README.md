@@ -16,6 +16,37 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 
 ---
 
+## What changed in v0.8.0 — Launch Dynamics
+
+v0.8 adds a **numerical multi-stage 3DOF launch simulator** to the same SDK that already has CelesTrak/SGP4 space traffic and LL2 launch data.
+
+- rotating-Earth ECEF point-mass RK4 physics, central/J2 gravity and WGS84 pad position
+- pitch/azimuth/throttle guidance schedule; sea-level vs vacuum thrust/Isp and propellant burn
+- stage separation, fairing jettison, coasts, max-Q and time-tagged vehicle states
+- ISA atmosphere, upper-atmosphere approximation, optional wind, drag and Mach
+- trajectory screening against SGP4 satellite catalogs through `simulation.toTrajectory()`
+- Cesium CZML and GeoJSON launch ground-track export
+- strict `space.dynamics.fromLaunch()` adapter combining LL2 pad/time with **user-supplied** vehicle and guidance
+- **8 self-contained new launch examples**, offline and live demonstration scripts, 3DOF regression tests
+
+Run the fully offline example:
+
+```bash
+npm run example:launch
+```
+
+Optional network workflow (LL2 metadata + bounded CelesTrak catalog):
+
+```bash
+OPENLAUNCH_LIVE=1 npm run example:launch
+```
+
+**Accuracy boundary:** vehicle parameters and pitch profile are illustrative unless independently supplied and verified. LL2 metadata is insufficient to infer an authentic Falcon 9 trajectory. The v0.8 3DOF, GMST-based ECEF/TEME compatibility bridge and traffic screening are educational/exploratory, not certified collision clearance or launch guidance.
+
+See [Launch Dynamics architecture and equations](./docs/LAUNCH_DYNAMICS.md) and [v0.8 cookbook](./examples/15-launch-dynamics/).
+
+---
+
 ## What changed in v0.7.0 — Orbit Dynamics & Space Traffic
 
 v0.7 replaces the old gap between **"I have an OMM/TLE"** and **"where is this object, when does it pass, and how close does it get to another object?"** with a real propagation and relative-motion layer.

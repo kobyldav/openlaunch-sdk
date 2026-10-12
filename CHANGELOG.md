@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.0 - 2026-10-12
+
+Launch Dynamics numerical ascent simulation release.
+
+- added rotating-ECEF 3DOF point-mass multi-stage ascent simulator with fixed-step RK4
+- added WGS84 launch-pad initialization, Earth-rotation/coriolis/centrifugal effects, central or optional J2 gravity
+- added time-interpolated pitch/elevation, azimuth and throttle program
+- added atmospheric pressure-dependent thrust/Isp, continuous propellant depletion and burnout detection
+- added staged dry-mass separation, configurable staging coasts, upper stage ignition, fairing jettison, impact and max-Q event sampling
+- added ISA atmosphere and exponential upper-atmosphere extension, uniform configurable ENU wind, Mach and dynamic pressure
+- added detailed time-tagged mass/flight/geo/state diagnostics, proper acceleration estimate, two-body osculating end state
+- added preliminary Earth-rotation-aware candidate launch-azimuth solutions for user-defined orbital inclination and horizontal speed
+- added explicit GMST-based ECEF-to-approximate-TEME state bridge to the existing v0.7 SampledTemeTrajectory traffic engine
+- added LL2 pad/time adapter requiring external vehicle and guidance inputs; no implied actual SpaceX flight path
+- added CZML/GeoJSON trajectory exporters, 8 typed launch examples, deterministic runtime tests and offline/live demo
+- added `openlaunch-sdk/launch` package subpath and `space.dynamics` public client property
+- documented complete equations and operational/precision boundaries in `docs/LAUNCH_DYNAMICS.md`
+
 ## 0.7.0 - 2026-10-11
 
 Orbit Dynamics and Space Traffic release.

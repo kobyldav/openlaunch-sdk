@@ -1,6 +1,6 @@
 # Architecture
 
-OpenLaunch has eight layers:
+OpenLaunch has nine layers:
 
 1. **Core transport** — fetch, cache, retry, dedupe, timeout, concurrency, telemetry and circuit breaking.
 2. **Providers** — LL2, NASA, CelesTrak, generic STAC, Copernicus Data Space, Microsoft Planetary Computer and Open-Meteo.
@@ -9,7 +9,8 @@ OpenLaunch has eight layers:
 5. **Space traffic and sensors** — closest approach, RTN geometry, bounded screening, swath/off-nadir access and 3D scenario export.
 6. **Geospatial and EO primitives** — reusable WGS84 AOIs, STAC scene ranking, asset selection and spectral-index helpers.
 7. **Intelligence/orchestration** — workflows that combine multiple providers while preserving provenance and limitations.
-8. **Science/engineering toolbox** — deterministic calculations independent of provider availability.
+8. **Launch dynamics** — time-tagged point-mass 3DOF ascent, staged mass depletion, guidance, atmosphere and trajectory screening integration.
+9. **Science/engineering toolbox** — deterministic calculations independent of provider availability.
 
 Applications should prefer normalized models where available and use raw resources when they need provider-specific fields.
 
@@ -91,3 +92,26 @@ EarthIntelligenceClient / application orchestration
 Large raster processing is intentionally kept out of the generic JSON transport. Copernicus Process API is accessed directly as binary data so applications can request only the AOI they need.
 
 See `docs/EARTH_INTELLIGENCE.md` for provider and modeling details.
+
+
+## Launch Dynamics v0.8
+
+The independent numerical ascent solver is in `src/launch`; it uses WGS84 and atmosphere primitives, but no live provider requests.
+
+```text
+LL2 launch pad/time (optional) + user vehicle and guidance
+                        |
+                        v
+              LaunchDynamicsEngine
+          rotating ECEF + atmosphere + staging
+                        |
+          +-------------+---------------+
+          |             |               |
+    ECEF timeline    CZML / GeoJSON   approximate TEME
+                                          |
+                                     SampledTemeTrajectory
+                                          |
+                                      TrafficEngine + SGP4
+```
+
+The point-mass RK4 model, approximated Earth-fixed/TEME bridge and absence of uncertainty covariance **must remain explicit** to downstream applications. See `docs/LAUNCH_DYNAMICS.md`.

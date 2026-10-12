@@ -1,3 +1,13 @@
+## v0.8.0 additions
+
+Runtime: `candidateLaunchAzimuths`, `LaunchDynamicsEngine`, `totalMass`, `launchToCzml`, `launchGroundTrackGeoJson`, `launchSiteEcefM`, `gravityEcefMps2`, `airAtAltitude`, `engineAt`, `guidanceAt`, `thrustUnitEcef`, `ecefToTemeApprox`, `twoBodyOrbitEstimate` and associated vector helpers/constants.
+
+Typed: `LaunchSite`, `LaunchVehicle`, `AscentStage`, `AscentGuidance`, `PitchProgramPoint`, `LaunchSimulationOptions`, `AscentSimulationResult`, `AscentSample`, `AscentEvent`, `AscentSummary`, `LaunchScenarioInput`.
+
+Client: `space.dynamics`. Package subpath: `openlaunch-sdk/launch`.
+
+---
+
 # Runtime export inventory
 
 The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0 and v0.7.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
