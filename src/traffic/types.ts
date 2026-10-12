@@ -50,11 +50,23 @@ export interface CatalogScreenOptions extends ClosestApproachOptions {
   maxObjects?: number;
 }
 
+/** A coincidence means the public propagated states cannot resolve separation.
+ * It is NOT proof that two physical objects are touching, docked, or identical.
+ */
+export type EphemerisSeparation = "resolved" | "indistinguishable-ephemeris";
+
+export interface NearestSearchOptions {
+  /** Defaults to true for backwards compatibility. */
+  includeIndistinguishable?: boolean;
+}
+
 export interface NearestObject {
   satellite: SatelliteSourceInfo;
   distanceKm: number;
   relativeSpeedKmS: number;
   at: Date;
+  /** Flag coincident propagated states instead of presenting 0 km as a measured physical distance. */
+  separation: EphemerisSeparation;
 }
 
 export interface TimedTemeState {
