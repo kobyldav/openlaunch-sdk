@@ -152,6 +152,22 @@ console.log(simulation.samples);
 
 The sample list includes position, velocity, mass, altitude, Mach, dynamic pressure, g-load-like proper acceleration, thrust, stage and remaining propellant. The `summary.finalOrbit` field is a two-body end-state diagnostic; a positive apogee alone does not mean a sustained stable orbit. A periapsis below Earth's surface means suborbital geometry.
 
+## First-order orbital inclination / launch azimuth
+
+v0.8 includes a preliminary heading solver for a **specified target orbital inclination** at a given launch site and assumed local horizontal velocity.
+
+```ts
+const solutions = candidateLaunchAzimuths({
+  site,
+  inclinationDeg: 53,
+  horizontalSpeedMps: 7600,
+});
+```
+
+The solver computes inertial angular momentum from WGS84 launch-pad position, a tangent-plane horizontal velocity at each candidate heading, and Earth's rotational surface velocity. It searches possible headings numerically and returns northbound and southbound branches where available. Inclinations inaccessible from the specified pad/assumed horizontal-speed model return an empty list.
+
+**Important:** this is *not* a launch trajectory optimization or an actual Falcon 9 launch azimuth. It does not target RAAN, perform a gravity turn, account for orbital insertion latitude, Earth rotation drift during flight, range-safety geography, doglegs or time-varying vehicle performance. It is only an initial geometry feasibility tool.
+
 ## Linking LL2
 
 LL2's normalized launch object includes name, time (`net`) and usually launch pad latitude/longitude. It does **not** provide an authoritative thrust schedule, mass depletion, target orbit, ascent profile or published telemetry.
