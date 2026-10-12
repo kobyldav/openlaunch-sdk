@@ -14,6 +14,8 @@ Orbit Dynamics and Space Traffic release.
 - added pairwise closest-approach search with coarse bracketing and golden-section TCA refinement
 - added relative velocity and RTN/RIC separation geometry
 - added multiple-close-approach search, nearest-object queries and bounded CelesTrak group screening
+- nearest-object results now flag indistinguishable propagated GP ephemerides and support opt-in exclusion, without claiming physical zero separation
+- Rotterdam monitoring example now computes SGP4 ground passes and nominal Sentinel-2 MSI access windows
 - added cubic-Hermite sampled TEME trajectory interpolation and satellite screening as the bridge for future launch-vehicle trajectories
 - added element-freshness metadata and explicit no-covariance/no-collision-probability flags
 - added spherical-Earth sensor swath and off-nadir access geometry
