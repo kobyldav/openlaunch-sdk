@@ -104,7 +104,10 @@ export interface OsculatingOrbitEstimate {
   periapsisAltitudeKm: number;
   apoapsisAltitudeKm: number | null;
   specificOrbitalEnergyJkg: number;
+  /** Negative specific energy and e<1, even for surface-intersecting ellipses. */
   bound: boolean;
+  /** Geometric diagnostic, not long-term orbital stability. */
+  classification: "unbound" | "surface-intersecting" | "atmosphere-intersecting" | "candidate-bound";
 }
 export interface AscentSummary {
   initialMassKg: number;
