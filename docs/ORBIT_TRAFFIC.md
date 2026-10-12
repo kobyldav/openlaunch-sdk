@@ -210,6 +210,46 @@ The bounds are deliberate. A full operational catalog screen is a large numerica
 
 Future versions can add workers or WASM bulk propagation while preserving this API.
 
+## Catalog-coincident orbit records
+
+CelesTrak may publish multiple catalog entries with the same GP orbital state
+(e.g. components of an attached spacecraft). In that case, a propagator may
+return exactly the same TEME position and velocity for distinct catalog IDs.
+
+A computed **0 km separation is not a measured 0 km physical clearance**.
+It may mean that the available catalog ephemerides cannot resolve the relative
+motion. `TrafficEngine.nearestAt()` therefore returns:
+
+```ts
+{
+  distanceKm,
+  relativeSpeedKmS,
+  separation: "resolved" | "indistinguishable-ephemeris"
+}
+```
+
+`"indistinguishable-ephemeris"` is set only when both modeled position and
+velocity coincide to tight numerical thresholds (1 mm and 1 micrometer/s).
+The result neither asserts that the objects are docked nor merges their
+NORAD identities. By default, all entries are preserved.
+
+To hide these unresolved GP states in a ranking while preserving an explicit
+opt-in to the full raw view:
+
+```ts
+const distinct = space.traffic.nearestAt(
+  primary,
+  candidates,
+  at,
+  10,
+  { includeIndistinguishable: false },
+);
+```
+
+Do not use this convenience filter as a safety screen: for conjunction analysis,
+preserve source identities and seek higher-quality ephemerides and relative
+navigation data.
+
 ## What miss distance is not
 
 OpenLaunch deliberately does not return a made-up collision probability.
