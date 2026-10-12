@@ -150,7 +150,7 @@ console.log(simulation.events);
 console.log(simulation.samples);
 ```
 
-The sample list includes position, velocity, mass, altitude, Mach, dynamic pressure, g-load-like proper acceleration, thrust, stage and remaining propellant. The `summary.finalOrbit` field is a two-body end-state diagnostic; a positive apogee alone does not mean a sustained stable orbit. A periapsis below Earth's surface means suborbital geometry.
+The sample list includes position, velocity, mass, altitude, Mach, dynamic pressure, g-load-like proper acceleration, thrust, stage and remaining propellant. The `summary.finalOrbit` field is a two-body end-state diagnostic; a positive apogee alone does not mean a sustained stable orbit. A periapsis below Earth's surface means suborbital geometry. The `classification` field separates `unbound`, `surface-intersecting`, `atmosphere-intersecting` and `candidate-bound` trajectories. `candidate-bound` is **not** a guarantee of long-term orbital stability.
 
 ## First-order orbital inclination / launch azimuth
 
