@@ -193,3 +193,18 @@ test("targeting correctly reports unattainable lower inclination at high-latitud
   });
   assert.deepEqual(solutions,[]);
 });
+
+
+test("orbit classification separates negative energy from survivable periapsis",()=>{
+  const mu=3.986004418e14;
+  const earth=6378137;
+  const r=earth+400_000;
+  const circularSpeed=Math.sqrt(mu/r);
+  const circular=twoBodyOrbitEstimate([r,0,0],[0,circularSpeed,0]);
+  assert.equal(circular.classification,"candidate-bound");
+  assert.equal(circular.bound,true);
+  const verticalSuborbital=twoBodyOrbitEstimate([r,0,0],[1000,100,0]);
+  assert.equal(verticalSuborbital.classification,"surface-intersecting");
+  const escape=twoBodyOrbitEstimate([r,0,0],[0,12_000,0]);
+  assert.equal(escape.classification,"unbound");
+});
