@@ -27,7 +27,7 @@ v0.8 adds a **numerical multi-stage 3DOF launch simulator** to the same SDK that
 - trajectory screening against SGP4 satellite catalogs through `simulation.toTrajectory()`
 - Cesium CZML and GeoJSON launch ground-track export
 - strict `space.dynamics.fromLaunch()` adapter combining LL2 pad/time with **user-supplied** vehicle and guidance
-- **7 self-contained new launch examples**, offline and live demonstration scripts, 3DOF regression tests
+- **8 self-contained new launch examples**, offline and live demonstration scripts, 3DOF regression tests
 
 Run the fully offline example:
 
