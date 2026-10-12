@@ -191,3 +191,4 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`15-launch-dynamics/05-traffic-screening.ts`](./15-launch-dynamics/05-traffic-screening.ts) — **3DOF / SGP4 traffic**. Sample a simulated rocket path against a bounded satellite group.
 - [`15-launch-dynamics/06-cesium-czml-geojson.ts`](./15-launch-dynamics/06-cesium-czml-geojson.ts) — **3D visualization**. Export Cesium CZML and GeoJSON.
 - [`15-launch-dynamics/07-osculating-orbit-diagnostics.ts`](./15-launch-dynamics/07-osculating-orbit-diagnostics.ts) — **Final orbital geometry**. Analyze suborbital versus bound two-body estimated state.
+- [`15-launch-dynamics/08-target-inclination-azimuth.ts`](./15-launch-dynamics/08-target-inclination-azimuth.ts) — **Initial inclination feasibility**. Calculate northbound/southbound candidate launch azimuths using pad location and Earth rotation (not mission guidance).
