@@ -68,9 +68,17 @@ export class LaunchDynamicsEngine {
       const thrust=flight.current==="powered"?engineAt(stage,aero.pressurePa).thrustN*control.throttle:0;
       const inertial=ecefToTemeApprox(y.p,y.v,at);
       const totalMassKg=massNow();
-      const proper=flight.current==="powered"?
-        Math.hypot(thrust,vehicle.dragCoefficient*vehicle.referenceAreaM2*aero.qPa)/totalMassKg:
-        vehicle.dragCoefficient*vehicle.referenceAreaM2*aero.qPa/totalMassKg;
+      // Proper acceleration = magnitude of specific non-gravitational force;
+      // thrust and drag are vector forces and can oppose each other.
+      const dragAcceleration=aero.airspeedMps>1e-12
+        ?times(aero.airRelative,
+            -aero.qPa*vehicle.dragCoefficient*vehicle.referenceAreaM2/
+            (aero.airspeedMps*totalMassKg))
+        :[0,0,0] as V3;
+      const thrustAcceleration=flight.current==="powered"
+        ?times(thrustUnitEcef(y.p,control),thrust/totalMassKg)
+        :[0,0,0] as V3;
+      const proper=magnitude(plus(thrustAcceleration,dragAcceleration));
       return {
         time:at,tSeconds:t,stageIndex,flightMode:flight.current,
         massKg:totalMassKg,propellantRemainingKg:Math.max(0,y.propKg),
