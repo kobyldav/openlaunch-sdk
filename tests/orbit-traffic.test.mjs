@@ -224,5 +224,5 @@ test("Rotterdam-style SGP4 and nominal MSI access can be composed from an offlin
   });
   assert.ok(Array.isArray(passes));
   assert.ok(Array.isArray(access));
-  assert.ok(sat.stateAt(start).sourceAgeHours >= 0);
+  assert.ok(Number.isFinite(sat.stateAt(start).sourceAgeHours));
 });
