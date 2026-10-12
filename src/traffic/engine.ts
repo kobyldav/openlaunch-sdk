@@ -9,6 +9,7 @@ import type {
   ClosestApproach,
   ClosestApproachOptions,
   NearestObject,
+  NearestSearchOptions,
 } from "./types.js";
 
 export class TrafficEngine {
@@ -102,6 +103,7 @@ export class TrafficEngine {
     candidates: readonly Sgp4Satellite[],
     at: Date,
     limit = 10,
+    options: NearestSearchOptions = {},
   ): NearestObject[] {
     const p = primary.stateAt(at);
     const output: NearestObject[] = [];
@@ -116,11 +118,23 @@ export class TrafficEngine {
         const dvx = s.velocityTemeKmS.x - p.velocityTemeKmS.x;
         const dvy = s.velocityTemeKmS.y - p.velocityTemeKmS.y;
         const dvz = s.velocityTemeKmS.z - p.velocityTemeKmS.z;
+        const distanceKm = Math.hypot(dx, dy, dz);
+        const relativeSpeedKmS = Math.hypot(dvx, dvy, dvz);
+        // A shared/rounded GP orbit may be assigned to multiple distinct
+        // catalog entries (e.g. ISS modules). The resulting 0 km is NOT a
+        // measurement of physical object-to-object separation.
+        const separation =
+          distanceKm <= 1e-6 && relativeSpeedKmS <= 1e-9
+            ? "indistinguishable-ephemeris" as const
+            : "resolved" as const;
+        if (separation === "indistinguishable-ephemeris" &&
+            options.includeIndistinguishable === false) continue;
         output.push({
           satellite: candidate.sourceInfo,
-          distanceKm: Math.hypot(dx, dy, dz),
-          relativeSpeedKmS: Math.hypot(dvx, dvy, dvz),
+          distanceKm,
+          relativeSpeedKmS,
           at: new Date(at),
+          separation,
         });
       } catch {
         // Ignore unpropagatable catalog entries.
