@@ -291,7 +291,7 @@ export function totalMass(vehicle:LaunchVehicle,currentStageIndex:number,propell
   return mass;
 }
 
-function aerodynamics(state:IntegrationState,environment:LaunchSimulationOptions["environment"]):Aero {
+function aerodynamics(state:IntegrationState,environment:LaunchSimulationOptions["environment"]) {
   const env=environment??{};
   const location=ecefToGeodetic(state.p);
   const atmo=airAtAltitude(location.altitudeM,env.upperAtmosphereScaleHeightM??7000);
