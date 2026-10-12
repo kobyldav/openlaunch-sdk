@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  LaunchDynamicsEngine, OpenLaunch, Sgp4Satellite, airAtAltitude,
+  LaunchDynamicsEngine, OpenLaunch, Sgp4Satellite, candidateLaunchAzimuths, airAtAltitude,
   ecefToTemeApprox, gravityEcefMps2, guidanceAt, launchToCzml,
   launchGroundTrackGeoJson, offNadirGroundReachKm, totalMass,
   twoBodyOrbitEstimate,
@@ -167,4 +167,29 @@ test("mass helper uses remaining propellant in active stage and full upper stage
   assert.equal(totalMass(v,0,500,true),1020);
   assert.equal(totalMass(v,0,0,true),520);
   assert.equal(totalMass(v,1,200,false),310);
+});
+
+
+test("inclination target returns physically consistent north/south azimuth candidates",()=>{
+  const solutions=candidateLaunchAzimuths({
+    site:{latitudeDeg:28.5,longitudeDeg:-80.5,altitudeM:3},
+    inclinationDeg:53,
+    horizontalSpeedMps:7600,
+  });
+  assert.equal(solutions.length,2);
+  assert.ok(solutions.some(s=>s.hemisphereDirection==="northbound"));
+  assert.ok(solutions.some(s=>s.hemisphereDirection==="southbound"));
+  for(const candidate of solutions){
+    assert.ok(Math.abs(candidate.resultingInclinationDeg-53)<1e-6);
+    assert.ok(candidate.azimuthDeg>=0&&candidate.azimuthDeg<360);
+  }
+});
+
+test("targeting correctly reports unattainable lower inclination at high-latitude pad",()=>{
+  const solutions=candidateLaunchAzimuths({
+    site:{latitudeDeg:75,longitudeDeg:0,altitudeM:0},
+    inclinationDeg:10,
+    horizontalSpeedMps:7600,
+  });
+  assert.deepEqual(solutions,[]);
 });
