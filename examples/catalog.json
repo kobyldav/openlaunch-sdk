@@ -1334,6 +1334,84 @@
       ],
       "network": true,
       "description": "Interpolate time-tagged TEME states with cubic Hermite and screen an external or future launch trajectory against propagated catalog objects."
+    },
+    {
+      "path": "15-launch-dynamics/01-single-stage-3dof.ts",
+      "title": "Single-stage rotating-Earth 3DOF ascent",
+      "category": "launch-dynamics",
+      "symbols": [
+        "OpenLaunch",
+        "dynamics.simulate"
+      ],
+      "network": false,
+      "description": "Numerical RK4 WGS84 ascent with drag, thrust, and fuel consumption."
+    },
+    {
+      "path": "15-launch-dynamics/02-multistage-events.ts",
+      "title": "Multistage burnout, staging and fairing timeline",
+      "category": "launch-dynamics",
+      "symbols": [
+        "LaunchDynamicsEngine",
+        "AscentEvent"
+      ],
+      "network": false,
+      "description": "Stage burnout, coast, jettison, upper-stage ignition and fairing event timing."
+    },
+    {
+      "path": "15-launch-dynamics/03-wind-j2-atmosphere.ts",
+      "title": "Wind, atmosphere and J2 comparison",
+      "category": "launch-dynamics",
+      "symbols": [
+        "LaunchDynamicsEngine",
+        "LaunchEnvironment"
+      ],
+      "network": false,
+      "description": "Compare environmental assumptions and their effect on dynamic pressure and altitude."
+    },
+    {
+      "path": "15-launch-dynamics/04-ll2-launch-metadata.ts",
+      "title": "LL2 pad and NET into user-defined trajectory",
+      "category": "launch-dynamics",
+      "symbols": [
+        "dynamics.fromLaunch",
+        "launches.next"
+      ],
+      "network": true,
+      "description": "Use LL2 only for launch site and time; require separate vehicle and guidance."
+    },
+    {
+      "path": "15-launch-dynamics/05-traffic-screening.ts",
+      "title": "Launch trajectory and satellite screening",
+      "category": "launch-dynamics",
+      "symbols": [
+        "dynamics.simulate",
+        "AscentSimulationResult.toTrajectory",
+        "traffic.screenTrajectory"
+      ],
+      "network": true,
+      "description": "Pass simulated ascent TEME-like states to SGP4 catalog encounter screening."
+    },
+    {
+      "path": "15-launch-dynamics/06-cesium-czml-geojson.ts",
+      "title": "Ascent Cesium CZML and GeoJSON",
+      "category": "launch-dynamics",
+      "symbols": [
+        "launchToCzml",
+        "launchGroundTrackGeoJson"
+      ],
+      "network": false,
+      "description": "Export ECEF time-tagged 3D scenario and WGS84 ground track."
+    },
+    {
+      "path": "15-launch-dynamics/07-osculating-orbit-diagnostics.ts",
+      "title": "Final osculating orbit and suborbital diagnostics",
+      "category": "launch-dynamics",
+      "symbols": [
+        "AscentSummary",
+        "OsculatingOrbitEstimate"
+      ],
+      "network": false,
+      "description": "Inspect perigee, apogee, energy and inclination from final inertial-like launch state."
     }
   ]
 }
