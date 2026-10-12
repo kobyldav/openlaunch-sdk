@@ -19,6 +19,7 @@ import { OpenMeteoClient } from "./providers/openmeteo.js";
 import { EarthIntelligenceClient } from "./intelligence/earth.js";
 import { OrbitEngine } from "./orbit/engine.js";
 import { TrafficEngine } from "./traffic/engine.js";
+import { LaunchDynamicsEngine } from "./launch/dynamics.js";
 
 export const PRODUCTION_BASE_URL = LL2_PRODUCTION_BASE_URL;
 export const DEVELOPMENT_BASE_URL = LL2_DEVELOPMENT_BASE_URL;
@@ -81,6 +82,9 @@ export class OpenLaunch {
 
   /** Relative-motion, closest-approach and bounded catalog screening. */
   readonly traffic: TrafficEngine;
+
+  /** v0.8 educational point-mass multi-stage launch dynamics (not flight-qualified). */
+  readonly dynamics: LaunchDynamicsEngine;
 
   private readonly http: HttpClient;
 
@@ -159,6 +163,7 @@ export class OpenLaunch {
 
     this.orbit = new OrbitEngine(this.celestrak);
     this.traffic = new TrafficEngine(this.celestrak, this.orbit);
+    this.dynamics = new LaunchDynamicsEngine();
   }
 
   raw<T = unknown>(path: string, query: Query = {}): Promise<T> { return this.http.get<T>(path, query); }
