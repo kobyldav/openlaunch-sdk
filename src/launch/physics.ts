@@ -137,5 +137,9 @@ export function twoBodyOrbitEstimate(positionInertialM:V3, velocityInertialMps:V
     apoapsisAltitudeKm:apoapsisM===null?null:(apoapsisM-WGS84.a)/1000,
     specificOrbitalEnergyJkg:energy,
     bound,
+    classification:!bound?"unbound":
+      (periapsisM-WGS84.a)<0?"surface-intersecting":
+      (periapsisM-WGS84.a)<160_000?"atmosphere-intersecting":
+      "candidate-bound",
   };
 }
