@@ -1412,6 +1412,16 @@
       ],
       "network": false,
       "description": "Inspect perigee, apogee, energy and inclination from final inertial-like launch state."
+    },
+    {
+      "path": "15-launch-dynamics/08-target-inclination-azimuth.ts",
+      "title": "Approximate launch azimuth solutions for target inclination",
+      "category": "launch-dynamics",
+      "symbols": [
+        "candidateLaunchAzimuths"
+      ],
+      "network": false,
+      "description": "Solve local tangent-plane heading candidates for orbital inclination with Earth's surface rotation."
     }
   ]
 }
