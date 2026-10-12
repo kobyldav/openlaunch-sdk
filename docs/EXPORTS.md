@@ -1,6 +1,6 @@
 ## v0.8.0 additions
 
-Runtime: `LaunchDynamicsEngine`, `totalMass`, `launchToCzml`, `launchGroundTrackGeoJson`, `launchSiteEcefM`, `gravityEcefMps2`, `airAtAltitude`, `engineAt`, `guidanceAt`, `thrustUnitEcef`, `ecefToTemeApprox`, `twoBodyOrbitEstimate` and associated vector helpers/constants.
+Runtime: `candidateLaunchAzimuths`, `LaunchDynamicsEngine`, `totalMass`, `launchToCzml`, `launchGroundTrackGeoJson`, `launchSiteEcefM`, `gravityEcefMps2`, `airAtAltitude`, `engineAt`, `guidanceAt`, `thrustUnitEcef`, `ecefToTemeApprox`, `twoBodyOrbitEstimate` and associated vector helpers/constants.
 
 Typed: `LaunchSite`, `LaunchVehicle`, `AscentStage`, `AscentGuidance`, `PitchProgramPoint`, `LaunchSimulationOptions`, `AscentSimulationResult`, `AscentSample`, `AscentEvent`, `AscentSummary`, `LaunchScenarioInput`.
 
