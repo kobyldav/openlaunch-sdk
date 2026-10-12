@@ -37,14 +37,25 @@ console.log(nextPass ? {
 } : "No matching pass in search window");
 
 const stations = await space.orbit.group("STATIONS", 100);
-const nearest = space.traffic.nearestAt(iss, stations, now, 5);
-console.log("\nNearest objects from CelesTrak STATIONS group");
-console.table(nearest.map((item) => ({
+const ranked = space.traffic.nearestAt(iss, stations, now, stations.length);
+const indistinguishable = ranked.filter((item) => item.separation === "indistinguishable-ephemeris");
+const nearestResolved = ranked.filter((item) => item.separation === "resolved").slice(0, 5);
+console.log("\nNearest resolved GP orbits from CelesTrak STATIONS group");
+console.table(nearestResolved.map((item) => ({
   name: item.satellite.name,
   norad: item.satellite.noradCatalogId,
-  distanceKm: item.distanceKm,
+  modeledDistanceKm: item.distanceKm,
   relativeSpeedKmS: item.relativeSpeedKmS,
 })));
+console.log("Unresolved/catalog-coincident orbit entries:", indistinguishable.length);
+if (indistinguishable.length) {
+  console.log("These entries propagate to the same state as the reference ISS. Their catalog GP orbits do not resolve physical separation; 0 km is NOT a physical clearance measurement.");
+  console.table(indistinguishable.map((item) => ({
+    name: item.satellite.name,
+    norad: item.satellite.noradCatalogId,
+    separation: item.separation,
+  })));
+}
 
 const czechia = bbox(12.09, 48.55, 18.86, 51.06);
 const sentinelMatches = await space.orbit.byName("SENTINEL-2C");
