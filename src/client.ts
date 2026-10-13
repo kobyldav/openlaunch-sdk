@@ -92,7 +92,7 @@ export class OpenLaunch {
   private readonly http: HttpClient;
 
   constructor(options: OpenLaunchOptions = {}) {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation available. Pass { fetch } to OpenLaunch().");
     const headers: Record<string, string> = { ...(options.headers ?? {}) };
     if (options.apiKey) headers.Authorization = `Token ${options.apiKey}`;
