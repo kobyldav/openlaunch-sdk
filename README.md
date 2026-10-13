@@ -1,18 +1,81 @@
 # OpenLaunch SDK
 
-**OpenLaunch SDK** is a TypeScript space-computation toolkit for spaceflight data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, mission analysis and spacecraft engineering.
+**OpenLaunch SDK** is a TypeScript space-computation toolkit for spaceflight data, generic 3DOF launch trajectory simulation, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, mission analysis and spacecraft engineering.
 
-It combines five layers in one package:
+It combines six layers in one package:
 
 1. **Live spaceflight data** — Launch Library 2 (LL2), NASA Open APIs and CelesTrak.
 2. **Orbit dynamics and space traffic** — SGP4/SDP4, TEME/Earth-fixed state handling, ground tracks, passes, closest approach, RTN geometry and bounded catalog screening.
-3. **Earth observation and geospatial intelligence** — STAC, Copernicus, Sentinel-1/2, Landsat, Open-Meteo, AOIs and cross-provider workflows.
-4. **Mission-engineering utilities** — orbital mechanics, interplanetary transfers, rockets, geodesy, atmosphere, communications, thermal, power, navigation, EDL, reliability, statistics and more.
-5. **Production SDK infrastructure** — typed resources, pagination, caching, request deduplication, retries, timeouts, concurrency control, telemetry and a circuit breaker.
+3. **Launch trajectory dynamics** — generic multistage 3DOF ascent, propellant flow, guidance, atmosphere, maximum dynamic pressure, stochastic dispersion and modeled satellite screening.
+4. **Earth observation and geospatial intelligence** — STAC, Copernicus, Sentinel-1/2, Landsat, Open-Meteo, AOIs and cross-provider workflows.
+5. **Mission-engineering utilities** — orbital mechanics, interplanetary transfers, rockets, geodesy, atmosphere, communications, thermal, power, navigation, EDL, reliability, statistics and more.
+6. **Production SDK infrastructure** — typed resources, pagination, caching, request deduplication, retries, timeouts, concurrency control, telemetry and a circuit breaker.
 
 The goal is not to hide public data behind a paywall. The goal is to provide a clean, reusable engineering layer on top of public sources and deterministic calculations.
 
 > **Important:** OpenLaunch is an engineering/development library, not flight-qualified software. Do not use its results as the sole basis for human safety, launch commit criteria, collision avoidance, flight termination, autonomous spacecraft control or other safety-critical operations without independent verification, validated models, requirements traceability and appropriate certification.
+
+---
+
+## New in v0.8.0 — Launch Trajectory Engine
+
+v0.8 adds a generic **3DOF multistage ascent simulator** instead of treating rocket trajectories as a launch date plus guessed ground track:
+
+- fixed-step RK4 integration of 3D position, velocity and changing mass;
+- central/J2 Earth gravity, rotating Earth and co-rotating ISA atmosphere with aerodynamic drag;
+- staged engines with pressure-dependent thrust/Isp, burnouts, separation, coast and fairing events;
+- time-tagged pitch/heading/throttle schedules with interpolation;
+- mass, altitude, Mach, max-Q, speed and flight-event telemetry;
+- seeded Monte Carlo dispersion and percentile-based positional spread;
+- use of v0.7 satellite screening to compare a modeled rocket trajectory with SGP4 objects;
+- CZML export of simulated rocket paths and event markers for Cesium.
+
+```ts
+import { OpenLaunch, type LaunchModel } from "openlaunch-sdk";
+
+const space = new OpenLaunch();
+const model: LaunchModel = {
+  liftoff: new Date("2026-10-13T12:00:00Z"),
+  site: { latitudeDeg: 28.56, longitudeDeg: -80.58 },
+  durationSeconds: 120,
+  guidance: [
+    { timeSeconds: 0, pitchDeg: 90, headingDeg: 90 },
+    { timeSeconds: 120, pitchDeg: 30, headingDeg: 90 },
+  ],
+  vehicle: {
+    name: "Generic model, not a real vehicle profile",
+    payloadMassKg: 100,
+    dragCoefficient: 0.25,
+    referenceAreaM2: 2,
+    stages: [
+      { name: "S1", dryMassKg: 1000, propellantMassKg: 5000, thrustSeaLevelN: 300000,
+        thrustVacuumN: 330000, ispSeaLevelS: 250, ispVacuumS: 280 },
+      { name: "S2", dryMassKg: 300, propellantMassKg: 1000, thrustSeaLevelN: 60000,
+        thrustVacuumN: 65000, ispSeaLevelS: 280, ispVacuumS: 310 },
+    ],
+  },
+};
+
+const flight = space.trajectory.simulate(model);
+const envelope = space.trajectory.monteCarlo(model, { runs: 20, seed: 42 });
+console.log(flight.events, flight.maxQPa, envelope.dispersion);
+```
+
+To compare with catalog satellites:
+
+```ts
+const iss = await space.orbit.byCatalogNumber(25544);
+if (iss) {
+  const screen = space.trajectory.screenSatellites(model, [iss], { thresholdKm: 100 });
+  console.log(screen.approaches);
+}
+```
+
+**Accuracy boundary:** neither a launch timestamp nor a rocket name determines a real mission trajectory. These are modeled states from explicitly supplied parameters, not SpaceX telemetry or operational launch clearance. The integration frame is GMST-aligned **TEME-approx**, not an EOP-corrected reference frame. The Monte Carlo envelope is not a collision probability.
+
+Full details: [Launch Trajectory Engine](docs/LAUNCH_TRAJECTORY.md).
+
+Offline demo: `npm run example:launch` (add `-- --czml` to write a Cesium CZML file).
 
 ---
 
