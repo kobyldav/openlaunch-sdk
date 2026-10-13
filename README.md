@@ -2,7 +2,7 @@
 
 **OpenLaunch SDK v1.1.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
 
-**Status:** v1.1.0 is developed on a feature branch and is not published to npm. The v1.0 base passed 83 offline tests; modular package and installation checks are separately required before v1.1 can be released. This is not flight-qualified or certified for safety-critical operations.
+**Status:** v1.1.0 is validated in its separate feature branch (95 regression tests + isolated npm tarball installations, all passing on Node 18/20/22), but is not merged or published to npm. This is not flight-qualified or certified for safety-critical operations.
 
 The SDK combines these layers:
 
@@ -77,6 +77,21 @@ console.log(next?.name);
 The generated distribution contains just the transitively needed compiled modules. Shared HTTP/cache internals are external `@openlaunch/core` imports. This incremental split preserves the original `src/` as source of truth, with an eventual physical source reorganization possible after confirming independent installs. Package size measurements are printed by `npm run build:packages` and live in `packages/build-report.json` locally.
 
 **Trade-offs:** smaller domain-specific installations and no `satellite.js` in Earth/launch/raster packages; more semver/publishing work and a temporary generated-dependency-graph build step. Browser bundle size must still be measured with an actual bundler.
+
+### Verified npm archive sizes (Node 22 CI)
+
+| Install | Tarballs (compressed) | Compared with umbrella tarball |
+| --- | ---: | ---: |
+| Full `openlaunch-sdk@1.1.0` | 361.5 kB | Baseline |
+| `@openlaunch/earth` + `@openlaunch/core` | 35.7 kB | ~90% smaller |
+| `@openlaunch/raster` + `@openlaunch/core` | 46.0 kB | ~87% smaller |
+| `@openlaunch/launches` + `@openlaunch/core` | 22.8 kB | ~94% smaller |
+| `@openlaunch/orbit` (+ core, excluding satellite.js tarball) | 52.9 kB | Not an isolated web-data scenario |
+| `@openlaunch/engineering` (+ core + orbit; excluding satellite.js) | 109.6 kB | Research/engineering bundle |
+
+Measurements use `npm pack --dry-run` from CI. They exclude external npm dependencies and do **not** equal minified/gzip browser JS bundles or real network install times. The domain packages have separate, tested ESM and CJS entrypoints.
+
+**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and three separately isolated npm tarball installation smoke checks. All succeeded on Node 18, 20 and 22.
 
 Full architecture, commands, migration strategy and remaining risks: [Modular workspaces v1.1](./docs/MONOREPO_V1_1.md).
 
