@@ -94,7 +94,7 @@ export class StacClient {
   private readonly http: HttpClient;
 
   constructor(options: StacClientOptions) {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation available");
     const cache = options.cache === false ? undefined : options.cache ?? new MemoryCache(300);
     this.http = new HttpClient({
