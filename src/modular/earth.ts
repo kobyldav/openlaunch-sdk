@@ -1,4 +1,4 @@
-import { CopernicusClient, type CopernicusClientOptions } from "../providers/copernicus.js";
+import { CopernicusClient, type CopernicusOptions } from "../providers/copernicus.js";
 import { PlanetaryComputerClient, type PlanetaryComputerOptions } from "../providers/planetary-computer.js";
 import { OpenMeteoClient, type OpenMeteoOptions } from "../providers/openmeteo.js";
 import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport } from "../intelligence/observations.js";
@@ -13,7 +13,7 @@ import type { StacItem } from "../providers/stac.js";
  * For georeferenced TIFF/COG pixels, install @openlaunch/raster separately.
  */
 export interface EarthCatalogOptions {
-  copernicus?: CopernicusClientOptions;
+  copernicus?: CopernicusOptions;
   planetaryComputer?: PlanetaryComputerOptions;
   weather?: OpenMeteoOptions;
 }
