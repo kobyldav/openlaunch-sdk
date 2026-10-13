@@ -1,8 +1,8 @@
 # OpenLaunch SDK
 
-**OpenLaunch SDK v0.9.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
+**OpenLaunch SDK v1.0.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
 
-**Status:** v0.9.0 is validated by the repository's offline unit/integration tests (65/65 tests on Node 18/20/22 in GitHub Actions). This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
+**Status:** v1.0.0 is under development on a dedicated feature branch, with CI validation and release tests required before merging. This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
 
 The SDK combines these layers:
 
@@ -21,7 +21,7 @@ The runtime has **one pinned third-party dependency**, `satellite.js@6.0.2`, whi
 
 ## Contents
 
-- [Installation and verification](#installation)
+- [Installation and verification](#installation)\n- [v1.0 GeoTIFF and raster analysis](#new-in-v100--real-geotiffcog-raster-analytics)
 - [Quick start](#1-quick-start)
 - [What's new in v0.9](#new-in-v090--mission--earth-intelligence)
 - [Mission & Earth Intelligence](./docs/MISSION_INTELLIGENCE.md)
@@ -31,6 +31,35 @@ The runtime has **one pinned third-party dependency**, `satellite.js@6.0.2`, whi
 - [Typed examples and AI index](#examples-and-ai-code-indexing)
 - [Testing and validation](#34-testing)
 - [Accuracy and roadmap](#39-accuracy-tiers)
+
+## New in v1.0.0 — Real GeoTIFF/COG Raster Analytics
+
+v1.0 makes it possible to work with **real georeferenced pixels**, instead of only catalog metadata and previews. The previous launch, orbit and provider APIs remain available.
+
+| Capability | API | Scope |
+|---|---|---|
+| Read an actual GeoTIFF | `decodeGeoTiff(binary)`, `space.earth.downloadRaster(item,key,options)` | Single-band classic TIFF/BigTIFF, up to 64 MiB default download |
+| Read only relevant remote COG blocks | `space.earth.readRasterWindow(item,key,aoi,{allowedHosts})` | HTTPS 206 Range, EPSG:4326/3857, Deflate or uncompressed strips/tiles |
+| Geographic crops & raster alignment | `clipRasterToAoi`, `alignRasterTo` | AOI polygon/bbox, nearest or bilinear resampling **within same CRS** |
+| Radiometric calibration & cloud masks | `calibrateRasterFromStac`, `maskRasterBySentinel2Scl` | Requires explicit scale/offset and actual SCL pixels |
+| NDVI & temporal change | `ndviRaster`, `rasterDifference`, `rasterStatistics` | Aligned, physically consistent bands; missing pixels remain NaN |
+| Raster visualization & terrain | `renderRasterRgb`, `elevationToLocalMesh` | RGBA pixel bytes and a **local** projected-metre DEM mesh |
+
+**Test offline:**
+
+```bash
+git clone https://github.com/kobyldav/openlaunch-sdk.git
+cd openlaunch-sdk
+npm ci
+npm run check
+npm run example:raster
+```
+
+The `example:raster` script generates genuine small GeoTIFF files in memory and runs the production decoder. Real remote images require accessible provider TIFF assets, correct authorization/signing and an explicit trusted hostname allowlist. The SDK **does not** currently support JPEG2000, LZW/JPEG or all GeoTIFF CRSs, and a local mesh is **not** a finished Cesium 3D globe or glTF export.
+
+Full technical details, supported encodings, limits and working code: [Real Raster Analytics v1.0](./docs/RASTER_V1.md).
+
+---
 
 ## New in v0.9.0 — Mission & Earth Intelligence
 
@@ -376,7 +405,7 @@ Requirements:
 
 ## Examples and AI/code indexing
 
-The repository includes **128 indexed, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
+The repository includes **132 indexed, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
 
 ```text
 examples/
@@ -406,7 +435,7 @@ Useful commands:
 ```bash
 npm run examples:check   # type-check examples; no network calls
 npm run check            # source + examples + regression tests + offline scenarios
-npm run example:mission  # offline EO and mission demonstration
+npm run example:raster   # offline GeoTIFF pixels, NDVI changes and DEM mesh\nnpm run example:mission  # offline EO and mission demonstration
 npm run example:launch   # offline staged rocket ascent demonstration
 npm run example:orbit-traffic # satellite example; calls live CelesTrak
 npm run example:rotterdam    # live EO/weather/launch providers
