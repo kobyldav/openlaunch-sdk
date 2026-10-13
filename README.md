@@ -2,7 +2,7 @@
 
 **OpenLaunch SDK v1.0.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
 
-**Status:** v1.0.0 is under development on a dedicated feature branch, with CI validation and release tests required before merging. This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
+**Status:** v1.0.0 is implemented on a separate feature branch. GitHub Actions passed 83/83 offline tests on Node 18, 20 and 22, including the GeoTIFF/COG decoder and npm pack. Real upstream data still require provider-specific live verification. This is not a published npm release or flight-qualified library. This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
 
 The SDK combines these layers:
 
@@ -50,6 +50,7 @@ v1.0 makes it possible to work with **real georeferenced pixels**, instead of on
 ```bash
 git clone https://github.com/kobyldav/openlaunch-sdk.git
 cd openlaunch-sdk
+git switch --track origin/feature/geospatial-raster-v1.0.0
 npm ci
 npm run check
 npm run example:raster
