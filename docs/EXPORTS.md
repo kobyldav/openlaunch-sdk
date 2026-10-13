@@ -1,6 +1,28 @@
 # Runtime export inventory
 
-The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0 and v0.7.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
+The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0, v0.7.0 and v0.8.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
+
+## v0.8.0 additions
+
+```text
+LaunchTrajectoryEngine
+simulateLaunch
+rk4LaunchStep
+launchMonteCarlo
+launchToCzml
+assessLaunchOrbit
+initialLaunchState
+launchInitialMass
+validateLaunchModel
+guidanceAt
+atmosphericState
+computeForces
+telemetryAt
+```
+
+Typed domains: `LaunchModel`, `LaunchVehicle`, `LaunchStage`, `LaunchSite`, `GuidanceKnot`, `LaunchTelemetry`, `LaunchSimulation`, `LaunchEvent`, `LaunchMonteCarloResult`, `TrajectoryDispersion`, `LaunchOrbitalAssessment`. Subpath `openlaunch-sdk/trajectory` and `space.trajectory`.
+
+**Model limit:** GMST-only TEME-aligned 3DOF dynamics and first-order dispersion, not an actual mission flight plan or certified conjunction probability.
 
 ## v0.7.0 additions
 
