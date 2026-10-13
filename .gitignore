@@ -5,3 +5,4 @@ coverage/
 .env
 .DS_Store
 *.log
+packages/*/dist/\npackages/*/LICENSE\npackages/build-report.json\n
