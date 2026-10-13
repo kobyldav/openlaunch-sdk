@@ -1,5 +1,6 @@
 import { computeForces, guidanceAt, initialLaunchState, launchInitialMass, telemetryAt, validateLaunchModel } from "./dynamics.js";
 import { rk4LaunchStep } from "./integrator.js";
+import { assessLaunchOrbit } from "./orbit-analysis.js";
 import { norm } from "./math.js";
 import type {
   DerivativeState, LaunchEvent, LaunchEventKind, LaunchModel, LaunchSimulation,
@@ -94,6 +95,11 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
   recordEvent("liftoff","Requested simulation initial state, not evidence of an actual liftoff");
   recordEvent("engine-ignition",model.vehicle.stages[0]!.name);
   ignitedStageIndex=0;
+  if (model.vehicle.fairingJettisonSeconds === 0) {
+    fairingJettisoned = true;
+    state = { ...state, massKg: state.massKg - (model.vehicle.fairingMassKg ?? 0) };
+    recordEvent("fairing-jettison", "Fairing separation at T+0");
+  }
   sample();
 
   let iterations=0;
@@ -205,6 +211,7 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
   return {
     model,trajectory,telemetry,events,
     initialMassKg:startMass,finalMassKg:state.massKg,
+    finalOrbit: assessLaunchOrbit(trajectory[trajectory.length - 1]!),
     maxQPa,maxQTime,maxAltitudeKm,totalSimulatedSeconds:elapsedSeconds,
     termination,
     frame:"TEME-approx-GMST",
