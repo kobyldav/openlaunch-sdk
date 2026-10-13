@@ -84,7 +84,7 @@ export class ObservationDiscoveryClient {
         const result = await client.search({
           collections: [query.collection],
           intersects: options.area.geometry,
-          datetime: { from, to },
+          ...(layer === "elevation" ? {} : { datetime: { from, to } }),
           limit,
           sortby: [{ field: "properties.datetime", direction: "desc" }],
           ...(maxCloud !== undefined && layer === "optical" ? { query: { "eo:cloud_cover": { lte: maxCloud } } } : {}),
@@ -115,6 +115,7 @@ export class ObservationDiscoveryClient {
       "Catalog records are not image pixel arrays; use declared asset hrefs and a suitable COG/GeoTIFF processor or provider Process API.",
       "Resolution comes from explicit STAC metadata only. A rendered preview is not full-resolution data.",
       "Scene-level cloud estimates do not prove that a selected AOI is clear.",
+      "Elevation is a static DEM product and its acquisition date does not match an optical observation date.",
       "A catalog intersection does not establish that satellite imaging was commanded or that pixels are available for every target point.",
     ];
     if (statuses.some(status => status.status === "error")) warnings.push("One or more provider queries failed; results are partial, not an exhaustive inventory.");
