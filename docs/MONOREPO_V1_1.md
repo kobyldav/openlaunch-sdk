@@ -143,6 +143,38 @@ npm run build:packages
 
 **Bundle-size distinction:** raw tarball size is **not the same** as browser bundle size; bundled size also depends on your bundler and tree-shaking. A follow-up real bundler benchmark should measure minified+gzip browser output and actual cold install size separately.
 
+### Verified npm archive sizes (Node 22 CI)
+
+| Install | Tarballs (compressed) | Compared with umbrella tarball |
+| --- | ---: | ---: |
+| Full `openlaunch-sdk@1.1.0` | 361.5 kB | Baseline |
+| `@openlaunch/earth` + `@openlaunch/core` | 35.7 kB | ~90% smaller |
+| `@openlaunch/raster` + `@openlaunch/core` | 46.0 kB | ~87% smaller |
+| `@openlaunch/launches` + `@openlaunch/core` | 22.8 kB | ~94% smaller |
+| `@openlaunch/orbit` (+ core, excluding satellite.js tarball) | 52.9 kB | Not an isolated web-data scenario |
+| `@openlaunch/engineering` (+ core + orbit; excluding satellite.js) | 109.6 kB | Research/engineering bundle |
+
+Measurements use `npm pack --dry-run` from CI. They exclude external npm dependencies and do **not** equal minified/gzip browser JS bundles or real network install times. The domain packages have separate, tested ESM and CJS entrypoints.
+
+**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and three separately isolated npm tarball installation smoke checks. All succeeded on Node 18, 20 and 22.
+
+## Publication prerequisites and dependency order
+
+This PR **does not create or publish packages in the npm registry**. Publication requires authenticated ownership of the `@openlaunch` organization/scope, explicit authorization, and a release tag.
+
+After that, the dependency-safe publish order is:
+
+```sh
+npm publish --access public --workspace @openlaunch/core
+npm publish --access public --workspace @openlaunch/earth
+npm publish --access public --workspace @openlaunch/raster
+npm publish --access public --workspace @openlaunch/launches
+npm publish --access public --workspace @openlaunch/orbit
+npm publish --access public --workspace @openlaunch/engineering
+```
+
+Build + validate before publishing: `npm ci && npm run check && npm run pack:check:packages && npm run test:packed`. Verify exact version/source hashes, npm publishing permissions and release provenance before running any publish command.
+
 ## Trade-offs and risks
 
 | Choice | Benefit | Cost / risk |
