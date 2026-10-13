@@ -10,9 +10,9 @@ const names=["core","earth","raster","launches","orbit","engineering"];
 const require=createRequire(import.meta.url);
 const publicFunctions={
  core:["HttpClient","MemoryCache","query"],
- earth:["StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
+ earth:["EarthCatalogClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
  raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","calibrateRasterFromStac","elevationToLocalMesh"],
- launches:["LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
+ launches:["LaunchDataClient","LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
  orbit:["Sgp4Satellite","OrbitEngine","TrafficEngine"],
  engineering:["simulateLaunch","sweepLaunchGuidance","idealStagedDeltaVMps"],
 };
@@ -88,4 +88,18 @@ test("Package build-report shows isolated module sizes",async()=>{
   console.log("Workspace uncompressed size report:",report.map(x=>({
     name:"@openlaunch/"+x.pkg,modules:x.modules,KiB:Math.round(x.bytes/1024)
   })));
+});
+
+test("Small standalone facades support one-line Earth and launch data clients",async()=>{
+  const {EarthCatalogClient}=await import("@openlaunch/earth");
+  const {LaunchDataClient}=await import("@openlaunch/launches");
+  const providers=new EarthCatalogClient();
+  assert.equal(typeof providers.discoverObservations,"function");
+  assert.equal(typeof providers.downloadPreview,"function");
+  const launches=new LaunchDataClient({
+    fetch:async()=>new Response(JSON.stringify({count:0,next:null,previous:null,results:[]})),
+    retries:0,
+  });
+  assert.equal((await launches.launches.upcoming({limit:1})).results.length,0);
+  assert.ok(launches.config);
 });
