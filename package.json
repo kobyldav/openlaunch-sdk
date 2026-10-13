@@ -115,7 +115,7 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
@@ -125,7 +125,8 @@
     "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
     "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
     "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs",
-    "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs"
+    "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs",
+    "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs"
   },
   "engines": {
     "node": ">=18"
