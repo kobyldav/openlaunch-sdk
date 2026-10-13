@@ -30,6 +30,12 @@ export interface LaunchVehicle {
   payloadMassKg: number;
   fairingMassKg?: number;
   fairingJettisonSeconds?: number;
+  /** Optional event-driven fairing release. Takes precedence over fixed-time release. */
+  fairingSeparation?: {
+    earliestSeconds: number;
+    minAltitudeKm?: number;
+    maxDynamicPressurePa?: number;
+  };
   dragCoefficient: number;
   referenceAreaM2: number;
 }
@@ -54,6 +60,13 @@ export interface LaunchModel {
   enableJ2?: boolean;
   /** Coast with the remaining payload/stage when fuel is exhausted. Default true. */
   coastAfterBurnout?: boolean;
+  /** Optional idealized first-order throttle constraint controller. */
+  flightConstraints?: {
+    maxDynamicPressurePa?: number;
+    maxAxialAccelerationG?: number;
+    /** Response horizon in seconds for max-Q prediction. Default 5s. */
+    maxQResponseSeconds?: number;
+  };
   /** Maximum output samples. Default 20000. */
   maxSamples?: number;
 }
@@ -76,6 +89,9 @@ export interface LaunchEvent {
   massKg: number;
   stageIndex: number | null;
   detail?: string;
+  /** For discrete mass-release events, allows auditing discontinuities. */
+  massBeforeKg?: number;
+  massAfterKg?: number;
 }
 
 export interface LaunchTelemetry {
@@ -94,6 +110,11 @@ export interface LaunchTelemetry {
   mach: number;
   accelerationMps2: number;
   thrustN: number;
+  /** Scheduled throttle from the guidance profile. */
+  commandedThrottle: number;
+  /** Applied throttle after idealized constraint limiting. */
+  effectiveThrottle: number;
+  throttleLimiter: "none" | "max-q" | "axial-g" | "both";
   dragN: number;
   gravityMps2: number;
   positionTemeKm: CartesianKm;
@@ -109,6 +130,10 @@ export interface LaunchSimulation {
   finalMassKg: number;
   finalOrbit: LaunchOrbitalAssessment | null;
   maxQPa: number;
+  maxAxialAccelerationG: number;
+  throttledSamples: number;
+  /** Constraints are best effort and may be exceeded: never imply certification. */
+  constraintViolations: readonly string[];
   maxQTime: Date;
   maxAltitudeKm: number;
   totalSimulatedSeconds: number;
