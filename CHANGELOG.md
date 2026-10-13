@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.9.0 - 2026-10-13
+
+Mission & Earth Intelligence: cross-version functional gap closure.
+
+- STAC-derived EO asset metadata for actual available RGB, spectral, radar, quality, thermal and elevation layers, with explicit per-asset GSD provenance
+- real, bounded HTTPS STAC preview/visual bytes downloader (not GeoTIFF decoding, arbitrary raster analysis or a fabricated image)
+- independent Sentinel-1, Sentinel-2, Landsat L2 surface temperature and Copernicus DEM GLO-30 catalog discovery, with provider-level error statuses
+- Earth monitoring snapshot resilience when optical, radar or weather provider is offline
+- Landsat Collection 2 ST_B10 calibrated surface temperature and ST_QA uncertainty pixel helpers; Sentinel-2 L2A SCL classifier/summary
+- separate time/platform metadata correlation between predicted geometric swath access and actually indexed STAC scenes, without claiming exact AOI pixel confirmation
+- auditable historical/current satellite traffic screening: element-age and trajectory sample-resolution warnings, failed orbit data accounting, no operational clearance claim
+- bounded pitch/heading guidance sweep scored against optional target inclination/perigee/apogee and physical constraint violations
+- idealized staged vacuum delta-v and circular orbit-speed diagnostics
+- `space.mission`, `openlaunch-sdk/mission`, `space.earth.discoverObservations`, `space.earth.downloadPreview`, `space.trajectory.auditTraffic`
+- offline v0.9 mission example, expanded regression suite and machine-readable examples catalog
+
+Incomplete by design: full COG pixel tile reads, multi-resolution raster fusion/reprojection, actual DEM 3D mesh generation, full closed-loop launch optimizer, verified real SpaceX telemetry/trajectories and covariance-based collision probabilities.
+
+
 ## 0.8.1 - 2026-10-13
 
 Ascent modeling refinement following the offline high-q launch scenario:
