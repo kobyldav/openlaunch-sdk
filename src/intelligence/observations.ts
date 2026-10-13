@@ -27,6 +27,7 @@ export interface ObservationQueryStatus {
   collection: string;
   status: "ok" | "error";
   returned: number;
+  excludedWithoutRequiredAsset?: number;
   message?: string;
 }
 export interface ObservationDiscoveryReport {
@@ -89,13 +90,25 @@ export class ObservationDiscoveryClient {
           sortby: [{ field: "properties.datetime", direction: "desc" }],
           ...(maxCloud !== undefined && layer === "optical" ? { query: { "eo:cloud_cover": { lte: maxCloud } } } : {}),
         });
-        const scenes: ObservationScene[] = result.features.map(item => ({
+        const categorized: ObservationScene[] = result.features.map(item => ({
           provider: query.provider,
           layer,
           item,
           product: inspectEoProduct(item),
         }));
-        return { status: { ...query, status: "ok" as const, returned: scenes.length }, scenes };
+        const scenes = layer === "thermal"
+          ? categorized.filter(scene => scene.product.availableKinds.includes("thermal"))
+          : categorized;
+        const excludedWithoutRequiredAsset = categorized.length - scenes.length;
+        return {
+          status: {
+            ...query,
+            status: "ok" as const,
+            returned: scenes.length,
+            ...(excludedWithoutRequiredAsset ? { excludedWithoutRequiredAsset } : {}),
+          },
+          scenes,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         return {
