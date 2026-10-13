@@ -2,6 +2,23 @@
 
 The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0, v0.7.0 and v0.8.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
 
+## v0.9.0 additions
+
+Public root and `openlaunch-sdk/mission`:
+`MissionPlanningEngine`, `sweepLaunchGuidance`, `assessOrbitTarget`, `idealStagedDeltaVMps`, `circularSpeedAtAltitudeMps`, orbit targets and bounded guidance candidate types.
+
+Earth intelligence and EO:
+`ObservationDiscoveryClient`, `inspectEoProduct`, `inspectEoAsset`, `selectEoAssets`,
+`downloadEoAsset`, `downloadEoPreview`, `landsatC2SurfaceTemperature`,
+`landsatC2StUncertaintyKelvin`, `sentinel2SclClass`,
+`summarizeSentinel2Scl`, `reconcileAccessWithScenes`.
+
+Orbit traffic:
+`auditTrajectoryAgainstCatalog`, `TrajectoryScreenAudit`, `AuditedEncounter`.
+Clients: `space.mission`, `space.earth.discoverObservations`, `space.earth.downloadPreview`, `space.trajectory.auditTraffic`.
+
+**Please note:** None of these functions claims actual mission guidance, generated imagery, certified collision probability, or verified optical quality.
+
 ## v0.8.0 additions
 
 ```text
