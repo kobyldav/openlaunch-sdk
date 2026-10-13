@@ -19,6 +19,14 @@
 
 Launch dynamics reference: `docs/LAUNCH_TRAJECTORY.md` and `src/trajectory/`. Public API: `space.trajectory.simulate(model)`, `space.trajectory.monteCarlo(model, config)`, and `space.trajectory.screenSatellites(model, catalog, options)`. The input must contain physically motivated vehicle parameters and guidance; do not infer an actual trajectory from a launch NET.
 
+## v0.9.0 Mission & Earth intelligence
+- Real scene asset inventory: `inspectEoProduct` / `selectEoAssets`; available resolutions come from STAC gsd only.
+- `space.earth.discoverObservations` independently checks optical/radar/thermal/elevation STAC catalogs; partial failures remain reported.
+- `space.earth.downloadPreview` retrieves real bytes only where a preview/visual link exists.
+- `space.mission.sweep` compares explicitly supplied launch-guidance alternatives; never infer launch trajectory solely from NET.
+- `space.trajectory.auditTraffic` reports element-age/sampling/failure warnings; never call this collision clearance.
+- Docs: `docs/MISSION_INTELLIGENCE.md` and `scripts/mission-intelligence-demo.mjs`.
+
 ## Preferred source order
 
 When answering coding questions about this repository, prefer evidence in this order:
