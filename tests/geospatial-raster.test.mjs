@@ -5,7 +5,7 @@ import {
   bbox,polygon,point,decodeGeoTiff,ndviRaster,rasterStatistics,
   alignRasterTo,clipRasterToAoi,rasterDifference,elevationToLocalMesh,
   sampleRaster,pixelToWorld,worldToPixel,lonLatToGridCrs,
-  OpenLaunch,calibrateRaster,calibrateRasterFromStac,maskRasterBySentinel2Scl,renderRasterRgb,
+  OpenLaunch,calibrateRaster,calibrateRasterFromStac,maskRasterBySentinel2Scl,renderRasterRgb,readCogWindowUrl,
 } from "../dist/index.js";
 
 /** Exact-value generated GeoTIFF bytes, never a mock decoder. */
@@ -207,4 +207,71 @@ test("SCL removes clouds and quality failures before pixel-level NDVI",()=>{
   assert.equal(rgb.rgba[11],0);
   assert.equal(rgb.rgba[15],255);
   assert.equal(rgb.encodedImage,false);
+});
+
+function mockRangeSource(bytes){
+  const calls=[];
+  const fetch=async(_url,init={})=>{
+    const range=init.headers?.Range;
+    calls.push(range??"none");
+    if(!range)return new Response("range required",{status:400});
+    const m=/^bytes=(\d+)-(\d+)$/.exec(range);
+    if(!m)throw new RangeError("Invalid Range header");
+    const start=Number(m[1]),end=Math.min(Number(m[2]),bytes.length-1);
+    if(start>=bytes.length)return new Response(null,{status:416});
+    const data=bytes.slice(start,end+1);
+    return new Response(data,{
+      status:206,
+      headers:{
+        "content-range":`bytes ${start}-${end}/${bytes.length}`,
+        "content-length":String(data.length),"content-type":"image/tiff",
+      },
+    });
+  };
+  return {fetch,calls};
+}
+test("HTTP Range reader returns exact AOI TIFF pixels and refuses full-download fallback",async()=>{
+  const bytes=fixture();
+  const mock=mockRangeSource(bytes);
+  const result=await readCogWindowUrl("https://assets.example.test/test.tif",
+    bbox(14,50.99,14.01,51),{
+      allowedHosts:["assets.example.test"],fetch:mock.fetch,
+    });
+  assert.equal(result.transferStrategy,"http-byte-ranges");
+  assert.equal(result.requestedTiles,1);
+  assert.deepEqual([...result.raster.values],[100]);
+  assert.deepEqual([result.raster.width,result.raster.height],[1,1]);
+  assert.equal(mock.calls.length,2); // IFD header + only selected data strip
+  assert.ok(mock.calls.every(s=>s.startsWith("bytes=")));
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/test.tif",
+    bbox(14,50.99,14.01,51),{
+      allowedHosts:["assets.example.test"],
+      fetch:async()=>new Response(bytes),
+    }),/206 Partial Content/);
+});
+test("Remote COG reader checks trusted hosts and rejects unsupported areas",async()=>{
+  const bytes=fixture(),mock=mockRangeSource(bytes);
+  await assert.rejects(readCogWindowUrl("https://localhost/file.tif",bbox(14,50.99,14.01,51),{
+    allowedHosts:["localhost"],fetch:mock.fetch,
+  }),/trusted/);
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/file.tif",bbox(14,50.99,14.01,51),{
+    allowedHosts:["different.test"],fetch:mock.fetch,
+  }),/trusted/);
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/file.tif",bbox(0,0,1,1),{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  }),/does not intersect/);
+});
+test("OpenLaunch Earth Intelligence returns cropped pixels from remote COG asset",async()=>{
+  const mock=mockRangeSource(fixture());
+  const sdk=new OpenLaunch();
+  const scene={
+    type:"Feature",id:"remote-tiff",collection:"landsat-c2-l2",
+    geometry:null,properties:{datetime:"2026-09-03T00:00:00Z"},
+    assets:{B04:{href:"https://assets.example.test/2026.tif",type:"image/tiff",roles:["data"]}},
+  };
+  const r=await sdk.earth.readRasterWindow(scene,"B04",bbox(14,50.99,14.01,51),{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  });
+  assert.deepEqual([...r.raster.values],[100]);
+  assert.equal(r.requestedTiles,1);
 });
