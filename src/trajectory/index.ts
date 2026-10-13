@@ -5,3 +5,4 @@ export * from "./simulate.js";
 export * from "./monte-carlo.js";
 export * from "./engine.js";
 export * from "./czml.js";
+export * from "./orbit-analysis.js";
