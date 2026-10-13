@@ -395,6 +395,8 @@ examples/
 ├── 12-sdk-infrastructure/
 ├── 13-earth-observation/
 ├── 14-orbit-traffic/
+├── 15-launch-trajectory/
+├── 16-mission-intelligence/
 ├── catalog.json
 └── AI_INDEX.md
 ```
