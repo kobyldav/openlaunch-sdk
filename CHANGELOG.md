@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.8.0 - 2026-10-13
+
+Generic Launch Trajectory Engine.
+
+- physics-based RK4 integration of 3DOF point-mass ascent with position, velocity and total wet mass
+- central Earth gravity with optional J2 perturbation and launch-pad Earth-rotation initial velocity
+- co-rotating atmospheric drag, pressure-dependent thrust and Isp, mass-flow integration
+- time-tagged pitch/heading/throttle schedule interpolation
+- multi-stage burnout, dry-mass separation, between-stage coast, fairing jettison
+- max-Q, Mach, dynamic pressure, altitude, speed and mass telemetry and flight events
+- optional post-burnout coast, explicit non-flight-qualified limits and frame provenance
+- seeded Monte Carlo with position-deviation percentiles and bounded runs
+- direct v0.7 satellite-relative launch screening with an explicit modeled frame warning
+- Cesium CZML launch track export including flight-event markers
+- new `openlaunch-sdk/trajectory` subpath and `space.trajectory`
+- offline regression tests and demo `npm run example:launch`
+
+The full flight simulator does NOT infer a genuine mission profile from a public NET alone; no certified EOP frame, covariance, closed-loop guidance or operational collision assessment.
+
+
 ## 0.7.0 - 2026-10-11
 
 Orbit Dynamics and Space Traffic release.
