@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.8.1 - 2026-10-13
+
+Ascent modeling refinement following the offline high-q launch scenario:
+
+- first-order max-dynamic-pressure throttle limiter with predictive q-rate estimate, nominal 4% headroom and explicit best-effort violation reporting
+- optional axial-thrust acceleration limiting, telemetry of requested/applied throttle and active limiting reason
+- conditional fairing release gated by earliest time, minimum altitude and maximum modeled dynamic pressure
+- retain legacy fixed-time fairing release for backwards compatibility, rejecting ambiguous mixed configuration
+- mass-before/mass-after audit metadata for stage separation and fairing release
+- report maximum modeled axial thrust-g, number of throttled telemetry samples and constraint warnings
+- improved deterministic launch demo with complete time checkpoint summaries and final two-body perigee/apogee classification
+- explicit distinction between inertial ground-rotation velocity and atmospheric-relative launch speed
+- additional offline controller, fairing, staging and model-constraint regression tests
+- package and lockfile updated to 0.8.1
+
+**Not a certified launch controller or actual SpaceX vehicle model.** Max-Q and acceleration limits are approximate and may be exceeded in model results. Do not use as operational launch-clearance data.
+
+
 ## 0.8.0 - 2026-10-13
 
 Generic Launch Trajectory Engine.
