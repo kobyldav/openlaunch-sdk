@@ -2,6 +2,8 @@ import { OpenLaunch } from "../../src/index.js";
 import { genericLaunchModel } from "./00-model.js";
 
 /** First-order engineering throttle model. NOT a certified safety controller. */
+const { fairingJettisonSeconds: _legacyTime, ...baseVehicle } = genericLaunchModel.vehicle;
+
 const study = {
   ...genericLaunchModel,
   durationSeconds:240,
@@ -12,8 +14,7 @@ const study = {
     maxQResponseSeconds:6,
   },
   vehicle:{
-    ...genericLaunchModel.vehicle,
-    fairingJettisonSeconds:undefined,
+    ...baseVehicle,
     fairingSeparation:{
       earliestSeconds:30,
       minAltitudeKm:80,
