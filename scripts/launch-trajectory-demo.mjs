@@ -57,7 +57,8 @@ console.log("\nSummary:",{
   } : null,
 });
 
-console.log("\nFlight events:");
+console.log("\nReminder: initial inertial speed includes Earth rotation; air-relative speed starts near 0.\n");
+console.log("Flight events:");
 console.table(result.events.map(e=>({
   event:e.kind,tPlusSeconds:e.elapsedSeconds.toFixed(2),
   altitudeKm:e.altitudeKm.toFixed(2),massKg:e.massKg.toFixed(1),stage:e.stageIndex,
@@ -73,7 +74,8 @@ console.table(checkpoints.map(t=>{
   return {
     requestedT:t,actualT:p.elapsedSeconds.toFixed(2),
     altitudeKm:p.altitudeKm.toFixed(2),
-    speedMps:p.inertialSpeedMps.toFixed(0),
+    inertialMps:p.inertialSpeedMps.toFixed(0),
+    airRelativeMps:p.atmosphericRelativeSpeedMps.toFixed(0),
     qPa:p.dynamicPressurePa.toFixed(0),
     massKg:p.massKg.toFixed(1),
     throttle:p.effectiveThrottle.toFixed(2),
