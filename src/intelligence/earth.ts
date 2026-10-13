@@ -1,5 +1,6 @@
 import type { AreaOfInterest } from "../geo/types.js";
 import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport } from "./observations.js";
+import { downloadEoPreview, type EoAssetDownload, type EoDownloadOptions } from "../eo/download.js";
 import { centerOf } from "../geo/types.js";
 import { rankScenes, type SceneScore } from "../eo/scenes.js";
 import type { StacFeatureCollection, StacItem } from "../providers/stac.js";
@@ -58,6 +59,10 @@ export class EarthIntelligenceClient {
     this.planetaryComputer = options.planetaryComputer ?? new PlanetaryComputerClient();
     this.weather = options.weather ?? new OpenMeteoClient();
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
+  }
+
+  downloadPreview(item: StacItem, options: EoDownloadOptions = {}): Promise<EoAssetDownload> {
+    return downloadEoPreview(item, options);
   }
 
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
