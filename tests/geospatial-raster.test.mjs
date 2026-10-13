@@ -5,7 +5,7 @@ import {
   bbox,polygon,point,decodeGeoTiff,ndviRaster,rasterStatistics,
   alignRasterTo,clipRasterToAoi,rasterDifference,elevationToLocalMesh,
   sampleRaster,pixelToWorld,worldToPixel,lonLatToGridCrs,
-  OpenLaunch,
+  OpenLaunch,calibrateRaster,calibrateRasterFromStac,maskRasterBySentinel2Scl,renderRasterRgb,
 } from "../dist/index.js";
 
 /** Exact-value generated GeoTIFF bytes, never a mock decoder. */
@@ -141,7 +141,7 @@ test("NDVI performs calibrated pixel arithmetic, preserves nodata, and detects c
   const after=mk(3,1,[.9,2,0]);
   const delta=rasterDifference(red,after);
   assert.equal(delta.comparedPixels,2);
-  assert.ok(Math.abs(delta.values?.[0]??delta.grid.values[0]-.7)<1e-12);
+  assert.ok(Math.abs(delta.grid.values[0]-.7)<1e-12);
   assert.ok(Number.isNaN(delta.grid.values[2]));
   assert.throws(()=>ndviRaster(red,mk(3,1,[.1,.2,.3],[20,.01,0,51,0,-.01])),/Raster grids/);
 });
@@ -180,4 +180,31 @@ test("High-level OpenLaunch raster decoder consumes actual binary returned by a 
   assert.equal(grid.values[4],500);
   assert.equal(grid.source,"test-actual-bytes:B04");
   await assert.rejects(sdk.earth.downloadRaster(scene,"B08",{fetch:async()=>new Response(tiff)}),/does not exist/);
+});
+
+test("Calibrated Landsat SR DNs give physical reflectances with nodata preserved",()=>{
+  const raw=mk(3,1,[0,10000,40000]);
+  const result=calibrateRasterFromStac(raw,{"raster:bands":[{
+    scale:0.0000275,offset:-0.2,nodata:0,unit:"reflectance"
+  }]});
+  assert.equal(result.applied,true);
+  assert.equal(result.invalidPixels,1);
+  assert.ok(Number.isNaN(result.grid.values[0]));
+  assert.ok(Math.abs(result.grid.values[1]-0.075)<1e-12);
+  assert.ok(Math.abs(result.grid.values[2]-0.9)<1e-12);
+  assert.throws(()=>calibrateRasterFromStac(raw,{}),/raster:bands/);
+});
+
+test("SCL removes clouds and quality failures before pixel-level NDVI",()=>{
+  const grid=mk(4,1,[.1,.2,.3,.4]),scl=mk(4,1,[4,9,3,6]);
+  const filtered=maskRasterBySentinel2Scl(grid,scl);
+  assert.equal(filtered.retained,2);
+  assert.deepEqual([...filtered.grid.values].map(v=>Number.isNaN(v)?"NaN":v),[.1,"NaN","NaN",.4]);
+  const rgb=renderRasterRgb(filtered.grid,filtered.grid,filtered.grid,{ranges:[[0,.4],[0,.4],[0,.4]]});
+  assert.equal(rgb.rgba.length,16);
+  assert.equal(rgb.rgba[3],255);
+  assert.equal(rgb.rgba[7],0);
+  assert.equal(rgb.rgba[11],0);
+  assert.equal(rgb.rgba[15],255);
+  assert.equal(rgb.encodedImage,false);
 });
