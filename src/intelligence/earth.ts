@@ -1,6 +1,9 @@
 import type { AreaOfInterest } from "../geo/types.js";
 import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport } from "./observations.js";
-import { downloadEoPreview, type EoAssetDownload, type EoDownloadOptions } from "../eo/download.js";
+import { downloadEoPreview, downloadEoAsset, type EoAssetDownload, type EoDownloadOptions } from "../eo/download.js";
+import { inspectEoProduct } from "../eo/products.js";
+import { decodeGeoTiff, type GeoTiffDecodeOptions } from "../eo/geotiff.js";
+import type { RasterGrid } from "../eo/raster.js";
 import { centerOf } from "../geo/types.js";
 import { rankScenes, type SceneScore } from "../eo/scenes.js";
 import type { StacFeatureCollection, StacItem } from "../providers/stac.js";
@@ -63,6 +66,23 @@ export class EarthIntelligenceClient {
 
   downloadPreview(item: StacItem, options: EoDownloadOptions = {}): Promise<EoAssetDownload> {
     return downloadEoPreview(item, options);
+  }
+
+  /**
+   * Decode a real existing one-band TIFF asset through the v1.0 bounded decoder.
+   * Full asset must be accessible and <= 64 MiB; common JP2/LZW TIFF assets,
+   * unsupported CRS and large COGs need external specialized decoders.
+   */
+  async downloadRaster(
+    item: StacItem,
+    assetKey: string,
+    options: EoDownloadOptions & GeoTiffDecodeOptions = {},
+  ): Promise<RasterGrid> {
+    const asset = inspectEoProduct(item).assets.find(a => a.key === assetKey);
+    if (!asset) throw new RangeError("Selected STAC asset does not exist: " + assetKey);
+    const downloaded = await downloadEoAsset(asset, options);
+    const raster = await decodeGeoTiff(downloaded.bytes, options);
+    return { ...raster, source: item.id + ":" + assetKey };
   }
 
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
