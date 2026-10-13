@@ -1,0 +1,35 @@
+{
+  "name": "@openlaunch/engineering",
+  "version": "1.1.0",
+  "description": "Spacecraft physics, rocket trajectory, control, mission math and target-orbit studies",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/cjs/index.js",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/esm/index.js",
+      "require": "./dist/cjs/index.js"
+    },
+    "./internal/*": {
+      "types": "./dist/types/*.d.ts",
+      "import": "./dist/esm/*.js",
+      "require": "./dist/cjs/*.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@openlaunch/core": "^1.1.0",
+    "@openlaunch/orbit": "^1.1.0"
+  }
+}

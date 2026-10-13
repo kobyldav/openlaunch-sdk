@@ -8,7 +8,7 @@
 - examples/catalog.json — machine-readable example metadata
 - examples/AI_INDEX.md — AI-oriented usage rules, units and modeling assumptions
 - docs/EXPORTS.md — public export inventory
-- docs/ARCHITECTURE.md — SDK architecture
+- docs/ARCHITECTURE.md — SDK architecture\n- docs/MONOREPO_V1_1.md — modular npm workspace ownership, builds, dependency graph and install guide
 - docs/PROVIDERS.md — LL2, NASA and CelesTrak provider notes
 - docs/VALIDATION.md — validation boundaries
 - docs/EARTH_INTELLIGENCE.md — STAC, Copernicus, Planetary Computer, weather and EO orchestration

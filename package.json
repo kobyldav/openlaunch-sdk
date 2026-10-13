@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.0.0",
-  "description": "Space engineering TypeScript SDK with georeferenced GeoTIFF raster analysis, EO data, SGP4 space traffic and 3DOF launch simulation.",
+  "version": "1.1.0",
+  "description": "Backwards-compatible OpenLaunch umbrella SDK plus six independently installable domain workspaces.",
   "keywords": [
     "space",
     "spaceflight",
@@ -131,13 +131,13 @@
   "sideEffects": false,
   "scripts": {
     "clean": "node scripts/clean.mjs",
-    "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs",
+    "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs && node scripts/build-workspaces.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && npm run test:packages",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "npm run check && npm run pack:check",
+    "prepublishOnly": "npm run check && npm run pack:check && npm run pack:check:packages && npm run test:packed",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
     "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
@@ -145,7 +145,12 @@
     "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs",
     "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs",
     "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs",
-    "example:raster": "npm run build && node scripts/geospatial-raster-demo.mjs"
+    "example:raster": "npm run build && node scripts/geospatial-raster-demo.mjs",
+    "build:packages": "node scripts/build-workspaces.mjs",
+    "test:packages": "npm run typecheck:packages && node --test tests/packages.test.mjs",
+    "pack:check:packages": "node scripts/pack-workspaces.mjs",
+    "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit",
+    "test:packed": "node scripts/test-packed-consumers.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -155,5 +160,8 @@
   },
   "dependencies": {
     "satellite.js": "6.0.2"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
