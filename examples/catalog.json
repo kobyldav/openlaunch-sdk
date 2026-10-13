@@ -1432,6 +1432,59 @@
       ],
       "network": false,
       "description": "Apply best-effort dynamic-pressure/axial-g throttling and release fairing when altitude and pressure gates pass."
+    },
+    {
+      "path": "16-mission-intelligence/01-czechia-latest-scenes.ts",
+      "title": "Latest optical/radar/thermal/DEM catalog scenes over Czechia",
+      "category": "mission-intelligence",
+      "symbols": [
+        "ObservationDiscoveryClient",
+        "discoverObservations"
+      ],
+      "network": true,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/02-asset-resolutions.ts",
+      "title": "Inspect per-product asset resolutions without fabricated imagery",
+      "category": "mission-intelligence",
+      "symbols": [
+        "inspectEoProduct",
+        "selectEoAssets"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/03-target-orbit-sweep.ts",
+      "title": "Bounded launch guidance alternatives scored against target orbit",
+      "category": "mission-intelligence",
+      "symbols": [
+        "MissionPlanningEngine",
+        "sweepLaunchGuidance"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/04-space-traffic-audit.ts",
+      "title": "Audited spacecraft–rocket close-approach quality",
+      "category": "mission-intelligence",
+      "symbols": [
+        "auditTrajectoryAgainstCatalog"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/05-access-scene-correlation.ts",
+      "title": "Reconcile scene timestamps with geometric swath access",
+      "category": "mission-intelligence",
+      "symbols": [
+        "reconcileAccessWithScenes"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
     }
   ]
 }
