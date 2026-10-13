@@ -20,6 +20,6 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: npm
-      - run: npm install --no-audit --no-fund
+      - run: npm ci --no-audit --no-fund
       - run: npm run check
-      - run: npm pack --dry-run
+      - run: npm pack --dry-run\n      - run: npm run pack:check:packages
