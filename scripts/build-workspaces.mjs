@@ -7,7 +7,7 @@
  * This incremental "strangler" migration deliberately leaves openlaunch-sdk
  * and its existing imports/API untouched during v1.1 adoption.
  */
-import { mkdir, readFile, writeFile, rm, stat } from "node:fs/promises";
+import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { posix as path } from "node:path";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
@@ -30,7 +30,7 @@ const packages = {
     entries: ["eo/index", "geo/index"],
   },
   launches: {
-    entries: ["providers/ll2", "providers/nasa", "resources/launches", "resources/agencies", "resources/rockets", "resources/astronauts", "resources/events", "resources/pads", "resources/generic", "resources/raw"],
+    entries: ["providers/ll2", "providers/nasa", "resources/launches", "resources/agencies", "resources/rockets", "resources/astronauts", "resources/events", "resources/pads"],
   },
   orbit: {
     entries: ["orbit/index", "traffic/index", "sensors/index", "scenario/index", "providers/celestrak"],
@@ -77,6 +77,7 @@ async function readIfExists(file) {
 async function build(pkg) {
   const definition = packages[pkg];
   const target = rootPath("packages", pkg, "dist");
+  await writeFile(rootPath("packages",pkg,"LICENSE"),await readFile(rootPath("LICENSE"),"utf8"));
   await rm(target, {recursive:true,force:true});
   for (const kind of types) await mkdir(join(target,kind),{recursive:true});
   await writeFile(join(target, "cjs", "package.json"), '{"type":"commonjs"}\n');
