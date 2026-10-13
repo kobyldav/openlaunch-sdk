@@ -19,6 +19,15 @@
 
 Launch dynamics reference: `docs/LAUNCH_TRAJECTORY.md` and `src/trajectory/`. Public API: `space.trajectory.simulate(model)`, `space.trajectory.monteCarlo(model, config)`, and `space.trajectory.screenSatellites(model, catalog, options)`. The input must contain physically motivated vehicle parameters and guidance; do not infer an actual trajectory from a launch NET.
 
+## v1.0.0 GeoTIFF, COG and raster analytics
+- Read native GeoTIFF bytes: `decodeGeoTiff` (actual samples and EPSG-affine transform).
+- Fetch only intersecting remote COG blocks: `space.earth.readRasterWindow` / `readCogWindowUrl`.
+- Match grid geometry: `clipRasterToAoi`, `alignRasterTo`; use explicit radiometric calibration and Sentinel SCL masks.
+- NDVI, spatial change: `ndviRaster`, `rasterDifference`, `rasterStatistics`.
+- Visualize local pixels/terrain: `renderRasterRgb`, `elevationToLocalMesh` (local EPSG:3857 coordinates).
+- Examples: `examples/17-raster`, `scripts/geospatial-raster-demo.mjs`.
+- Details, unsupported formats: `docs/RASTER_V1.md`.
+
 ## v0.9.0 Mission & Earth intelligence
 - Real scene asset inventory: `inspectEoProduct` / `selectEoAssets`; available resolutions come from STAC gsd only.
 - `space.earth.discoverObservations` independently checks optical/radar/thermal/elevation STAC catalogs; partial failures remain reported.
