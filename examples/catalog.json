@@ -1485,6 +1485,50 @@
       ],
       "network": false,
       "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "17-raster/01-real-cog-window.ts",
+      "title": "Read a real COG AOI window using HTTPS byte ranges",
+      "category": "raster-analytics",
+      "symbols": [
+        "readCogWindowUrl",
+        "readRasterWindow"
+      ],
+      "network": true,
+      "description": "v1.0 bounded pixel-level geospatial processing and explicit engineering limitations."
+    },
+    {
+      "path": "17-raster/02-calibrated-ndvi.ts",
+      "title": "Calibrate raw DNs and cloud-mask NDVI pixels",
+      "category": "raster-analytics",
+      "symbols": [
+        "calibrateRasterFromStac",
+        "maskRasterBySentinel2Scl",
+        "ndviRaster"
+      ],
+      "network": false,
+      "description": "v1.0 bounded pixel-level geospatial processing and explicit engineering limitations."
+    },
+    {
+      "path": "17-raster/03-ndvi-change.ts",
+      "title": "Compare before/after aligned vegetation indices",
+      "category": "raster-analytics",
+      "symbols": [
+        "rasterDifference",
+        "ndviRaster"
+      ],
+      "network": false,
+      "description": "v1.0 bounded pixel-level geospatial processing and explicit engineering limitations."
+    },
+    {
+      "path": "17-raster/04-terrain-mesh.ts",
+      "title": "Create a local projected-metre DEM triangle mesh",
+      "category": "raster-analytics",
+      "symbols": [
+        "elevationToLocalMesh"
+      ],
+      "network": false,
+      "description": "v1.0 bounded pixel-level geospatial processing and explicit engineering limitations."
     }
   ]
 }
