@@ -1,60 +1,82 @@
 # OpenLaunch SDK
 
-**OpenLaunch SDK** is a TypeScript space-computation toolkit for spaceflight data, generic 3DOF launch trajectory simulation, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, mission analysis and spacecraft engineering.
+**OpenLaunch SDK v0.9.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
 
-It combines six layers in one package:
+**Status:** v0.9.0 is validated by the repository's offline unit/integration tests (65/65 tests on Node 18/20/22 in GitHub Actions). This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
 
-1. **Live spaceflight data** — Launch Library 2 (LL2), NASA Open APIs and CelesTrak.
-2. **Orbit dynamics and space traffic** — SGP4/SDP4, TEME/Earth-fixed state handling, ground tracks, passes, closest approach, RTN geometry and bounded catalog screening.
-3. **Launch trajectory dynamics** — generic multistage 3DOF ascent, propellant flow, guidance, atmosphere, maximum dynamic pressure, stochastic dispersion and modeled satellite screening.
-4. **Earth observation and geospatial intelligence** — STAC, Copernicus, Sentinel-1/2, Landsat, Open-Meteo, AOIs and cross-provider workflows.
-5. **Mission-engineering utilities** — orbital mechanics, interplanetary transfers, rockets, geodesy, atmosphere, communications, thermal, power, navigation, EDL, reliability, statistics and more.
-6. **Production SDK infrastructure** — typed resources, pagination, caching, request deduplication, retries, timeouts, concurrency control, telemetry and a circuit breaker.
+The SDK combines these layers:
 
-The goal is not to hide public data behind a paywall. The goal is to provide a clean, reusable engineering layer on top of public sources and deterministic calculations.
+| Area | API | What it actually does |
+| --- | --- | --- |
+| Launch data | `space.launches`, `space.ll2`, `space.nasa` | Launch Library 2 resources, NASA APIs and typed HTTP helpers |
+| Satellite dynamics | `space.orbit`, `space.traffic` | SGP4/SDP4 TLE/OMM propagation, ground tracks, visibility passes, relative geometry |
+| Rocket ascent | `space.trajectory` | Generic 3DOF multistage RK4 simulation, staging, Max-Q, throttle constraints, Monte Carlo dispersion |
+| Earth observation | `space.earth`, `space.copernicus`, `space.planetaryComputer` | STAC catalog searches, optical/SAR/thermal/DEM asset metadata, existing preview binary downloads |
+| Mission analysis | `space.mission` | Target orbit assessment, bounded guidance grid sweep, ideal delta-v/circular speed checks |
+| General science | `openlaunch-sdk/science` | Orbital mechanics, geodesy, atmosphere, units, transfers, mathematics and spacecraft engineering |
 
-> **Important:** OpenLaunch is an engineering/development library, not flight-qualified software. Do not use its results as the sole basis for human safety, launch commit criteria, collision avoidance, flight termination, autonomous spacecraft control or other safety-critical operations without independent verification, validated models, requirements traceability and appropriate certification.
+The runtime has **one pinned third-party dependency**, `satellite.js@6.0.2`, which implements SGP4/SDP4; TypeScript is a development dependency. Node 18+ is tested in CI. Both ESM and CommonJS packages are built.
 
----
+> **Safety and accuracy:** Public orbital elements can be stale; modeled miss distance is not collision probability. A launch NET is not an actual flight plan. Sensor swath intersection is not confirmed spacecraft tasking or image acquisition. STAC metadata is not a downloaded, georeferenced pixel raster. Independent validation is required before any safety-critical decision.
+
+## Contents
+
+- [Installation and verification](#installation)
+- [Quick start](#1-quick-start)
+- [What's new in v0.9](#new-in-v090--mission--earth-intelligence)
+- [Mission & Earth Intelligence](./docs/MISSION_INTELLIGENCE.md)
+- [Orbit dynamics & space traffic](./docs/ORBIT_TRAFFIC.md)
+- [Launch simulation & constraints](./docs/LAUNCH_TRAJECTORY.md)
+- [Earth observation & providers](./docs/EARTH_INTELLIGENCE.md)
+- [Typed examples and AI index](#examples-and-ai-code-indexing)
+- [Testing and validation](#34-testing)
+- [Accuracy and roadmap](#39-accuracy-tiers)
 
 ## New in v0.9.0 — Mission & Earth Intelligence
 
-This version closes **specific integration gaps** in v0.6 Earth observation, v0.7 SGP4/traffic and v0.8 launch simulation, without claiming real SpaceX telemetry, certified launch clearance, raster pixel processing or a full terrain mesh.
+v0.9 connects functionality added in v0.6 (Earth observation), v0.7 (orbit traffic) and v0.8/0.8.1 (launch physics), while maintaining clear provenance for observations and modeled estimates.
 
-- **Real STAC product capabilities**: `inspectEoProduct(item)` enumerates band keys, radar/thermal/DEM/cloud-mask assets, media types and only explicitly declared `gsd` resolutions. No fabricated resolution or cloud-free claim.
-- **Four sources in one discovery**: `space.earth.discoverObservations({area, from, to})` searches optical Sentinel-2, SAR Sentinel-1, thermal-enabled Landsat C2 L2 and static Copernicus DEM through their providers. Failing sources are reported while other results remain available.
-- **Download a real preview**: `space.earth.downloadPreview(item, {maxBytes, allowedHosts})` fetches actual HTTPS bytes from an existing preview/visual asset with time and size bounds. No COG decoder or secret signing is implicit.
-- **Pixel math**: Landsat C2 L2 ST_B10 digital values to actual *land surface* Kelvin/Celsius and Sentinel-2 L2A SCL cloud-mask categories, for caller-supplied raster pixels.
-- **Acquisition correlation**: `reconcileAccessWithScenes(windows, items, {expectedPlatform})` checks time and platform metadata matches, not imaging-command proof.
-- **Orbit traffic quality**: `space.trajectory.auditTraffic(simulation, catalog, {thresholdKm})` returns nearest modeled encounters, failed satellite propagations, age-of-elements and coarse-sampling warnings. Operational clearance is always false.
-- **Mission planning**: `space.mission.assess(...)`, `space.mission.sweep(...)`, `idealDeltaV` and `circularSpeed`. Bounded, transparent, deterministic guidance candidates — **not** automated closed-loop ascent GNC.
+**Earth observation and actual image assets:** `space.earth.discoverObservations()` searches Sentinel-2 optical, Sentinel-1 radar, Landsat Collection 2 L2 and Copernicus DEM catalogs independently. Every query reports success, failure and missing required thermal assets. `inspectEoProduct()` exposes **only** the data layers and ground-sample distances declared for that specific STAC scene. `space.earth.downloadPreview()` fetches the **bytes of an existing** HTTPS preview with size and host controls; it does not manufacture pixels, decode GeoTIFF, fetch a full image tile or sign inaccessible assets. Caller-supplied Landsat ST_B10 samples can be converted to **land surface temperature**; caller-supplied Sentinel-2 SCL samples can be summarized for cloud classes.
 
 ```ts
 import { OpenLaunch, bbox, inspectEoProduct, selectEoAssets } from "openlaunch-sdk";
 
-const sdk = new OpenLaunch();
-const report = await sdk.earth.discoverObservations({
-  area: bbox(12.1, 48.6, 18.9, 51.1),
-  from: new Date("2026-09-01T00:00:00Z"),
-  to: new Date("2026-10-13T00:00:00Z"),
+const space = new OpenLaunch();
+const now = new Date();
+const report = await space.earth.discoverObservations({
+  area: bbox(12.09, 48.55, 18.86, 51.06), // Czechia, approximate bounding box
+  from: new Date(now.getTime() - 30 * 86_400_000),
+  to: now,
   layers: ["optical", "radar", "thermal", "elevation"],
+  perQueryLimit: 10,
 });
-console.table(report.queryStatuses);
-if (report.newestByLayer.optical) {
-  const product = inspectEoProduct(report.newestByLayer.optical.item);
-  console.log(product.availableResolutionsM, selectEoAssets(product,"visible"));
-}
+console.table(report.queryStatuses); // provider failures are NOT silently hidden
 
-// With a LaunchModel and OrbitTarget supplied by your own engineering study:
-const outcome = sdk.mission.sweep(model, {
-  perigeeAltitudeKm: 350, apogeeAltitudeKm: 350, inclinationDeg: 51.6,
-}, { pitchOffsetsDeg: [-2, 0, 2], headingOffsetsDeg: [-2, 0, 2] });
-console.log(outcome.achieved, outcome.best.assessment);
+const scene = report.newestByLayer.optical;
+if (scene) {
+  const product = inspectEoProduct(scene.item);
+  console.log(product.availableKinds, product.availableResolutionsM);
+  console.log(selectEoAssets(product, "visible")); // asset links, NOT image pixels
+}
 ```
 
-The example above assumes an existing `model: LaunchModel` from the v0.8 examples. Run the completely self-contained, offline v0.9 example with `npm run example:mission`.
+**Orbit traffic and acquisition audit:** `space.trajectory.auditTraffic()` checks nearest approaches and reports stale element sets, failed propagation and under-sampled trajectory geometry. `reconcileAccessWithScenes()` compares modeled swath-access times with catalog scene times and optional platform identity; that does **not** prove that the requested coordinates contain useful pixels.
 
-Documentation: [Mission & Earth Intelligence](docs/MISSION_INTELLIGENCE.md).
+**Mission targeting:** `space.mission.assess()` scores a simulated vehicle's instantaneous orbital state against a target perigee/apogee/inclination; `space.mission.sweep()` evaluates a *bounded grid* of supplied guidance offsets. It is not autonomous closed-loop trajectory optimization.
+
+Try the **completely offline** integrated demonstration:
+
+```bash
+npm ci
+npm run check
+npm run example:mission
+npm run example:launch
+npm run example:orbit-traffic
+```
+
+The offline v0.9 demo intentionally uses **synthetic EO catalog records** and a **historical** ISS TLE. The live EO queries require network access; provider outages, access restrictions, quota limits and asset URL signing remain external dependencies. For production, also test real acquisitions and compare physics results with independent reference implementations.
+
+More detail: [v0.9 Mission & Earth Intelligence](./docs/MISSION_INTELLIGENCE.md), [EO providers](./docs/EARTH_INTELLIGENCE.md), [v0.9 examples](./examples/16-mission-intelligence/).
 
 ---
 
@@ -333,10 +355,12 @@ The package currently exposes more than **300 public exports**. It intentionally
 npm install openlaunch-sdk
 ```
 
-For development from this repository:
+For development from this repository (recommended until you explicitly publish v0.9.0 to npm):
 
 ```bash
-npm install
+git clone https://github.com/kobyldav/openlaunch-sdk.git
+cd openlaunch-sdk
+npm ci
 npm run check
 ```
 
@@ -352,7 +376,7 @@ Requirements:
 
 ## Examples and AI/code indexing
 
-The repository includes **110+ categorized, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
+The repository includes **128 indexed, type-checked TypeScript examples** under [`examples/`](./examples/). The examples are deliberately optimized for code search and AI/LLM retrieval: descriptive paths, self-contained imports, explicit units, a machine-readable catalog, and an AI-oriented context file.
 
 ```text
 examples/
@@ -378,8 +402,12 @@ examples/
 Useful commands:
 
 ```bash
-npm run examples:check   # type-check every example; no network calls
-npm run check            # source + examples + unit tests
+npm run examples:check   # type-check examples; no network calls
+npm run check            # source + examples + regression tests + offline scenarios
+npm run example:mission  # offline EO and mission demonstration
+npm run example:launch   # offline staged rocket ascent demonstration
+npm run example:orbit-traffic # satellite example; calls live CelesTrak
+npm run example:rotterdam    # live EO/weather/launch providers
 ```
 
 AI-oriented repository map: [`llms.txt`](./llms.txt). Machine-readable example inventory: [`examples/catalog.json`](./examples/catalog.json). These files improve discoverability but cannot guarantee indexing by any specific AI provider.
@@ -1767,26 +1795,23 @@ life-support consumables
 
 These are useful for trade studies and sanity checks.
 
-### Not included as validated high-fidelity flight models
+### Fidelity limits of v0.9.0
 
-OpenLaunch v0.5.0 does not claim to provide validated implementations of:
+Available but **research-grade**: SGP4/SDP4 public GP-element propagation, GMST-only approximate Earth-fixed/TEME alignment, first-order sensor-access windows, catalog-level scene/cloud metadata, and 3DOF rocket ascent with idealized guidance/constraint controls.
+
+**Not yet supplied as validated high-fidelity operational functions:**
 
 ```text
-SGP4/SDP4 propagation
-SPICE kernels / JPL ephemerides
-high-order geopotential propagation
-n-body numerical ephemerides
-atmospheric density models such as NRLMSISE-00
-precision conjunction assessment
-6-DOF launch vehicle simulation
-GN&C flight software
-fault protection flight software
-CFD
-FEA
-certified EDL simulation
+Precise EOP-corrected frame transformations and maneuvers
+Covariance-based collision probability or launch clearance
+Real Falcon/Starship guidance reconstructed from public schedules
+Fully validated 6DOF launch GN&C / TVC and flight software
+AOI-clipped imagery rasters, multi-resolution resampling, terrain meshes
+SPICE/JPL spacecraft ephemeris kernels and sophisticated n-body solvers
+Certified CFD, FEA, EDL, structural qualification or crew safety models
 ```
 
-Those belong in dedicated, validated packages or mission analysis environments. OpenLaunch can integrate with them later without pretending a simplistic formula is equivalent.
+A library's passing tests and stable API are **not** evidence of aerospace flight certification.
 
 ---
 
@@ -1810,7 +1835,7 @@ Those belong in dedicated, validated packages or mission analysis environments. 
 openlaunch-sdk/
 ├── .github/
 │   └── workflows/
-│       └── ci.yml
+│       ├── ci.yml\n│       ├── earth-live-smoke.yml\n│       └── orbit-live-smoke.yml
 ├── docs/
 ├── examples/
 ├── scripts/
@@ -1863,32 +1888,19 @@ openlaunch-sdk/
 
 # 42. Roadmap
 
-The architecture is intentionally ready for significantly deeper mission-analysis tooling.
+Already implemented: SGP4/SDP4 (via `satellite.js`), ground tracks, AOS/TCA/LOS passes, bounded space-traffic screening, sensor-access geometry, generic multistage 3DOF ascent, telemetry/Max-Q, EO catalog search and modeled mission-target scoring.
 
-High-value future additions:
+**Still missing or only partially implemented (prioritized):**
 
-1. validated SGP4 package integration instead of reimplementing it casually
-2. SPICE/JPL ephemeris provider adapter
-3. multi-revolution Lambert extensions and branch selection
-4. universal-variable n-body propagator
-5. event detection for apoapsis, periapsis, node crossings and eclipses
-6. ground-track generation
-7. access-window scheduling
-8. covariance propagation
-9. conjunction screening adapters
-10. CCSDS OEM/OMM/OPM/TDM parsing
-11. maneuver timeline model
-12. spacecraft subsystem budgets
-13. high-fidelity solar-array/eclipse energy simulation
-14. atmospheric model adapters
-15. mission configuration snapshots and provenance
-16. schema validation for provider responses
-17. worker-safe persistent cache adapters
-18. Redis/KV/D1 cache packages
-19. Python SDK generated from a shared schema
-20. automatic API reference generation
+1. **Raster processing:** read actual signed Cloud-Optimized GeoTIFF windows, georeference/reproject bands to a common grid, clip to AOIs and apply cloud/thermal quality masks.
+2. **Terrain & 3D:** decode real DEM elevation grids, create terrain meshes and imagery textures, with correct coordinate reference systems and provenance.
+3. **Orbital accuracy:** IERS Earth orientation parameters, verified TEME/ITRF/GCRF frame transforms, numerical cross-validation, better propagation fidelity for maneuvering objects.
+4. **Probabilistic space traffic:** ephemeris/covariance ingestion (CDM/OEM/OPM), robust conjunction event detection, uncertainty propagation and validated collision probability; no premature operational clearance claims.
+5. **Launch dynamics:** adaptive integration, precise event detection, wind/atmosphere models, vehicle-specific propulsion/aerodynamics, validated 6DOF attitude/TVC and closed-loop orbit targeting.
+6. **Mission interoperability:** SPICE/JPL ephemerides, scenario timelines, standardized CCSDS formats, robust acquisition/tasking metadata and reproducible artifact exports.
+7. **Production hardening:** schema validation, deeper integration tests against live providers, quotas/auth/signing, security review and generated API reference.
 
-The target should be **more verified capability**, not just a larger function count.
+Prioritize **validated fidelity and reproducible data** over simply increasing the function count. An external launch schedule alone does not reveal actual vehicle guidance or ascent trajectory.
 
 ---
 
