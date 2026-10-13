@@ -17,6 +17,47 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 
 ---
 
+## New in v0.9.0 — Mission & Earth Intelligence
+
+This version closes **specific integration gaps** in v0.6 Earth observation, v0.7 SGP4/traffic and v0.8 launch simulation, without claiming real SpaceX telemetry, certified launch clearance, raster pixel processing or a full terrain mesh.
+
+- **Real STAC product capabilities**: `inspectEoProduct(item)` enumerates band keys, radar/thermal/DEM/cloud-mask assets, media types and only explicitly declared `gsd` resolutions. No fabricated resolution or cloud-free claim.
+- **Four sources in one discovery**: `space.earth.discoverObservations({area, from, to})` searches optical Sentinel-2, SAR Sentinel-1, thermal-enabled Landsat C2 L2 and static Copernicus DEM through their providers. Failing sources are reported while other results remain available.
+- **Download a real preview**: `space.earth.downloadPreview(item, {maxBytes, allowedHosts})` fetches actual HTTPS bytes from an existing preview/visual asset with time and size bounds. No COG decoder or secret signing is implicit.
+- **Pixel math**: Landsat C2 L2 ST_B10 digital values to actual *land surface* Kelvin/Celsius and Sentinel-2 L2A SCL cloud-mask categories, for caller-supplied raster pixels.
+- **Acquisition correlation**: `reconcileAccessWithScenes(windows, items, {expectedPlatform})` checks time and platform metadata matches, not imaging-command proof.
+- **Orbit traffic quality**: `space.trajectory.auditTraffic(simulation, catalog, {thresholdKm})` returns nearest modeled encounters, failed satellite propagations, age-of-elements and coarse-sampling warnings. Operational clearance is always false.
+- **Mission planning**: `space.mission.assess(...)`, `space.mission.sweep(...)`, `idealDeltaV` and `circularSpeed`. Bounded, transparent, deterministic guidance candidates — **not** automated closed-loop ascent GNC.
+
+```ts
+import { OpenLaunch, bbox, inspectEoProduct, selectEoAssets } from "openlaunch-sdk";
+
+const sdk = new OpenLaunch();
+const report = await sdk.earth.discoverObservations({
+  area: bbox(12.1, 48.6, 18.9, 51.1),
+  from: new Date("2026-09-01T00:00:00Z"),
+  to: new Date("2026-10-13T00:00:00Z"),
+  layers: ["optical", "radar", "thermal", "elevation"],
+});
+console.table(report.queryStatuses);
+if (report.newestByLayer.optical) {
+  const product = inspectEoProduct(report.newestByLayer.optical.item);
+  console.log(product.availableResolutionsM, selectEoAssets(product,"visible"));
+}
+
+// With a LaunchModel and OrbitTarget supplied by your own engineering study:
+const outcome = sdk.mission.sweep(model, {
+  perigeeAltitudeKm: 350, apogeeAltitudeKm: 350, inclinationDeg: 51.6,
+}, { pitchOffsetsDeg: [-2, 0, 2], headingOffsetsDeg: [-2, 0, 2] });
+console.log(outcome.achieved, outcome.best.assessment);
+```
+
+The example above assumes an existing `model: LaunchModel` from the v0.8 examples. Run the completely self-contained, offline v0.9 example with `npm run example:mission`.
+
+Documentation: [Mission & Earth Intelligence](docs/MISSION_INTELLIGENCE.md).
+
+---
+
 ## v0.8.1 — Practical ascent constraints and fairing safety gates
 
 The v0.8.0 demo was intentionally an illustrative, high-thrust case: it produced **Max-Q ~156 kPa**, and an unconditional T+25 s fairing jettison happened at only **~10.7 km**. This is not a plausible mission configuration. v0.8.1 makes these weaknesses visible and lets you model safer *assumptions* without hiding failure.
