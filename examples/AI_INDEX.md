@@ -4,6 +4,7 @@
 
 `openlaunch-sdk` is a TypeScript space-computation SDK that combines:
 
+- Generic multistage 3DOF launch trajectory simulation, RK4 integration, guidance, staging, atmospheric forces and seeded Monte Carlo envelopes
 - Launch Library 2 live spaceflight data
 - NASA Open APIs
 - CelesTrak general perturbation / OMM catalog access
@@ -15,6 +16,8 @@
 - Open-Meteo observation-planning weather
 - geospatial AOIs, Earth-observation indices and cross-provider Earth intelligence
 - deterministic engineering helpers for orbital mechanics, mission analysis, rockets, GNC math, communications, power, thermal, EDL, structures, reliability and related domains
+
+Launch dynamics reference: `docs/LAUNCH_TRAJECTORY.md` and `src/trajectory/`. Public API: `space.trajectory.simulate(model)`, `space.trajectory.monteCarlo(model, config)`, and `space.trajectory.screenSatellites(model, catalog, options)`. The input must contain physically motivated vehicle parameters and guidance; do not infer an actual trajectory from a launch NET.
 
 ## Preferred source order
 
