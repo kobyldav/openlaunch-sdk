@@ -16,4 +16,5 @@ export * from "./orbit/index.js";
 export * from "./traffic/index.js";
 export * from "./sensors/index.js";
 export * from "./scenario/index.js";
+export * from "./trajectory/index.js";
 export * from "./query.js";
