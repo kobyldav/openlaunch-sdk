@@ -11,6 +11,7 @@ import type {
   LaunchTelemetry,
 } from "./types.js";
 import { add, clamp, cross, dot, finite, lerp, norm, rad, scale, sub, unit } from "./math.js";
+import { limitLaunchThrottle } from "./controller.js";
 
 const G0 = PHYSICS.standardGravity;
 const OMEGA = PHYSICS.earthRotationRate;
@@ -32,6 +33,9 @@ export interface InstantForces {
   thrustAcceleration: CartesianKm;
   dragAcceleration: CartesianKm;
   thrustN: number;
+  commandedThrottle: number;
+  effectiveThrottle: number;
+  throttleLimiter: "none" | "max-q" | "axial-g" | "both";
   massFlowKgS: number;
   dragN: number;
   densityKgM3: number;
@@ -59,6 +63,20 @@ export function validateLaunchModel(model: LaunchModel): void {
   if (!(vehicle.fairingMassKg === undefined || Number.isFinite(vehicle.fairingMassKg) && vehicle.fairingMassKg >= 0)) throw new RangeError("fairing mass must be >= 0");
   if (vehicle.fairingJettisonSeconds !== undefined && !(vehicle.fairingJettisonSeconds >= 0)) throw new RangeError("fairingJettisonSeconds must be >= 0");
   if (vehicle.fairingJettisonSeconds !== undefined && !(vehicle.fairingMassKg! > 0)) throw new RangeError("fairing mass is required for jettison");
+  if (vehicle.fairingSeparation !== undefined) {
+    if (vehicle.fairingJettisonSeconds !== undefined) throw new RangeError("Specify fairingSeparation or fairingJettisonSeconds, not both");
+    if (!(vehicle.fairingMassKg! > 0)) throw new RangeError("fairing mass is required for release policy");
+    const policy = vehicle.fairingSeparation;
+    if (!(Number.isFinite(policy.earliestSeconds) && policy.earliestSeconds >= 0)) throw new RangeError("fairing earliestSeconds must be >= 0");
+    if (policy.minAltitudeKm !== undefined && !(Number.isFinite(policy.minAltitudeKm) && policy.minAltitudeKm >= 0)) throw new RangeError("fairing minAltitudeKm must be >= 0");
+    if (policy.maxDynamicPressurePa !== undefined && !(Number.isFinite(policy.maxDynamicPressurePa) && policy.maxDynamicPressurePa > 0)) throw new RangeError("fairing maxDynamicPressurePa must be > 0");
+  }
+  if (model.flightConstraints) {
+    const c = model.flightConstraints;
+    if (c.maxDynamicPressurePa !== undefined && !(Number.isFinite(c.maxDynamicPressurePa) && c.maxDynamicPressurePa > 0)) throw new RangeError("maxDynamicPressurePa must be > 0");
+    if (c.maxAxialAccelerationG !== undefined && !(Number.isFinite(c.maxAxialAccelerationG) && c.maxAxialAccelerationG > 0)) throw new RangeError("maxAxialAccelerationG must be > 0");
+    if (c.maxQResponseSeconds !== undefined && !(Number.isFinite(c.maxQResponseSeconds) && c.maxQResponseSeconds > 0)) throw new RangeError("maxQResponseSeconds must be > 0");
+  }
   for (const [index, stage] of vehicle.stages.entries()) {
     for (const [field, value] of Object.entries({
       dryMassKg: stage.dryMassKg, propellantMassKg: stage.propellantMassKg,
@@ -155,29 +173,45 @@ export function computeForces(model: LaunchModel, state: DerivativeState, contex
 
   let thrustN=0, massFlowKgS=0;
   let thrustAcceleration: CartesianKm = {x:0,y:0,z:0};
+  let commandedThrottle=0, effectiveThrottle=0;
+  let throttleLimiter: InstantForces["throttleLimiter"]="none";
+
   if (context.engineOn && context.stage) {
     const stage=context.stage;
-    const throttle=clamp(guidanceAt(model.guidance,context.elapsedSeconds).throttle,0,1);
+    const gd=guidanceAt(model.guidance,context.elapsedSeconds);
     const p=clamp(atmosphere.pressurePa/SEA_LEVEL_PRESSURE,0,1);
-    thrustN=throttle*lerp(stage.thrustVacuumN,stage.thrustSeaLevelN,p);
+    const fullThrustN=lerp(stage.thrustVacuumN,stage.thrustSeaLevelN,p);
     const isp=lerp(stage.ispVacuumS,stage.ispSeaLevelS,p);
+    const lat=rad(geo.latitudeDeg),lon=rad(geo.longitudeDeg);
+    const east={x:-Math.sin(lon),y:Math.cos(lon),z:0};
+    const north={x:-Math.sin(lat)*Math.cos(lon),y:-Math.sin(lat)*Math.sin(lon),z:Math.cos(lat)};
+    const up={x:Math.cos(lat)*Math.cos(lon),y:Math.cos(lat)*Math.sin(lon),z:Math.sin(lat)};
+    const heading=rad(gd.headingDeg), pitch=rad(gd.pitchDeg);
+    const horizontal=add(scale(north,Math.cos(heading)),scale(east,Math.sin(heading)));
+    const thrustEcf=add(scale(horizontal,Math.cos(pitch)),scale(up,Math.sin(pitch)));
+    const direction=ecfToEci(thrustEcf,gstime(date));
+    const commanded=limitLaunchThrottle(model,{
+      commandedThrottle:gd.throttle,
+      thrustAtFullThrottleN:fullThrustN,
+      massKg:state.massKg,
+      densityKgM3:atmosphere.densityKgM3,
+      dynamicPressurePa:0.5*atmosphere.densityKgM3*relativeSpeed**2,
+      relativeVelocityMps:relative,
+      radialVerticalSpeedMps:dot(relative,unit(r)),
+      gravityAndDragAccelerationMps2:add(gravity,dragAcceleration),
+      thrustDirection:direction,
+    });
+    commandedThrottle=commanded.commandedThrottle;
+    effectiveThrottle=commanded.effectiveThrottle;
+    throttleLimiter=commanded.throttleLimiter;
+    thrustN=effectiveThrottle*fullThrustN;
     massFlowKgS=thrustN/(isp*G0);
-    if(thrustN>0) {
-      const gd=guidanceAt(model.guidance,context.elapsedSeconds);
-      const lat=rad(geo.latitudeDeg),lon=rad(geo.longitudeDeg);
-      const east={x:-Math.sin(lon),y:Math.cos(lon),z:0};
-      const north={x:-Math.sin(lat)*Math.cos(lon),y:-Math.sin(lat)*Math.sin(lon),z:Math.cos(lat)};
-      const up={x:Math.cos(lat)*Math.cos(lon),y:Math.cos(lat)*Math.sin(lon),z:Math.sin(lat)};
-      const heading=rad(gd.headingDeg), pitch=rad(gd.pitchDeg);
-      const horizontal=add(scale(north,Math.cos(heading)),scale(east,Math.sin(heading)));
-      const thrustEcf=add(scale(horizontal,Math.cos(pitch)),scale(up,Math.sin(pitch)));
-      const direction=ecfToEci(thrustEcf,gstime(date));
-      thrustAcceleration=scale(direction,thrustN/state.massKg);
-    }
+    if(thrustN>0) thrustAcceleration=scale(direction,thrustN/state.massKg);
   }
 
   return {
     gravity, thrustAcceleration, dragAcceleration, thrustN, massFlowKgS, dragN,
+    commandedThrottle, effectiveThrottle, throttleLimiter,
     densityKgM3: atmosphere.densityKgM3, pressurePa:atmosphere.pressurePa,
     speedOfSoundMps:atmosphere.speedOfSoundMps,
     atmosphericRelativeVelocityMps:relative,
@@ -210,7 +244,9 @@ export function telemetryAt(model:LaunchModel,state:DerivativeState,context:Phys
     dynamicPressurePa:0.5*f.densityKgM3*atmosphericSpeed**2,
     mach:atmosphericSpeed/Math.max(1,f.speedOfSoundMps),
     accelerationMps2:norm(acceleration),
-    thrustN:f.thrustN,dragN:f.dragN,gravityMps2:norm(f.gravity),
+    thrustN:f.thrustN,
+    commandedThrottle:f.commandedThrottle,effectiveThrottle:f.effectiveThrottle,throttleLimiter:f.throttleLimiter,
+    dragN:f.dragN,gravityMps2:norm(f.gravity),
     positionTemeKm,velocityTemeKmS,
   };
 }
