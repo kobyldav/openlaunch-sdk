@@ -275,3 +275,54 @@ test("OpenLaunch Earth Intelligence returns cropped pixels from remote COG asset
   assert.deepEqual([...r.raster.values],[100]);
   assert.equal(r.requestedTiles,1);
 });
+
+function realTiled4x4Fixture(){
+  const tags=[
+    [256,4,1,4],[257,4,1,4],[258,3,1,16],[259,3,1,1],
+    [262,3,1,1],[277,3,1,1],[284,3,1,1],[322,4,1,2],
+    [323,4,1,2],[324,4,4,0],[325,4,4,0],[339,3,1,1],
+    [33550,12,3,0],[33922,12,6,0],[34735,3,8,0],
+  ].sort((a,b)=>a[0]-b[0]);
+  let pos=(8+2+tags.length*12+4+7)&~7;
+  const offsetsPtr=pos;pos+=16;
+  const lengthsPtr=pos;pos+=16;
+  const scalePtr=pos;pos+=24;
+  const tiePtr=pos;pos+=48;
+  const keyPtr=pos;pos+=16;
+  const pixelStart=(pos+7)&~7;
+  const buf=Buffer.alloc(pixelStart+32);
+  buf.write("II",0);buf.writeUInt16LE(42,2);buf.writeUInt32LE(8,4);
+  buf.writeUInt16LE(tags.length,8);
+  tags.forEach(([tag,type,count,val],i)=>{
+    const o=10+i*12;buf.writeUInt16LE(tag,o);buf.writeUInt16LE(type,o+2);
+    buf.writeUInt32LE(count,o+4);
+    const ptr=tag===324?offsetsPtr:tag===325?lengthsPtr:tag===33550?scalePtr:
+      tag===33922?tiePtr:tag===34735?keyPtr:val;
+    if(type===3&&count===1)buf.writeUInt16LE(ptr,o+8);else buf.writeUInt32LE(ptr,o+8);
+  });
+  for(let i=0;i<4;i++){
+    buf.writeUInt32LE(pixelStart+i*8,offsetsPtr+i*4);
+    buf.writeUInt32LE(8,lengthsPtr+i*4);
+  }
+  [0.01,0.01,0].forEach((n,i)=>buf.writeDoubleLE(n,scalePtr+i*8));
+  [0,0,0,14,51,0].forEach((n,i)=>buf.writeDoubleLE(n,tiePtr+i*8));
+  [1,1,0,1,2048,0,1,4326].forEach((n,i)=>buf.writeUInt16LE(n,keyPtr+i*2));
+  const tiles=[[1,2,5,6],[3,4,7,8],[9,10,13,14],[11,12,15,16]];
+  tiles.forEach((tile,i)=>tile.forEach((v,p)=>buf.writeUInt16LE(v,pixelStart+i*8+p*2)));
+  return new Uint8Array(buf);
+}
+test("True tiled COG requests only selected bottom-right TIFF tile",async()=>{
+  const bytes=realTiled4x4Fixture();
+  const mock=mockRangeSource(bytes);
+  const area=bbox(14.02,50.96,14.04,50.98);
+  const r=await readCogWindowUrl("https://assets.example.test/four-tiles.tif",area,{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  });
+  assert.equal(r.requestedTiles,1);
+  assert.equal(r.tileBytesRead,8);
+  assert.deepEqual([...r.raster.values],[11,12,15,16]);
+  assert.equal(mock.calls.length,2);
+  assert.ok(mock.calls[1].startsWith("bytes="));
+  const full=await decodeGeoTiff(bytes);
+  assert.deepEqual([...full.values],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+});
