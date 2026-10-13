@@ -1,8 +1,8 @@
 # OpenLaunch SDK
 
-**OpenLaunch SDK v1.0.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
+**OpenLaunch SDK v1.1.0** is a TypeScript toolkit combining live spaceflight data, SGP4/SDP4 satellite tracking, orbit/space-traffic geometry, generic multistage rocket ascent simulation, Earth observation, and research-grade mission analysis.
 
-**Status:** v1.0.0 is implemented on a separate feature branch. GitHub Actions passed 83/83 offline tests on Node 18, 20 and 22, including the GeoTIFF/COG decoder and npm pack. Real upstream data still require provider-specific live verification. This is not a published npm release or flight-qualified library. This is **not** a flight-qualified, certified collision-assessment or operational acquisition-planning system. Live external providers and signed imagery links require separate checks.
+**Status:** v1.1.0 is developed on a feature branch and is not published to npm. The v1.0 base passed 83 offline tests; modular package and installation checks are separately required before v1.1 can be released. This is not flight-qualified or certified for safety-critical operations.
 
 The SDK combines these layers:
 
@@ -21,7 +21,7 @@ The runtime has **one pinned third-party dependency**, `satellite.js@6.0.2`, whi
 
 ## Contents
 
-- [Installation and verification](#installation)\n- [v1.0 GeoTIFF and raster analysis](#new-in-v100--real-geotiffcog-raster-analytics)
+- [Installation and verification](#installation)\n- [v1.1 Modular npm workspaces](./docs/MONOREPO_V1_1.md)\n- [v1.0 GeoTIFF and raster analysis](#new-in-v100--real-geotiffcog-raster-analytics)
 - [Quick start](#1-quick-start)
 - [What's new in v0.9](#new-in-v090--mission--earth-intelligence)
 - [Mission & Earth Intelligence](./docs/MISSION_INTELLIGENCE.md)
@@ -31,6 +31,56 @@ The runtime has **one pinned third-party dependency**, `satellite.js@6.0.2`, whi
 - [Typed examples and AI index](#examples-and-ai-code-indexing)
 - [Testing and validation](#34-testing)
 - [Accuracy and roadmap](#39-accuracy-tiers)
+
+## OpenLaunch v1.1.0 — Modular npm packages (development branch)
+
+OpenLaunch is transitioning from one large SDK to **six independently installable, tree-shakeable domain packages**. Old `openlaunch-sdk` imports remain available without code changes.
+
+| Package | What it contains | Direct runtime dependencies |
+|---|---|---|
+| `@openlaunch/core` | Typed HTTP, cache, retries, queries, data mappers | None |
+| `@openlaunch/earth` | STAC, Copernicus, Planetary Computer, Open-Meteo, AOI, light `EarthCatalogClient` | core |
+| `@openlaunch/raster` | TIFF/COG window reader, NDVI, cloud masks, raster statistics, DEM mesh | core |
+| `@openlaunch/launches` | LL2 launches, rockets, agencies, NASA, light `LaunchDataClient` | core |
+| `@openlaunch/orbit` | SGP4/SDP4, TLE/OMM, ground passes, traffic screening, CZML | core, satellite.js |
+| `@openlaunch/engineering` | Rocket simulations, orbital mission studies, general engineering math | core, orbit |
+
+Install **only** what your application needs *after these scoped packages have been published to npm*:
+
+```bash
+npm install @openlaunch/earth @openlaunch/raster
+# or:
+npm install @openlaunch/launches
+```
+
+```ts
+import { EarthCatalogClient, bbox } from "@openlaunch/earth";
+import { readCogWindowUrl } from "@openlaunch/raster";
+const earth = new EarthCatalogClient();
+const scenes = await earth.discoverObservations({
+  area: bbox(12,49,19,51),
+  from: new Date("2026-09-01"),
+  to: new Date(),
+});
+// Raster data is fetched independently from catalog metadata.
+```
+
+```ts
+import { LaunchDataClient } from "@openlaunch/launches";
+const sdk = new LaunchDataClient();
+const next = await sdk.launches.next();
+console.log(next?.name);
+```
+
+**Development branch install:** check out `feature/modular-workspaces-v1.1.0`, then run `npm ci && npm run check && npm run pack:check:packages`. Workspaces are locally linked by npm. Public `@openlaunch/*` package publishing has **not** happened yet, and ownership of the npm scope must be verified before release.
+
+The generated distribution contains just the transitively needed compiled modules. Shared HTTP/cache internals are external `@openlaunch/core` imports. This incremental split preserves the original `src/` as source of truth, with an eventual physical source reorganization possible after confirming independent installs. Package size measurements are printed by `npm run build:packages` and live in `packages/build-report.json` locally.
+
+**Trade-offs:** smaller domain-specific installations and no `satellite.js` in Earth/launch/raster packages; more semver/publishing work and a temporary generated-dependency-graph build step. Browser bundle size must still be measured with an actual bundler.
+
+Full architecture, commands, migration strategy and remaining risks: [Modular workspaces v1.1](./docs/MONOREPO_V1_1.md).
+
+---
 
 ## New in v1.0.0 — Real GeoTIFF/COG Raster Analytics
 
