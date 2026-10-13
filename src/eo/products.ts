@@ -82,6 +82,7 @@ export function inspectEoAsset(key: string, asset: StacAsset, item?: StacItem): 
   const resolutionSource = assetGsd !== undefined ? "asset-gsd" : itemGsd !== undefined ? "item-gsd" : "unspecified";
   const text = [key, asset.title ?? "", ...bandNames].join(" ").toLowerCase();
   const kind: EoLayerKind =
+    (item?.collection?.includes("dem") && roles.includes("data")) ? "elevation" :
     /(^|[ _-])(scl|qa|mask|classification|cloud|fmask|data_mask)([ _-]|$)/i.test(text) || roles.includes("mask") ? "quality-mask" :
     /(^|[ _-])(thermal|tir|tirs|st_b1[01]|lst|brightness.temperature)([ _-]|$)/i.test(text) ? "thermal" :
     /(^|[ _-])(dem|dsm|dtm|elevation|terrain)([ _-]|$)/i.test(text) ? "elevation" :
