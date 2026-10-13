@@ -1,5 +1,6 @@
 import type { CartesianKm } from "../orbit/types.js";
 import type { TimedTemeState } from "../traffic/types.js";
+import type { LaunchOrbitalAssessment } from "./orbit-analysis.js";
 
 /** Generic vehicle data. Never interpret these values as a specific real launch vehicle. */
 export interface LaunchStage {
@@ -106,6 +107,7 @@ export interface LaunchSimulation {
   events: readonly LaunchEvent[];
   initialMassKg: number;
   finalMassKg: number;
+  finalOrbit: LaunchOrbitalAssessment | null;
   maxQPa: number;
   maxQTime: Date;
   maxAltitudeKm: number;
