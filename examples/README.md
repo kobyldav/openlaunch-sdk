@@ -14,7 +14,7 @@ Full numeric and frame documentation: [Launch Trajectory](../docs/LAUNCH_TRAJECT
 
 ## Conventions
 
-- Every `.ts` file is self-contained and imports from the public root export.
+- Examples import the public root API; scenarios may share a typed local fixture (for example `15-launch-trajectory/00-model.ts`) to keep engineering assumptions consistent.
 - `Network: yes` examples call LL2, NASA or CelesTrak and may be rate-limited or change with upstream data.
 - Pure engineering examples have `Network: no` and are deterministic unless they explicitly use `Math.random()`.
 - Numerical/engineering utilities are first-order development tools, **not flight-qualified models**.
