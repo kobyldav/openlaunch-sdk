@@ -1334,6 +1334,104 @@
       ],
       "network": true,
       "description": "Interpolate time-tagged TEME states with cubic Hermite and screen an external or future launch trajectory against propagated catalog objects."
+    },
+    {
+      "path": "15-launch-trajectory/00-model.ts",
+      "title": "Generic launch-model fixture",
+      "category": "launch-trajectory",
+      "symbols": [
+        "LaunchModel"
+      ],
+      "network": false,
+      "description": "Shared typed sample vehicle data; illustrative, not a real aerospace vehicle."
+    },
+    {
+      "path": "15-launch-trajectory/01-multistage-flight.ts",
+      "title": "Numerical multistage flight",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "OpenLaunch.trajectory"
+      ],
+      "network": false,
+      "description": "Integrate a generic two-stage vehicle with flight-event telemetry."
+    },
+    {
+      "path": "15-launch-trajectory/02-telemetry-max-q.ts",
+      "title": "Find maximum dynamic pressure",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "dynamicPressurePa"
+      ],
+      "network": false,
+      "description": "Inspect modeled maximum dynamic pressure, altitude and atmospheric speed."
+    },
+    {
+      "path": "15-launch-trajectory/03-monte-carlo-dispersion.ts",
+      "title": "Sample guidance and propulsion uncertainty",
+      "category": "launch-trajectory",
+      "symbols": [
+        "launchMonteCarlo",
+        "TrajectoryDispersion"
+      ],
+      "network": false,
+      "description": "Compute seeded position deviation percentiles from generic input perturbations."
+    },
+    {
+      "path": "15-launch-trajectory/04-screen-historical-iss.ts",
+      "title": "Compare modeled rocket with historical ISS",
+      "category": "launch-trajectory",
+      "symbols": [
+        "screenSatellites",
+        "Sgp4Satellite"
+      ],
+      "network": false,
+      "description": "Numerically screen an illustrative launch state against a matching-epoch historical catalog orbit."
+    },
+    {
+      "path": "15-launch-trajectory/05-export-launch-czml.ts",
+      "title": "Export rocket 3D scenario as CZML",
+      "category": "launch-trajectory",
+      "symbols": [
+        "launchToCzml"
+      ],
+      "network": false,
+      "description": "Serialize a modeled rocket and flight-event markers for Cesium visualization."
+    },
+    {
+      "path": "15-launch-trajectory/06-guidance-sensitivity.ts",
+      "title": "Compare guidance program offsets",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "GuidanceKnot"
+      ],
+      "network": false,
+      "description": "Assess altitude sensitivity to time-tagged pitch command perturbations."
+    },
+    {
+      "path": "15-launch-trajectory/07-stage-and-fairing-events.ts",
+      "title": "Audit staging and fairing mass changes",
+      "category": "launch-trajectory",
+      "symbols": [
+        "LaunchEvent",
+        "simulateLaunch"
+      ],
+      "network": false,
+      "description": "Trace stage cutoffs, separation and fairing events across a nominal flight."
+    },
+    {
+      "path": "15-launch-trajectory/08-constraints-and-fairing.ts",
+      "title": "Constrain ascent and defer fairing release",
+      "category": "launch-trajectory",
+      "symbols": [
+        "flightConstraints",
+        "fairingSeparation",
+        "limitLaunchThrottle"
+      ],
+      "network": false,
+      "description": "Apply best-effort dynamic-pressure/axial-g throttling and release fairing when altitude and pressure gates pass."
     }
   ]
 }
