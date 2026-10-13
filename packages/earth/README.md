@@ -7,8 +7,10 @@ npm install @openlaunch/earth
 ```
 
 ```ts
-import { ObservationDiscoveryClient, CopernicusClient, PlanetaryComputerClient, bbox } from '@openlaunch/earth';
+import { EarthCatalogClient, bbox } from '@openlaunch/earth';
 ```
+
+Use `const sdk=new EarthCatalogClient(); const scenes=await sdk.discoverObservations({area:bbox(12,49,13,50),from:new Date("2026-09-01"),to:new Date()});`.
 
 No satellite.js dependency. Raster decoding is in @openlaunch/raster. Existing all-in-one EarthIntelligenceClient remains in openlaunch-sdk for compatibility.
 
