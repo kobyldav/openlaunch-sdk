@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.8.0",
-  "description": "A TypeScript space computation SDK with SGP4/SDP4, generic multistage 3DOF launch simulation, satellite traffic screening, Earth observation and mission engineering.",
+  "version": "0.8.1",
+  "description": "TypeScript space computation SDK: SGP4/SDP4, multistage 3DOF launch simulation with constrained throttle and conditional fairing, traffic screening, Earth observation and mission engineering.",
   "keywords": [
     "space",
     "spaceflight",
