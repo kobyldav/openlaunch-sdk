@@ -146,16 +146,18 @@ export class EarthIntelligenceClient {
     const weather = outcomes[2]!.status === "fulfilled" ? outcomes[2]!.value : null;
     const optical = rankScenes(opticalRaw.features, { maxCloudCoverPercent: maxCloud, preferRecent: true, now });
     const reasons: string[] = [];
-    let recommendedSensor: ObservationSensor = "optical";
+    let recommendedSensor: ObservationSensor = "radar";
     const cloud = weather?.cloudCoverPercent;
 
     if (cloud !== undefined && cloud > maxCloud) {
       recommendedSensor = "radar";
       reasons.push(`current forecast cloud cover is ${cloud.toFixed(0)}%, above optical threshold ${maxCloud}%`);
     } else if (cloud !== undefined) {
+      recommendedSensor = weather?.isDay === false ? "radar" : "optical";
       reasons.push(`current forecast cloud cover is ${cloud.toFixed(0)}%, within optical threshold`);
+      if (weather?.isDay === false) reasons.push("nighttime limits passive optical imagery");
     } else {
-      reasons.push("current cloud cover is unavailable");
+      reasons.push("current cloud cover is unavailable; radar is the conservative fallback");
     }
 
     if (optical.length === 0 && radarRaw.features.length > 0) {
