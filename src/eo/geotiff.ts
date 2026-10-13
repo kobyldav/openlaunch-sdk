@@ -108,7 +108,8 @@ function checkedSlice(bytes:Uint8Array,offset:number,length:number):Uint8Array {
     throw new RangeError("Invalid or out-of-bounds TIFF data range");
   return bytes.subarray(offset,offset+length);
 }
-async function inflateDeflate(data:Uint8Array,expected:number):Promise<Uint8Array>{
+/** @internal Shared bounded TIFF zlib decoder for COG byte range access. */
+export async function inflateDeflate(data:Uint8Array,expected:number):Promise<Uint8Array>{
   if(typeof DecompressionStream==="undefined")throw new Error("Deflate GeoTIFF requires standard DecompressionStream");
   // Compression=8 is zlib-wrapped Deflate per TIFF/Adobe Tech Note 2.
   const stream=new Blob([new Uint8Array(data)]).stream().pipeThrough(new DecompressionStream("deflate"));
@@ -128,7 +129,8 @@ async function inflateDeflate(data:Uint8Array,expected:number):Promise<Uint8Arra
   let offset=0;for(const chunk of chunks){out.set(chunk,offset);offset+=chunk.byteLength;}
   return out;
 }
-function undoHorizontalPredictor(bytes:Uint8Array,width:number,height:number,bits:number,little:boolean):void {
+/** @internal */
+export function undoHorizontalPredictor(bytes:Uint8Array,width:number,height:number,bits:number,little:boolean):void {
   const step=bits/8,mask=2**bits;
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
   for(let row=0;row<height;row++)for(let col=1;col<width;col++){
@@ -144,12 +146,14 @@ function undoHorizontalPredictor(bytes:Uint8Array,width:number,height:number,bit
 function unsigned(view:DataView,offset:number,bits:number,little:boolean):number {
   return bits===8?view.getUint8(offset):bits===16?view.getUint16(offset,little):view.getUint32(offset,little);
 }
-function readSample(view:DataView,offset:number,bits:number,format:SampleKind,little:boolean):number {
+/** @internal */
+export function readSample(view:DataView,offset:number,bits:number,format:SampleKind,little:boolean):number {
   if(format===3)return bits===32?view.getFloat32(offset,little):view.getFloat64(offset,little);
   if(format===2)return bits===8?view.getInt8(offset):bits===16?view.getInt16(offset,little):view.getInt32(offset,little);
   return unsigned(view,offset,bits,little);
 }
-function readCrs(tiff:TiffDirectory):RasterCrs{
+/** @internal */
+export function readCrs(tiff:TiffDirectory):RasterCrs{
   const keys=tiff.numbers(34735);
   if(!keys||keys.length<4)throw new RangeError("Missing GeoTIFF GeoKeyDirectory: CRS must be explicit");
   const total=keys[3]!;
@@ -164,7 +168,8 @@ function readCrs(tiff:TiffDirectory):RasterCrs{
     throw new RangeError("GeoTIFF CRS is missing or unsupported: only EPSG:4326 / EPSG:3857 are supported");
   return `EPSG:${epsg}` as RasterCrs;
 }
-function readTransform(tiff:TiffDirectory):RasterTransform{
+/** @internal */
+export function readTransform(tiff:TiffDirectory):RasterTransform{
   const mat=tiff.numbers(34264);
   if(mat){
     if(mat.length!==16||Math.abs(mat[12]!)>1e-12||Math.abs(mat[13]!)>1e-12||Math.abs(mat[14]!)>1e-12||Math.abs(mat[15]!-1)>1e-12)
@@ -177,7 +182,8 @@ function readTransform(tiff:TiffDirectory):RasterTransform{
   return [tie[3]!-tie[0]!*scale[0]!,scale[0]!,0,
           tie[4]!+tie[1]!*scale[1]!,0,-scale[1]!];
 }
-class TiffDirectory {
+/** @internal */
+export class TiffDirectory {
   readonly littleEndian:boolean;
   readonly view:DataView;
   readonly tags=new Map<number,TiffValue>();
