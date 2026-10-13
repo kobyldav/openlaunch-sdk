@@ -1,4 +1,5 @@
 import type { AreaOfInterest } from "../geo/types.js";
+import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport } from "./observations.js";
 import { centerOf } from "../geo/types.js";
 import { rankScenes, type SceneScore } from "../eo/scenes.js";
 import type { StacFeatureCollection, StacItem } from "../providers/stac.js";
@@ -43,17 +44,24 @@ export interface MonitoringSnapshot {
   recommendationReasons: string[];
   provenance: string[];
   limitations: string[];
+  sourceFailures?: string[];
 }
 
 export class EarthIntelligenceClient {
   readonly copernicus: CopernicusClient;
   readonly planetaryComputer: PlanetaryComputerClient;
   readonly weather: OpenMeteoClient;
+  readonly observations: ObservationDiscoveryClient;
 
   constructor(options: EarthIntelligenceOptions = {}) {
     this.copernicus = options.copernicus ?? new CopernicusClient();
     this.planetaryComputer = options.planetaryComputer ?? new PlanetaryComputerClient();
     this.weather = options.weather ?? new OpenMeteoClient();
+    this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
+  }
+
+  discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
+    return this.observations.discover(options);
   }
 
   async searchImagery(options: ImagerySearchOptions): Promise<StacFeatureCollection> {
@@ -117,12 +125,20 @@ export class EarthIntelligenceClient {
     const maxCloud = options.maxCloudCoverPercent ?? 25;
     const [lon, lat] = centerOf(options.area);
 
-    const [opticalRaw, radarRaw, weather] = await Promise.all([
+    const outcomes = await Promise.allSettled([
       this.copernicus.searchSentinel2(options.area, from, now, maxCloud, 30),
       this.copernicus.searchSentinel1(options.area, from, now, 30),
       this.weather.conditionsAt(lat, lon, now, { forecastDays: 1 }),
     ]);
-
+    const sourceNames = ["Copernicus Sentinel-2", "Copernicus Sentinel-1", "Open-Meteo"];
+    const sourceFailures = outcomes.flatMap((outcome, index) =>
+      outcome.status === "rejected"
+        ? [sourceNames[index]! + ": " + (outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason)).slice(0, 180)]
+        : []
+    );
+    const opticalRaw = outcomes[0]!.status === "fulfilled" ? outcomes[0]!.value : { features: [] };
+    const radarRaw = outcomes[1]!.status === "fulfilled" ? outcomes[1]!.value : { features: [] };
+    const weather = outcomes[2]!.status === "fulfilled" ? outcomes[2]!.value : null;
     const optical = rankScenes(opticalRaw.features, { maxCloudCoverPercent: maxCloud, preferRecent: true, now });
     const reasons: string[] = [];
     let recommendedSensor: ObservationSensor = "optical";
@@ -153,15 +169,17 @@ export class EarthIntelligenceClient {
       recommendedSensor,
       recommendationReasons: reasons,
       provenance: [
-        "Copernicus Data Space STAC: Sentinel-2 L2A",
-        "Copernicus Data Space STAC: Sentinel-1 GRD",
-        "Open-Meteo forecast API",
+        ...(outcomes[0]!.status === "fulfilled" ? ["Copernicus Data Space STAC: Sentinel-2 L2A"] : []),
+        ...(outcomes[1]!.status === "fulfilled" ? ["Copernicus Data Space STAC: Sentinel-1 GRD"] : []),
+        ...(outcomes[2]!.status === "fulfilled" ? ["Open-Meteo forecast API"] : []),
       ],
+      sourceFailures,
       limitations: [
         "A catalog scene intersecting the AOI does not prove the target itself is cloud-free.",
         "Weather forecast cloud cover is not a substitute for pixel-level cloud masks.",
         "Satellite overpass prediction is intentionally not inferred from simple two-body OMM conversion.",
         "Use validated orbit propagation and acquisition-plan data when timing a future collection matters.",
+        ...(sourceFailures.length ? ["Provider failures caused an incomplete monitoring snapshot."] : []),
       ],
     };
   }
