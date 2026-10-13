@@ -7,7 +7,7 @@ npm install @openlaunch/engineering
 ```
 
 ```ts
-import { rocketDeltaV, simulateLaunch } from '@openlaunch/engineering';
+import { simulateLaunch, sweepLaunchGuidance } from '@openlaunch/engineering';
 ```
 
 Depends on @openlaunch/orbit for coupled traffic/trajectory analysis. Use only when physics models are needed.
