@@ -22,6 +22,7 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 The v0.8.0 demo was intentionally an illustrative, high-thrust case: it produced **Max-Q ~156 kPa**, and an unconditional T+25 s fairing jettison happened at only **~10.7 km**. This is not a plausible mission configuration. v0.8.1 makes these weaknesses visible and lets you model safer *assumptions* without hiding failure.
 
 ```ts
+const { fairingJettisonSeconds: _legacyTime, ...safeVehicle } = model.vehicle;
 const study = {
   ...model,
   flightConstraints: {
@@ -30,8 +31,7 @@ const study = {
     maxQResponseSeconds: 6,        // first-order q-rate response horizon
   },
   vehicle: {
-    ...model.vehicle,
-    fairingJettisonSeconds: undefined, // use event-gated release instead
+    ...safeVehicle, // legacy time-based release removed for the new gate
     fairingSeparation: {
       earliestSeconds: 30,
       minAltitudeKm: 80,
