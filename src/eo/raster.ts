@@ -121,8 +121,12 @@ export function clipRasterToAoi(grid:RasterGrid,area:AreaOfInterest):RasterGrid 
     const [c,r]=worldToPixel(grid.transform,x,y);
     minC=Math.min(minC,c);maxC=Math.max(maxC,c);minR=Math.min(minR,r);maxR=Math.max(maxR,r);
   }
-  const c0=Math.max(0,Math.floor(minC)),r0=Math.max(0,Math.floor(minR)),
-    c1=Math.min(grid.width,Math.ceil(maxC)),r1=Math.min(grid.height,Math.ceil(maxR));
+  // Numeric lon/lat to affine inversion can yield 0.9999999999998 when
+  // a bbox edge lies exactly on a pixel border. Snap machine-precision
+  // artefacts before floor/ceil to avoid acquiring entire extra rows.
+  const snap=(value:number):number=>Math.abs(value-Math.round(value))<1e-9?Math.round(value):value;
+  const c0=Math.max(0,Math.floor(snap(minC))),r0=Math.max(0,Math.floor(snap(minR))),
+    c1=Math.min(grid.width,Math.ceil(snap(maxC))),r1=Math.min(grid.height,Math.ceil(snap(maxR)));
   if(c1<=c0||r1<=r0)throw new RangeError("AOI does not intersect raster grid");
   const width=c1-c0,height=r1-r0;
   const data=new Float64Array(width*height);
