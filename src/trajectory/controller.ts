@@ -66,7 +66,10 @@ export function limitLaunchThrottle(
         dot(unitRel, input.thrustDirection);
       if (qdotPerThrottle > 1e-9) {
         const responseSeconds = c.maxQResponseSeconds ?? 5;
-        const targetQdot = (c.maxDynamicPressurePa - q) / responseSeconds;
+        // Use a small nominal headroom because finite integration steps and density
+        // model errors can produce overshoot even with aggressive throttling.
+        // This remains an advisory first-order controller, not a hard limit.
+        const targetQdot = (0.96 * c.maxDynamicPressurePa - q) / responseSeconds;
         qThrottle = clamp((targetQdot - qdotExternal) / qdotPerThrottle, 0, 1);
       }
     }
