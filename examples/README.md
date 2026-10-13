@@ -4,9 +4,25 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
 
+## v0.9 Mission & Earth intelligence
+
+`npm run example:mission` is a fully offline, reproducible integration scenario exercising EO metadata (thermal/masks/DEM), scene discovery, orbit-target guidance scoring and satellite screening diagnostics. It uses explicitly synthetic imagery metadata: no real satellite preview is falsely represented as downloaded.
+
+See [Mission & Earth Intelligence](../docs/MISSION_INTELLIGENCE.md).
+
+## v0.8–v0.8.1 launch trajectory examples
+
+Folder `15-launch-trajectory/` includes a typed generic two-stage launch model and examples for staging, mass/atmosphere telemetry, max-Q, deterministic Monte Carlo dispersion, historical-epoch satellite screening, Cesium CZML and guidance sensitivity. The model is **illustrative only** and is not a SpaceX flight profile.
+
+Live-independent executable demo: `npm run example:launch`. Include `-- --czml` to generate `launch-demo.czml`.
+
+New in v0.8.1: `15-launch-trajectory/08-constraints-and-fairing.ts` demonstrates modeled dynamic-pressure limiting, axial acceleration throttling, deferred fairing release and final-orbit diagnostics.
+
+Full numeric and frame documentation: [Launch Trajectory](../docs/LAUNCH_TRAJECTORY.md).
+
 ## Conventions
 
-- Every `.ts` file is self-contained and imports from the public root export.
+- Examples import the public root API; scenarios may share a typed local fixture (for example `15-launch-trajectory/00-model.ts`) to keep engineering assumptions consistent.
 - `Network: yes` examples call LL2, NASA or CelesTrak and may be rate-limited or change with upstream data.
 - Pure engineering examples have `Network: no` and are deterministic unless they explicitly use `Math.random()`.
 - Numerical/engineering utilities are first-order development tools, **not flight-qualified models**.
@@ -150,3 +166,33 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 - [`12-sdk-infrastructure/04-storage-cache.ts`](./12-sdk-infrastructure/04-storage-cache.ts) — **Adapt key/value storage to the SDK cache**. Wrap browser-like or app storage behind JsonStorageCache without coupling OpenLaunch to a specific storage library.
 - [`12-sdk-infrastructure/05-telemetry.ts`](./12-sdk-infrastructure/05-telemetry.ts) — **Collect HTTP telemetry**. Observe requests, cache hits, retries and errors without modifying provider code.
 
+### `earth-observation`
+
+- [`13-earth-observation/01-area-of-interest.ts`](./13-earth-observation/01-area-of-interest.ts) — **Reusable AOI geometry**. Build WGS84 circles/bounds once and reuse them across Earth-data providers.
+- [`13-earth-observation/02-copernicus-sentinel2-search.ts`](./13-earth-observation/02-copernicus-sentinel2-search.ts) — **Copernicus Sentinel-2 search**. Search optical scenes by AOI, time and catalog cloud cover.
+- [`13-earth-observation/03-copernicus-sentinel1-radar.ts`](./13-earth-observation/03-copernicus-sentinel1-radar.ts) — **Sentinel-1 radar search**. Discover SAR scenes for cloud/night-resilient monitoring.
+- [`13-earth-observation/04-planetary-computer-landsat-history.ts`](./13-earth-observation/04-planetary-computer-landsat-history.ts) — **Landsat history through Planetary Computer**. Query long historical time spans with STAC.
+- [`13-earth-observation/05-optical-weather-windows.ts`](./13-earth-observation/05-optical-weather-windows.ts) — **Weather-aware optical windows**. Rank upcoming daylight/low-cloud opportunities.
+- [`13-earth-observation/06-monitoring-snapshot.ts`](./13-earth-observation/06-monitoring-snapshot.ts) — **Cross-provider monitoring snapshot**. Combine Sentinel-2, Sentinel-1 and Open-Meteo into one decision object.
+- [`13-earth-observation/07-copernicus-process-true-color.ts`](./13-earth-observation/07-copernicus-process-true-color.ts) — **Server-side true-color render**. Request only the AOI through Sentinel Hub Process API.
+- [`13-earth-observation/08-spectral-indices.ts`](./13-earth-observation/08-spectral-indices.ts) — **Spectral indices**. NDVI, NDWI, NDMI, NBR, EVI and SAVI from calibrated reflectance.
+- [`13-earth-observation/09-generic-stac.ts`](./13-earth-observation/09-generic-stac.ts) — **Generic STAC connection**. Point OpenLaunch at any compatible STAC API.
+- [`13-earth-observation/10-sign-planetary-asset.ts`](./13-earth-observation/10-sign-planetary-asset.ts) — **Planetary Computer asset signing**. Turn STAC asset URLs into short-lived readable Azure URLs.
+- [`13-earth-observation/11-rotterdam-all-in-one-monitor.ts`](./13-earth-observation/11-rotterdam-all-in-one-monitor.ts) — **All-in-one Rotterdam monitoring brief**. Combines CelesTrak catalog metadata, Open-Meteo, Sentinel-2, Sentinel-1, Landsat history and LL2 without pretending that catalog orbit data proves a future acquisition.
+
+### `orbit-traffic`
+
+- [`14-orbit-traffic/01-sgp4-from-omm.ts`](./14-orbit-traffic/01-sgp4-from-omm.ts) — **Live OMM -> SGP4/SDP4 state**. Propagate CelesTrak GP elements with source epoch and element-age metadata.
+- [`14-orbit-traffic/02-ground-track.ts`](./14-orbit-traffic/02-ground-track.ts) — **Ground track sampling**. Produce time-tagged latitude/longitude/altitude points with bounded allocation.
+- [`14-orbit-traffic/03-passes-over-prague.ts`](./14-orbit-traffic/03-passes-over-prague.ts) — **Refined passes over Prague**. Compute AOS/TCA/LOS, elevation, azimuth and range.
+- [`14-orbit-traffic/04-look-angles-and-range-rate.ts`](./14-orbit-traffic/04-look-angles-and-range-rate.ts) — **Look angles and range rate**. Observer-relative geometry for communications/tracking.
+- [`14-orbit-traffic/05-closest-approach.ts`](./14-orbit-traffic/05-closest-approach.ts) — **Pairwise closest approach**. Refined TCA, miss distance, relative velocity and RTN/RIC geometry.
+- [`14-orbit-traffic/06-nearest-objects.ts`](./14-orbit-traffic/06-nearest-objects.ts) — **Nearest objects at an instant**. Rank a bounded catalog group by TEME separation.
+- [`14-orbit-traffic/07-bounded-catalog-screen.ts`](./14-orbit-traffic/07-bounded-catalog-screen.ts) — **Bounded traffic screening**. Screen a CelesTrak group without accidentally launching an unbounded CPU workload.
+- [`14-orbit-traffic/08-sensor-access-over-czechia.ts`](./14-orbit-traffic/08-sensor-access-over-czechia.ts) — **Sentinel-2 swath geometry over Czechia**. Geometric access only; not a tasking claim.
+- [`14-orbit-traffic/09-off-nadir-geometry.ts`](./14-orbit-traffic/09-off-nadir-geometry.ts) — **Off-nadir reach geometry**. Convert pointing angles into approximate ground reach and back.
+- [`14-orbit-traffic/10-czml-3d-scenario.ts`](./14-orbit-traffic/10-czml-3d-scenario.ts) — **Cesium CZML orbit export**. Build a 3D time-tagged scenario from propagated states.
+- [`14-orbit-traffic/11-deep-space-sdp4.ts`](./14-orbit-traffic/11-deep-space-sdp4.ts) — **Deep-space propagation**. Demonstrate automatic SDP4 mode on a GEO object.
+- [`14-orbit-traffic/12-orbit-plus-earth-observation.ts`](./14-orbit-traffic/12-orbit-plus-earth-observation.ts) — **Orbit + EO orchestration**. Combine geometric access, weather and existing imagery while keeping acquisition truth separate.
+
+- [`14-orbit-traffic/13-screen-sampled-trajectory.ts`](./14-orbit-traffic/13-screen-sampled-trajectory.ts) — **External/launch trajectory traffic screening**. Feed time-tagged TEME states from another simulator into cubic-Hermite trajectory interpolation and screen the path against live satellites.

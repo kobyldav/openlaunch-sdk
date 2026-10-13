@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.5.1",
-  "description": "A zero-runtime-dependency TypeScript spaceflight and mission-engineering SDK: Launch Library 2, NASA, CelesTrak, orbital mechanics, rockets, navigation, communications, thermal, EDL and mission utilities.",
+  "version": "0.9.0",
+  "description": "TypeScript space SDK: Earth-observation product intelligence, orbit traffic audits, launch 3DOF physics and bounded mission targeting.",
   "keywords": [
     "space",
     "spaceflight",
@@ -14,7 +14,36 @@
     "launch-library",
     "mission",
     "typescript",
-    "sdk"
+    "sdk",
+    "earth-observation",
+    "stac",
+    "sentinel",
+    "landsat",
+    "copernicus",
+    "geospatial",
+    "remote-sensing",
+    "open-meteo",
+    "sgp4",
+    "sdp4",
+    "satellite-tracking",
+    "satellite-pass",
+    "ground-track",
+    "space-traffic",
+    "conjunction",
+    "ssa",
+    "space-situational-awareness",
+    "launch-simulation",
+    "3dof",
+    "trajectory",
+    "runge-kutta",
+    "aerodynamics",
+    "monte-carlo",
+    "mission-planning",
+    "satellite-imagery",
+    "raster-assets",
+    "earth-surface-temperature",
+    "orbit-targeting",
+    "targeting-sweep"
   ],
   "license": "MIT",
   "type": "module",
@@ -36,6 +65,51 @@
       "types": "./dist/providers/index.d.ts",
       "import": "./dist/providers/index.js",
       "require": "./dist-cjs/providers/index.js"
+    },
+    "./geo": {
+      "types": "./dist/geo/index.d.ts",
+      "import": "./dist/geo/index.js",
+      "require": "./dist-cjs/geo/index.js"
+    },
+    "./eo": {
+      "types": "./dist/eo/index.d.ts",
+      "import": "./dist/eo/index.js",
+      "require": "./dist-cjs/eo/index.js"
+    },
+    "./intelligence": {
+      "types": "./dist/intelligence/index.d.ts",
+      "import": "./dist/intelligence/index.js",
+      "require": "./dist-cjs/intelligence/index.js"
+    },
+    "./orbit": {
+      "types": "./dist/orbit/index.d.ts",
+      "import": "./dist/orbit/index.js",
+      "require": "./dist-cjs/orbit/index.js"
+    },
+    "./traffic": {
+      "types": "./dist/traffic/index.d.ts",
+      "import": "./dist/traffic/index.js",
+      "require": "./dist-cjs/traffic/index.js"
+    },
+    "./sensors": {
+      "types": "./dist/sensors/index.d.ts",
+      "import": "./dist/sensors/index.js",
+      "require": "./dist-cjs/sensors/index.js"
+    },
+    "./scenario": {
+      "types": "./dist/scenario/index.d.ts",
+      "import": "./dist/scenario/index.js",
+      "require": "./dist-cjs/scenario/index.js"
+    },
+    "./trajectory": {
+      "types": "./dist/trajectory/index.d.ts",
+      "import": "./dist/trajectory/index.js",
+      "require": "./dist-cjs/trajectory/index.js"
+    },
+    "./mission": {
+      "types": "./dist/mission/index.d.ts",
+      "import": "./dist/mission/index.js",
+      "require": "./dist-cjs/mission/index.js"
     }
   },
   "files": [
@@ -52,18 +126,27 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "npm run check && npm run pack:check",
-    "examples:check": "tsc -p tsconfig.examples.json --noEmit"
+    "examples:check": "tsc -p tsconfig.examples.json --noEmit",
+    "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
+    "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
+    "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs",
+    "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs",
+    "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs",
+    "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs"
   },
   "engines": {
     "node": ">=18"
   },
   "devDependencies": {
     "typescript": "^5.8.3"
+  },
+  "dependencies": {
+    "satellite.js": "6.0.2"
   }
 }

@@ -1,6 +1,126 @@
 # Runtime export inventory
 
-Generated from v0.5.0 ESM build. Runtime exports: **306**.
+The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0, v0.7.0 and v0.8.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
+
+## v0.9.0 additions
+
+Public root and `openlaunch-sdk/mission`:
+`MissionPlanningEngine`, `sweepLaunchGuidance`, `assessOrbitTarget`, `idealStagedDeltaVMps`, `circularSpeedAtAltitudeMps`, orbit targets and bounded guidance candidate types.
+
+Earth intelligence and EO:
+`ObservationDiscoveryClient`, `inspectEoProduct`, `inspectEoAsset`, `selectEoAssets`,
+`downloadEoAsset`, `downloadEoPreview`, `landsatC2SurfaceTemperature`,
+`landsatC2StUncertaintyKelvin`, `sentinel2SclClass`,
+`summarizeSentinel2Scl`, `reconcileAccessWithScenes`.
+
+Orbit traffic:
+`auditTrajectoryAgainstCatalog`, `TrajectoryScreenAudit`, `AuditedEncounter`.
+Clients: `space.mission`, `space.earth.discoverObservations`, `space.earth.downloadPreview`, `space.trajectory.auditTraffic`.
+
+**Please note:** None of these functions claims actual mission guidance, generated imagery, certified collision probability, or verified optical quality.
+
+## v0.8.0 additions
+
+```text
+LaunchTrajectoryEngine
+simulateLaunch
+rk4LaunchStep
+launchMonteCarlo
+launchToCzml
+assessLaunchOrbit
+initialLaunchState
+launchInitialMass
+validateLaunchModel
+guidanceAt
+atmosphericState
+computeForces
+telemetryAt
+```
+
+Typed domains: `LaunchModel`, `LaunchVehicle`, `LaunchStage`, `LaunchSite`, `GuidanceKnot`, `LaunchTelemetry`, `LaunchSimulation`, `LaunchEvent`, `LaunchMonteCarloResult`, `TrajectoryDispersion`, `LaunchOrbitalAssessment`. Subpath `openlaunch-sdk/trajectory` and `space.trajectory`.
+
+**Model limit:** GMST-only TEME-aligned 3DOF dynamics and first-order dispersion, not an actual mission flight plan or certified conjunction probability.
+
+## v0.7.0 additions
+
+The main v0.7 runtime surfaces include:
+
+```text
+OrbitEngine
+Sgp4Satellite
+OrbitPropagationError
+lookAnglesAt
+findPasses
+nextPass
+normalizeOmm
+satrecEpochDate
+EARTH_ROTATION_RATE_RAD_S
+temeToEcfPositionApprox
+temeToEcfStateApprox
+temeToGeodeticApprox
+geodeticToEcfKm
+TrafficEngine
+closestApproach
+findCloseApproaches
+SampledTemeTrajectory
+closestApproachTrajectoryToSatellite
+screenTrajectoryAgainstSatellites
+SENSOR_PRESETS
+findSensorAccessWindows
+offNadirGroundReachKm
+requiredOffNadirDeg
+OrbitScenario
+satelliteToCzml
+mergeCzml
+```
+
+Type-only domain models include orbit states, pass windows, conjunction quality, RTN separation, sampled trajectory state, sensor models and scenario interfaces.
+
+The complete generated export count should be refreshed from the final release build before tagging; this document intentionally does not pretend the old v0.5 numeric baseline is the current total.
+
+## v0.6.0 additions
+
+```text
+StacClient
+STAC_ENDPOINTS
+COPERNICUS_COLLECTIONS
+createCopernicusStac
+createPlanetaryComputerStac
+CopernicusClient
+COPERNICUS_ENDPOINTS
+TRUE_COLOR_EVALSCRIPT
+NDVI_EVALSCRIPT
+buildProcessRequest
+PlanetaryComputerClient
+PLANETARY_COMPUTER_COLLECTIONS
+OpenMeteoClient
+nearestObservation
+scoreOpticalWeather
+EarthIntelligenceClient
+point
+bbox
+polygon
+circle
+centerOf
+toGeoJson
+areaKm2Approx
+normalizedDifference
+ndvi
+ndwi
+ndmi
+nbr
+evi
+savi
+indexSet
+sceneDatetime
+sceneCloudCover
+rankScenes
+latestClearScene
+assetByRole
+assetByMediaType
+commonVisualAsset
+```
+
 
 > Type-only TypeScript exports are not included in this runtime list.
 

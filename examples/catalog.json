@@ -461,7 +461,7 @@
         "earthMarsHohmann"
       ],
       "network": false,
-      "description": "Compute a first-order heliocentric Earth\u2013Mars transfer reference."
+      "description": "Compute a first-order heliocentric Earth–Mars transfer reference."
     },
     {
       "path": "04-orbital-mechanics/07-patched-conic-departure.ts",
@@ -1055,6 +1055,436 @@
       ],
       "network": true,
       "description": "Observe requests, cache hits, retries and errors without modifying provider code."
+    },
+    {
+      "path": "13-earth-observation/01-area-of-interest.ts",
+      "title": "Reusable AOI geometry",
+      "category": "earth-observation",
+      "symbols": [
+        "circle",
+        "centerOf",
+        "areaKm2Approx"
+      ],
+      "network": false,
+      "description": "Build one WGS84 area of interest and reuse it across Earth-data providers."
+    },
+    {
+      "path": "13-earth-observation/02-copernicus-sentinel2-search.ts",
+      "title": "Copernicus Sentinel-2 search",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "circle",
+        "copernicus.searchSentinel2",
+        "sceneCloudCover",
+        "sceneDatetime"
+      ],
+      "network": true,
+      "description": "Search Sentinel-2 L2A scenes by AOI, time and catalog cloud cover."
+    },
+    {
+      "path": "13-earth-observation/03-copernicus-sentinel1-radar.ts",
+      "title": "Copernicus Sentinel-1 radar search",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "bbox",
+        "copernicus.searchSentinel1"
+      ],
+      "network": true,
+      "description": "Search Sentinel-1 GRD radar scenes for cloud/night-resilient monitoring."
+    },
+    {
+      "path": "13-earth-observation/04-planetary-computer-landsat-history.ts",
+      "title": "Planetary Computer Landsat history",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.searchLandsatHistory"
+      ],
+      "network": true,
+      "description": "Query Landsat Collection 2 Level-2 historical imagery through Planetary Computer STAC."
+    },
+    {
+      "path": "13-earth-observation/05-optical-weather-windows.ts",
+      "title": "Weather-aware optical windows",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.opticalWeatherWindows"
+      ],
+      "network": true,
+      "description": "Rank upcoming daylight low-cloud windows using Open-Meteo."
+    },
+    {
+      "path": "13-earth-observation/06-monitoring-snapshot.ts",
+      "title": "Cross-provider monitoring snapshot",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "earth.monitoringSnapshot"
+      ],
+      "network": true,
+      "description": "Combine Sentinel-2, Sentinel-1 and weather into one monitoring decision object."
+    },
+    {
+      "path": "13-earth-observation/07-copernicus-process-true-color.ts",
+      "title": "Copernicus server-side true color",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "copernicus.trueColor"
+      ],
+      "network": true,
+      "description": "Render only an AOI through the Sentinel Hub Process API using OAuth credentials."
+    },
+    {
+      "path": "13-earth-observation/08-spectral-indices.ts",
+      "title": "Remote-sensing spectral indices",
+      "category": "earth-observation",
+      "symbols": [
+        "ndvi",
+        "ndwi",
+        "ndmi",
+        "nbr",
+        "evi",
+        "savi"
+      ],
+      "network": false,
+      "description": "Compute common indices from already calibrated reflectance values."
+    },
+    {
+      "path": "13-earth-observation/09-generic-stac.ts",
+      "title": "Generic STAC catalog",
+      "category": "earth-observation",
+      "symbols": [
+        "StacClient"
+      ],
+      "network": true,
+      "description": "Connect to a standards-compatible STAC API directly."
+    },
+    {
+      "path": "13-earth-observation/10-sign-planetary-asset.ts",
+      "title": "Planetary Computer asset signing",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "PlanetaryComputerClient",
+        "PLANETARY_COMPUTER_COLLECTIONS"
+      ],
+      "network": true,
+      "description": "Sign Azure-backed STAC asset URLs for temporary read access."
+    },
+    {
+      "path": "13-earth-observation/11-rotterdam-all-in-one-monitor.ts",
+      "title": "All-in-one Rotterdam monitoring brief",
+      "category": "earth-observation",
+      "symbols": [
+        "OpenLaunch",
+        "circle",
+        "earth.monitoringSnapshot",
+        "earth.opticalWeatherWindows",
+        "earth.searchLandsatHistory",
+        "celestrak.byName",
+        "launches.next"
+      ],
+      "network": true,
+      "description": "Combines orbital catalog metadata, weather, Sentinel optical/radar scenes, Landsat history and launch data into one monitoring brief while explicitly separating catalog orbit data from validated pass/acquisition prediction."
+    },
+    {
+      "path": "14-orbit-traffic/01-sgp4-from-omm.ts",
+      "title": "Live OMM to SGP4/SDP4 state",
+      "category": "orbit-traffic",
+      "symbols": [
+        "OpenLaunch",
+        "orbit.byCatalogNumber",
+        "Sgp4Satellite.stateAt"
+      ],
+      "network": true,
+      "description": "Propagate live CelesTrak OMM GP elements with source epoch, geodetic state and propagation mode."
+    },
+    {
+      "path": "14-orbit-traffic/02-ground-track.ts",
+      "title": "SGP4 ground track",
+      "category": "orbit-traffic",
+      "symbols": [
+        "Sgp4Satellite.groundTrack"
+      ],
+      "network": true,
+      "description": "Sample a bounded time-tagged satellite ground track."
+    },
+    {
+      "path": "14-orbit-traffic/03-passes-over-prague.ts",
+      "title": "Refined passes over Prague",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.passes",
+        "findPasses"
+      ],
+      "network": true,
+      "description": "Compute AOS, TCA, LOS, maximum elevation, azimuth and range for a ground observer."
+    },
+    {
+      "path": "14-orbit-traffic/04-look-angles-and-range-rate.ts",
+      "title": "Look angles and range rate",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.lookAngles",
+        "lookAnglesAt"
+      ],
+      "network": true,
+      "description": "Calculate observer-relative azimuth, elevation, slant range and signed range rate."
+    },
+    {
+      "path": "14-orbit-traffic/05-closest-approach.ts",
+      "title": "Pairwise closest approach",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.closestApproach",
+        "closestApproach"
+      ],
+      "network": true,
+      "description": "Refine TCA and expose miss distance, relative velocity, RTN geometry and element freshness."
+    },
+    {
+      "path": "14-orbit-traffic/06-nearest-objects.ts",
+      "title": "Nearest catalog objects",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.nearestAt",
+        "orbit.group"
+      ],
+      "network": true,
+      "description": "Rank bounded CelesTrak objects by instantaneous TEME separation."
+    },
+    {
+      "path": "14-orbit-traffic/07-bounded-catalog-screen.ts",
+      "title": "Bounded catalog conjunction screen",
+      "category": "orbit-traffic",
+      "symbols": [
+        "traffic.screenGroup"
+      ],
+      "network": true,
+      "description": "Screen a bounded CelesTrak group for close approaches with explicit CPU/window limits."
+    },
+    {
+      "path": "14-orbit-traffic/08-sensor-access-over-czechia.ts",
+      "title": "Sensor access over Czechia",
+      "category": "orbit-traffic",
+      "symbols": [
+        "findSensorAccessWindows",
+        "SENSOR_PRESETS",
+        "bbox"
+      ],
+      "network": true,
+      "description": "Compute geometric Sentinel-2 swath access over a Czech Republic AOI without claiming acquisition."
+    },
+    {
+      "path": "14-orbit-traffic/09-off-nadir-geometry.ts",
+      "title": "Off-nadir pointing geometry",
+      "category": "orbit-traffic",
+      "symbols": [
+        "offNadirGroundReachKm",
+        "requiredOffNadirDeg"
+      ],
+      "network": false,
+      "description": "Convert sensor off-nadir angle to spherical-Earth ground reach and back."
+    },
+    {
+      "path": "14-orbit-traffic/10-czml-3d-scenario.ts",
+      "title": "Cesium CZML 3D orbit scenario",
+      "category": "orbit-traffic",
+      "symbols": [
+        "OrbitScenario",
+        "satelliteToCzml"
+      ],
+      "network": true,
+      "description": "Export propagated Earth-fixed trajectories as Cesium CZML."
+    },
+    {
+      "path": "14-orbit-traffic/11-deep-space-sdp4.ts",
+      "title": "Deep-space SDP4 propagation",
+      "category": "orbit-traffic",
+      "symbols": [
+        "orbit.group",
+        "Sgp4Satellite.stateAt"
+      ],
+      "network": true,
+      "description": "Demonstrate automatic deep-space propagation on a GEO catalog object."
+    },
+    {
+      "path": "14-orbit-traffic/12-orbit-plus-earth-observation.ts",
+      "title": "Orbit plus Earth observation planning",
+      "category": "orbit-traffic",
+      "symbols": [
+        "findSensorAccessWindows",
+        "weather.conditionsAt",
+        "copernicus.searchSentinel2"
+      ],
+      "network": true,
+      "description": "Combine geometric orbital access, weather and existing imagery while preserving acquisition uncertainty."
+    },
+    {
+      "path": "14-orbit-traffic/13-screen-sampled-trajectory.ts",
+      "title": "Screen a sampled external trajectory against satellites",
+      "category": "orbit-traffic",
+      "symbols": [
+        "SampledTemeTrajectory",
+        "traffic.screenTrajectory"
+      ],
+      "network": true,
+      "description": "Interpolate time-tagged TEME states with cubic Hermite and screen an external or future launch trajectory against propagated catalog objects."
+    },
+    {
+      "path": "15-launch-trajectory/00-model.ts",
+      "title": "Generic launch-model fixture",
+      "category": "launch-trajectory",
+      "symbols": [
+        "LaunchModel"
+      ],
+      "network": false,
+      "description": "Shared typed sample vehicle data; illustrative, not a real aerospace vehicle."
+    },
+    {
+      "path": "15-launch-trajectory/01-multistage-flight.ts",
+      "title": "Numerical multistage flight",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "OpenLaunch.trajectory"
+      ],
+      "network": false,
+      "description": "Integrate a generic two-stage vehicle with flight-event telemetry."
+    },
+    {
+      "path": "15-launch-trajectory/02-telemetry-max-q.ts",
+      "title": "Find maximum dynamic pressure",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "dynamicPressurePa"
+      ],
+      "network": false,
+      "description": "Inspect modeled maximum dynamic pressure, altitude and atmospheric speed."
+    },
+    {
+      "path": "15-launch-trajectory/03-monte-carlo-dispersion.ts",
+      "title": "Sample guidance and propulsion uncertainty",
+      "category": "launch-trajectory",
+      "symbols": [
+        "launchMonteCarlo",
+        "TrajectoryDispersion"
+      ],
+      "network": false,
+      "description": "Compute seeded position deviation percentiles from generic input perturbations."
+    },
+    {
+      "path": "15-launch-trajectory/04-screen-historical-iss.ts",
+      "title": "Compare modeled rocket with historical ISS",
+      "category": "launch-trajectory",
+      "symbols": [
+        "screenSatellites",
+        "Sgp4Satellite"
+      ],
+      "network": false,
+      "description": "Numerically screen an illustrative launch state against a matching-epoch historical catalog orbit."
+    },
+    {
+      "path": "15-launch-trajectory/05-export-launch-czml.ts",
+      "title": "Export rocket 3D scenario as CZML",
+      "category": "launch-trajectory",
+      "symbols": [
+        "launchToCzml"
+      ],
+      "network": false,
+      "description": "Serialize a modeled rocket and flight-event markers for Cesium visualization."
+    },
+    {
+      "path": "15-launch-trajectory/06-guidance-sensitivity.ts",
+      "title": "Compare guidance program offsets",
+      "category": "launch-trajectory",
+      "symbols": [
+        "simulateLaunch",
+        "GuidanceKnot"
+      ],
+      "network": false,
+      "description": "Assess altitude sensitivity to time-tagged pitch command perturbations."
+    },
+    {
+      "path": "15-launch-trajectory/07-stage-and-fairing-events.ts",
+      "title": "Audit staging and fairing mass changes",
+      "category": "launch-trajectory",
+      "symbols": [
+        "LaunchEvent",
+        "simulateLaunch"
+      ],
+      "network": false,
+      "description": "Trace stage cutoffs, separation and fairing events across a nominal flight."
+    },
+    {
+      "path": "15-launch-trajectory/08-constraints-and-fairing.ts",
+      "title": "Constrain ascent and defer fairing release",
+      "category": "launch-trajectory",
+      "symbols": [
+        "flightConstraints",
+        "fairingSeparation",
+        "limitLaunchThrottle"
+      ],
+      "network": false,
+      "description": "Apply best-effort dynamic-pressure/axial-g throttling and release fairing when altitude and pressure gates pass."
+    },
+    {
+      "path": "16-mission-intelligence/01-czechia-latest-scenes.ts",
+      "title": "Latest optical/radar/thermal/DEM catalog scenes over Czechia",
+      "category": "mission-intelligence",
+      "symbols": [
+        "ObservationDiscoveryClient",
+        "discoverObservations"
+      ],
+      "network": true,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/02-asset-resolutions.ts",
+      "title": "Inspect per-product asset resolutions without fabricated imagery",
+      "category": "mission-intelligence",
+      "symbols": [
+        "inspectEoProduct",
+        "selectEoAssets"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/03-target-orbit-sweep.ts",
+      "title": "Bounded launch guidance alternatives scored against target orbit",
+      "category": "mission-intelligence",
+      "symbols": [
+        "MissionPlanningEngine",
+        "sweepLaunchGuidance"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/04-space-traffic-audit.ts",
+      "title": "Audited spacecraft–rocket close-approach quality",
+      "category": "mission-intelligence",
+      "symbols": [
+        "auditTrajectoryAgainstCatalog"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
+    },
+    {
+      "path": "16-mission-intelligence/05-access-scene-correlation.ts",
+      "title": "Reconcile scene timestamps with geometric swath access",
+      "category": "mission-intelligence",
+      "symbols": [
+        "reconcileAccessWithScenes"
+      ],
+      "network": false,
+      "description": "Explicitly separates modeled/categorical inputs from verified acquisitions and flight-qualified predictions."
     }
   ]
 }
