@@ -18,6 +18,7 @@ import { PlanetaryComputerClient } from "./providers/planetary-computer.js";
 import { OpenMeteoClient } from "./providers/openmeteo.js";
 import { EarthIntelligenceClient } from "./intelligence/earth.js";
 import { LaunchTrajectoryEngine } from "./trajectory/engine.js";
+import { MissionPlanningEngine } from "./mission/targeting.js";
 import { OrbitEngine } from "./orbit/engine.js";
 import { TrafficEngine } from "./traffic/engine.js";
 
@@ -85,6 +86,8 @@ export class OpenLaunch {
 
   /** Generic 3DOF launch dynamics, staging, dispersion and satellite-relative screening. */
   readonly trajectory: LaunchTrajectoryEngine;
+  /** Research-grade target orbit scoring and bounded guidance sweeps. */
+  readonly mission: MissionPlanningEngine;
 
   private readonly http: HttpClient;
 
@@ -164,6 +167,7 @@ export class OpenLaunch {
     this.orbit = new OrbitEngine(this.celestrak);
     this.traffic = new TrafficEngine(this.celestrak, this.orbit);
     this.trajectory = new LaunchTrajectoryEngine();
+    this.mission = new MissionPlanningEngine();
   }
 
   raw<T = unknown>(path: string, query: Query = {}): Promise<T> { return this.http.get<T>(path, query); }
