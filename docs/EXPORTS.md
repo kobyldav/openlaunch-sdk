@@ -2,6 +2,15 @@
 
 The long inventory below is the generated v0.5.0 baseline (**306 runtime exports**). v0.6.0, v0.7.0 and v0.8.0 additions are summarized above it; regenerate the complete numeric inventory from the final release build before tagging.
 
+## v1.0.0 additions
+
+`openlaunch-sdk/eo` and root: `decodeGeoTiff`, `readCogWindowUrl`, `RasterGrid`, `RasterTransform`, `RasterCrs`,
+`clipRasterToAoi`, `alignRasterTo`, `ndviRaster`, `rasterDifference`, `rasterStatistics`, `sampleRaster`,
+`calibrateRaster`, `calibrateRasterFromStac`, `maskRasterBySentinel2Scl`, `renderRasterRgb`, `elevationToLocalMesh`.
+
+`OpenLaunch.earth.downloadRaster(item,key,options)` and `OpenLaunch.earth.readRasterWindow(item,key,area,{allowedHosts})`.
+The COG range reader explicitly rejects unknown TIFF codecs and unsupported EPSG codes.
+
 ## v0.9.0 additions
 
 Public root and `openlaunch-sdk/mission`:

@@ -1,0 +1,328 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { deflateSync } from "node:zlib";
+import {
+  bbox,polygon,point,decodeGeoTiff,ndviRaster,rasterStatistics,
+  alignRasterTo,clipRasterToAoi,rasterDifference,elevationToLocalMesh,
+  sampleRaster,pixelToWorld,worldToPixel,lonLatToGridCrs,
+  OpenLaunch,calibrateRaster,calibrateRasterFromStac,maskRasterBySentinel2Scl,renderRasterRgb,readCogWindowUrl,
+} from "../dist/index.js";
+
+/** Exact-value generated GeoTIFF bytes, never a mock decoder. */
+function fixture({
+  width=3,height=2,values=[100,200,300,400,500,600],
+  compression=1,predictor=1,epsg=4326,
+  tiled=false,bigTiff=false,
+}={}){
+  const samples=Buffer.alloc(values.length*2);
+  values.forEach((v,i)=>samples.writeUInt16LE(v,i*2));
+  const data=Buffer.from(samples);
+  if(predictor===2){
+    for(let r=0;r<height;r++)for(let c=width-1;c>=1;c--)
+      data.writeUInt16LE((values[r*width+c]-values[r*width+c-1]+65536)%65536,2*(r*width+c));
+  }
+  const compressed=compression===8?deflateSync(data):data;
+  const tags=[
+    [256,4,1,width],[257,4,1,height],
+    [258,3,1,16],[259,3,1,compression],[262,3,1,1],
+    [273,4,1,0],[277,3,1,1],[278,4,1,height],
+    [279,4,1,compressed.length],[284,3,1,1],
+    [317,3,1,predictor],[339,3,1,1],
+    [33550,12,3,null],[33922,12,6,null],
+    [34735,3,8,null],[42113,2,2,null],
+  ].sort((a,b)=>a[0]-b[0]);
+  const entrySize=bigTiff?20:12,head=bigTiff?16:8,entryCount=bigTiff?8:2,tail=bigTiff?8:4,slot=bigTiff?8:4;
+  let extra=head+entryCount+tags.length*entrySize+tail;
+  const chunks=new Map;
+  const fill=(tag,buffer)=>{
+    extra=(extra+7)&~7;
+    chunks.set(tag,{offset:extra,bytes:buffer});
+    extra+=buffer.length;
+  };
+  const scale=Buffer.alloc(24);[.01,.01,0].forEach((v,i)=>scale.writeDoubleLE(v,i*8));
+  const tie=Buffer.alloc(48);[0,0,0,14,51,0].forEach((v,i)=>tie.writeDoubleLE(v,i*8));
+  const keys=Buffer.alloc(16);[1,1,0,1,epsg===4326?2048:3072,0,1,epsg].forEach((v,i)=>keys.writeUInt16LE(v,i*2));
+  fill(33550,scale);fill(33922,tie);fill(34735,keys);
+  const rasterOffset=(extra+7)&~7;
+  const output=Buffer.alloc(rasterOffset+compressed.length);
+  output.write("II",0);output.writeUInt16LE(bigTiff?43:42,2);
+  if(bigTiff){output.writeUInt16LE(8,4);output.writeUInt16LE(0,6);output.writeBigUInt64LE(BigInt(head),8);output.writeBigUInt64LE(BigInt(tags.length),head);}
+  else{output.writeUInt32LE(head,4);output.writeUInt16LE(tags.length,head);}
+  for(let i=0;i<tags.length;i++){
+    const [tag,type,count,value]=tags[i],entry=head+entryCount+i*entrySize;
+    output.writeUInt16LE(tag,entry);output.writeUInt16LE(type,entry+2);
+    if(bigTiff)output.writeBigUInt64LE(BigInt(count),entry+4);
+    else output.writeUInt32LE(count,entry+4);
+    const field=entry+(bigTiff?12:8);
+    const bytesPerType=type===12?8:type===3?2:type===4?4:1;
+    const inline=bytesPerType*count<=slot;
+    let actual=tag===273?rasterOffset:value;
+    if(value===null&&tag===42113)actual=0;
+    if(chunks.has(tag))actual=chunks.get(tag).offset;
+    if(tag===42113){
+      if(bigTiff)output.write("0\0",field,"ascii");else output.write("0\0",field,"ascii");
+    }else if(inline&&type===3)output.writeUInt16LE(actual,field);
+    else if(bigTiff)output.writeBigUInt64LE(BigInt(actual),field);
+    else output.writeUInt32LE(actual,field);
+  }
+  for(const c of chunks.values())c.bytes.copy(output,c.offset);
+  compressed.copy(output,rasterOffset);
+  return new Uint8Array(output);
+}
+
+test("Decode genuine classic TIFF uncompressed pixel data and GeoTIFF transform",async()=>{
+  const g=await decodeGeoTiff(fixture());
+  assert.equal(g.width,3);
+  assert.equal(g.height,2);
+  assert.equal(g.crs,"EPSG:4326");
+  assert.deepEqual([...g.values],[100,200,300,400,500,600]);
+  assert.deepEqual(g.transform,[14,.01,0,51,0,-.01]);
+  assert.deepEqual(rasterStatistics(g),{count:6,valid:6,min:100,max:600,mean:350,sum:2100});
+});
+
+test("Decode zlib-Deflate GeoTIFF and horizontal integer predictor correctly",async()=>{
+  const g=await decodeGeoTiff(fixture({compression:8,predictor:2}));
+  assert.deepEqual([...g.values],[100,200,300,400,500,600]);
+});
+
+test("Decode BigTIFF LONG8 layout, not only classic TIFF",async()=>{
+  const g=await decodeGeoTiff(fixture({bigTiff:true}));
+  assert.deepEqual([...g.values],[100,200,300,400,500,600]);
+});
+
+test("Decode nodata as NaN without pretending 0 is valid reflectance",async()=>{
+  const g=await decodeGeoTiff(fixture({values:[100,0,300,0,500,600]}));
+  assert.ok(Number.isNaN(g.values[1]));
+  assert.ok(Number.isNaN(g.values[3]));
+  assert.equal(rasterStatistics(g).valid,4);
+});
+
+test("Decode guards reject arbitrary unsupported CRS and unsafe sizes",async()=>{
+  const bytes=fixture({epsg:32633});
+  await assert.rejects(decodeGeoTiff(bytes),/GeoTIFF CRS.*unsupported/);
+  await assert.rejects(decodeGeoTiff(fixture(),{maxPixels:5}),/maxPixels/);
+  await assert.rejects(decodeGeoTiff(fixture(),{maxInputBytes:50}),/maxInputBytes/);
+});
+
+const mk=(width,height,values,transform=[14,.01,0,51,0,-.01],crs="EPSG:4326")=>({
+  width,height,values:new Float64Array(values),transform,crs,
+});
+test("ROI clips correct pixel rows and columns and preserves affine origin",()=>{
+  const raster=mk(4,4,Array.from({length:16},(_,i)=>i+1));
+  const clipped=clipRasterToAoi(raster,bbox(14.01,50.97,14.03,50.99));
+  assert.deepEqual([clipped.width,clipped.height],[2,2]);
+  assert.deepEqual([...clipped.values],[6,7,10,11]);
+  assert.deepEqual([clipped.transform[0],clipped.transform[3]],[14.01,50.99]);
+});
+test("Polygon masking excludes outside pixels without changing ROI bounding-box",()=>{
+  const raster=mk(3,3,[1,2,3,4,5,6,7,8,9]);
+  const p=polygon([[14,51],[14.03,51],[14,50.97]]);
+  const result=clipRasterToAoi(raster,p);
+  assert.equal(result.width,3);
+  assert.equal(result.height,3);
+  assert.ok([...result.values].some(v=>Number.isNaN(v)));
+  assert.ok([...result.values].some(v=>Number.isFinite(v)));
+});
+
+test("Raster regrid preserves world centroids, masks and rejects mismatched CRS",()=>{
+  const a=mk(2,2,[10,20,30,40],[14,.02,0,51,0,-.02]);
+  const ref=mk(4,4,Array(16).fill(0));
+  const aligned=alignRasterTo(a,ref);
+  assert.deepEqual([...aligned.values].slice(0,8),[10,10,20,20,10,10,20,20]);
+  assert.throws(()=>alignRasterTo(a,mk(4,4,Array(16).fill(0),ref.transform,"EPSG:3857")) ,/CRS mismatch/);
+});
+
+test("NDVI performs calibrated pixel arithmetic, preserves nodata, and detects change",()=>{
+  const red=mk(3,1,[.2,.0,NaN]),nir=mk(3,1,[.8,.0,.3]);
+  const ndvi=ndviRaster(red,nir);
+  assert.ok(Math.abs(ndvi.values[0]-.6)<1e-12);
+  assert.ok(Number.isNaN(ndvi.values[1]));
+  assert.ok(Number.isNaN(ndvi.values[2]));
+  const after=mk(3,1,[.9,2,0]);
+  const delta=rasterDifference(red,after);
+  assert.equal(delta.comparedPixels,2);
+  assert.ok(Math.abs(delta.grid.values[0]-.7)<1e-12);
+  assert.ok(Number.isNaN(delta.grid.values[2]));
+  assert.throws(()=>ndviRaster(red,mk(3,1,[.1,.2,.3],[20,.01,0,51,0,-.01])),/Raster grids/);
+});
+
+test("Terrain mesh produces local metre-based triangles and omits missing elevations",()=>{
+  const m=mk(2,2,[100,120,140,NaN],[1000,30,0,2000,0,-30],"EPSG:3857");
+  const mesh=elevationToLocalMesh(m);
+  assert.equal(mesh.validVertices,3);
+  assert.equal(mesh.positions.length,12);
+  assert.deepEqual([...mesh.triangles],[0,1,2]);
+  assert.deepEqual([...mesh.positions].slice(0,3),[0,0,100]);
+  assert.throws(()=>elevationToLocalMesh(mk(2,2,[0,0,0,0])),/EPSG:3857/);
+});
+
+test("WGS84 and Mercator projected coordinates invert within tolerance",()=>{
+  const [x,y]=lonLatToGridCrs(14.4208,50.088,"EPSG:3857");
+  assert.ok(x>1e6&&y>6e6);
+  const g=mk(1,1,[42],[x,10,0,y,0,-10],"EPSG:3857");
+  const p=pixelToWorld(g.transform,.5,.5);
+  assert.equal(sampleRaster(g,...p),42);
+  assert.deepEqual(worldToPixel(g.transform,...p),[.5,.5]);
+});
+
+test("High-level OpenLaunch raster decoder consumes actual binary returned by a trusted source",async()=>{
+  const tiff=fixture();
+  const sdk=new OpenLaunch();
+  const scene={
+    type:"Feature",id:"test-actual-bytes",collection:"sentinel-2-l2a",
+    geometry:null,properties:{datetime:"2026-10-01T10:00:00Z"},
+    assets:{B04:{href:"https://assets.example.test/red.tif",type:"image/tiff",roles:["data"],gsd:10}},
+  };
+  const grid=await sdk.earth.downloadRaster(scene,"B04",{
+    allowedHosts:["assets.example.test"],
+    fetch:async()=>new Response(tiff,{headers:{"content-type":"image/tiff"}}),
+  });
+  assert.equal(grid.values[4],500);
+  assert.equal(grid.source,"test-actual-bytes:B04");
+  await assert.rejects(sdk.earth.downloadRaster(scene,"B08",{fetch:async()=>new Response(tiff)}),/does not exist/);
+});
+
+test("Calibrated Landsat SR DNs give physical reflectances with nodata preserved",()=>{
+  const raw=mk(3,1,[0,10000,40000]);
+  const result=calibrateRasterFromStac(raw,{"raster:bands":[{
+    scale:0.0000275,offset:-0.2,nodata:0,unit:"reflectance"
+  }]});
+  assert.equal(result.applied,true);
+  assert.equal(result.invalidPixels,1);
+  assert.ok(Number.isNaN(result.grid.values[0]));
+  assert.ok(Math.abs(result.grid.values[1]-0.075)<1e-12);
+  assert.ok(Math.abs(result.grid.values[2]-0.9)<1e-12);
+  assert.throws(()=>calibrateRasterFromStac(raw,{}),/raster:bands/);
+});
+
+test("SCL removes clouds and quality failures before pixel-level NDVI",()=>{
+  const grid=mk(4,1,[.1,.2,.3,.4]),scl=mk(4,1,[4,9,3,6]);
+  const filtered=maskRasterBySentinel2Scl(grid,scl);
+  assert.equal(filtered.retained,2);
+  assert.deepEqual([...filtered.grid.values].map(v=>Number.isNaN(v)?"NaN":v),[.1,"NaN","NaN",.4]);
+  const rgb=renderRasterRgb(filtered.grid,filtered.grid,filtered.grid,{ranges:[[0,.4],[0,.4],[0,.4]]});
+  assert.equal(rgb.rgba.length,16);
+  assert.equal(rgb.rgba[3],255);
+  assert.equal(rgb.rgba[7],0);
+  assert.equal(rgb.rgba[11],0);
+  assert.equal(rgb.rgba[15],255);
+  assert.equal(rgb.encodedImage,false);
+});
+
+function mockRangeSource(bytes){
+  const calls=[];
+  const fetch=async(_url,init={})=>{
+    const range=init.headers?.Range;
+    calls.push(range??"none");
+    if(!range)return new Response("range required",{status:400});
+    const m=/^bytes=(\d+)-(\d+)$/.exec(range);
+    if(!m)throw new RangeError("Invalid Range header");
+    const start=Number(m[1]),end=Math.min(Number(m[2]),bytes.length-1);
+    if(start>=bytes.length)return new Response(null,{status:416});
+    const data=bytes.slice(start,end+1);
+    return new Response(data,{
+      status:206,
+      headers:{
+        "content-range":`bytes ${start}-${end}/${bytes.length}`,
+        "content-length":String(data.length),"content-type":"image/tiff",
+      },
+    });
+  };
+  return {fetch,calls};
+}
+test("HTTP Range reader returns exact AOI TIFF pixels and refuses full-download fallback",async()=>{
+  const bytes=fixture();
+  const mock=mockRangeSource(bytes);
+  const result=await readCogWindowUrl("https://assets.example.test/test.tif",
+    bbox(14,50.99,14.01,51),{
+      allowedHosts:["assets.example.test"],fetch:mock.fetch,
+    });
+  assert.equal(result.transferStrategy,"http-byte-ranges");
+  assert.equal(result.requestedTiles,1);
+  assert.deepEqual([...result.raster.values],[100]);
+  assert.deepEqual([result.raster.width,result.raster.height],[1,1]);
+  assert.equal(mock.calls.length,2); // IFD header + only selected data strip
+  assert.ok(mock.calls.every(s=>s.startsWith("bytes=")));
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/test.tif",
+    bbox(14,50.99,14.01,51),{
+      allowedHosts:["assets.example.test"],
+      fetch:async()=>new Response(bytes),
+    }),/206 Partial Content/);
+});
+test("Remote COG reader checks trusted hosts and rejects unsupported areas",async()=>{
+  const bytes=fixture(),mock=mockRangeSource(bytes);
+  await assert.rejects(readCogWindowUrl("https://localhost/file.tif",bbox(14,50.99,14.01,51),{
+    allowedHosts:["localhost"],fetch:mock.fetch,
+  }),/trusted/);
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/file.tif",bbox(14,50.99,14.01,51),{
+    allowedHosts:["different.test"],fetch:mock.fetch,
+  }),/trusted/);
+  await assert.rejects(readCogWindowUrl("https://assets.example.test/file.tif",bbox(0,0,1,1),{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  }),/does not intersect/);
+});
+test("OpenLaunch Earth Intelligence returns cropped pixels from remote COG asset",async()=>{
+  const mock=mockRangeSource(fixture());
+  const sdk=new OpenLaunch();
+  const scene={
+    type:"Feature",id:"remote-tiff",collection:"landsat-c2-l2",
+    geometry:null,properties:{datetime:"2026-09-03T00:00:00Z"},
+    assets:{B04:{href:"https://assets.example.test/2026.tif",type:"image/tiff",roles:["data"]}},
+  };
+  const r=await sdk.earth.readRasterWindow(scene,"B04",bbox(14,50.99,14.01,51),{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  });
+  assert.deepEqual([...r.raster.values],[100]);
+  assert.equal(r.requestedTiles,1);
+});
+
+function realTiled4x4Fixture(){
+  const tags=[
+    [256,4,1,4],[257,4,1,4],[258,3,1,16],[259,3,1,1],
+    [262,3,1,1],[277,3,1,1],[284,3,1,1],[322,4,1,2],
+    [323,4,1,2],[324,4,4,0],[325,4,4,0],[339,3,1,1],
+    [33550,12,3,0],[33922,12,6,0],[34735,3,8,0],
+  ].sort((a,b)=>a[0]-b[0]);
+  let pos=(8+2+tags.length*12+4+7)&~7;
+  const offsetsPtr=pos;pos+=16;
+  const lengthsPtr=pos;pos+=16;
+  const scalePtr=pos;pos+=24;
+  const tiePtr=pos;pos+=48;
+  const keyPtr=pos;pos+=16;
+  const pixelStart=(pos+7)&~7;
+  const buf=Buffer.alloc(pixelStart+32);
+  buf.write("II",0);buf.writeUInt16LE(42,2);buf.writeUInt32LE(8,4);
+  buf.writeUInt16LE(tags.length,8);
+  tags.forEach(([tag,type,count,val],i)=>{
+    const o=10+i*12;buf.writeUInt16LE(tag,o);buf.writeUInt16LE(type,o+2);
+    buf.writeUInt32LE(count,o+4);
+    const ptr=tag===324?offsetsPtr:tag===325?lengthsPtr:tag===33550?scalePtr:
+      tag===33922?tiePtr:tag===34735?keyPtr:val;
+    if(type===3&&count===1)buf.writeUInt16LE(ptr,o+8);else buf.writeUInt32LE(ptr,o+8);
+  });
+  for(let i=0;i<4;i++){
+    buf.writeUInt32LE(pixelStart+i*8,offsetsPtr+i*4);
+    buf.writeUInt32LE(8,lengthsPtr+i*4);
+  }
+  [0.01,0.01,0].forEach((n,i)=>buf.writeDoubleLE(n,scalePtr+i*8));
+  [0,0,0,14,51,0].forEach((n,i)=>buf.writeDoubleLE(n,tiePtr+i*8));
+  [1,1,0,1,2048,0,1,4326].forEach((n,i)=>buf.writeUInt16LE(n,keyPtr+i*2));
+  const tiles=[[1,2,5,6],[3,4,7,8],[9,10,13,14],[11,12,15,16]];
+  tiles.forEach((tile,i)=>tile.forEach((v,p)=>buf.writeUInt16LE(v,pixelStart+i*8+p*2)));
+  return new Uint8Array(buf);
+}
+test("True tiled COG requests only selected bottom-right TIFF tile",async()=>{
+  const bytes=realTiled4x4Fixture();
+  const mock=mockRangeSource(bytes);
+  const area=bbox(14.02,50.96,14.04,50.98);
+  const r=await readCogWindowUrl("https://assets.example.test/four-tiles.tif",area,{
+    allowedHosts:["assets.example.test"],fetch:mock.fetch,
+  });
+  assert.equal(r.requestedTiles,1);
+  assert.equal(r.tileBytesRead,8);
+  assert.deepEqual([...r.raster.values],[11,12,15,16]);
+  assert.equal(mock.calls.length,2);
+  assert.ok(mock.calls[1].startsWith("bytes="));
+  const full=await decodeGeoTiff(bytes);
+  assert.deepEqual([...full.values],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
+});

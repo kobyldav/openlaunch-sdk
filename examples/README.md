@@ -4,6 +4,12 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
 
+## v1.0 Real GeoTIFF & Raster Analytics
+
+`npm run example:raster` demonstrates actual binary TIFF parsing, NDVI, AOI clipping, NDVI change statistics and a small DEM triangle mesh. The input is explicitly generated offline; see `examples/17-raster` for trusted remote COG byte-range, calibration, cloud masking, change detection and local 3D examples.
+
+Reference: [Real Raster Analytics](../docs/RASTER_V1.md).
+
 ## v0.9 Mission & Earth intelligence
 
 `npm run example:mission` is a fully offline, reproducible integration scenario exercising EO metadata (thermal/masks/DEM), scene discovery, orbit-target guidance scoring and satellite screening diagnostics. It uses explicitly synthetic imagery metadata: no real satellite preview is falsely represented as downloaded.
