@@ -2,6 +2,7 @@ import type { Sgp4Satellite } from "../orbit/sgp4.js";
 import type { TrajectoryClosestApproach } from "../traffic/types.js";
 import { screenTrajectoryAgainstSatellites, SampledTemeTrajectory } from "../traffic/trajectory.js";
 import { launchMonteCarlo } from "./monte-carlo.js";
+import { auditTrajectoryAgainstCatalog, type TrajectoryAuditOptions, type TrajectoryScreenAudit } from "../traffic/audit.js";
 import { simulateLaunch } from "./simulate.js";
 import type {
   LaunchModel, LaunchMonteCarloResult, LaunchSimulation, MonteCarloConfig,
@@ -25,6 +26,9 @@ export class LaunchTrajectoryEngine {
   /** Convert the simulation to the pre-existing v0.7 satellite-screening contract. */
   toSampledTrajectory(simulation: LaunchSimulation): SampledTemeTrajectory {
     return new SampledTemeTrajectory(simulation.trajectory);
+  }
+  auditTraffic(simulation: LaunchSimulation, satellites: readonly Sgp4Satellite[], options: TrajectoryAuditOptions): TrajectoryScreenAudit {
+    return auditTrajectoryAgainstCatalog(this.toSampledTrajectory(simulation), satellites, options);
   }
   /**
    * Compare a modeled generic vehicle against propagated public satellite elements.
