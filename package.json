@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.7.0",
-  "description": "A TypeScript space computation SDK for launch data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, geospatial intelligence and mission engineering.",
+  "version": "0.8.0",
+  "description": "A TypeScript space computation SDK with SGP4/SDP4, generic multistage 3DOF launch simulation, satellite traffic screening, Earth observation and mission engineering.",
   "keywords": [
     "space",
     "spaceflight",
@@ -31,7 +31,13 @@
     "space-traffic",
     "conjunction",
     "ssa",
-    "space-situational-awareness"
+    "space-situational-awareness",
+    "launch-simulation",
+    "3dof",
+    "trajectory",
+    "runge-kutta",
+    "aerodynamics",
+    "monte-carlo"
   ],
   "license": "MIT",
   "type": "module",
@@ -88,6 +94,11 @@
       "types": "./dist/scenario/index.d.ts",
       "import": "./dist/scenario/index.js",
       "require": "./dist-cjs/scenario/index.js"
+    },
+    "./trajectory": {
+      "types": "./dist/trajectory/index.d.ts",
+      "import": "./dist/trajectory/index.js",
+      "require": "./dist-cjs/trajectory/index.js"
     }
   },
   "files": [
@@ -113,7 +124,8 @@
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
     "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
-    "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs"
+    "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs",
+    "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs"
   },
   "engines": {
     "node": ">=18"
