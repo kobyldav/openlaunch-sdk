@@ -163,3 +163,11 @@ function validateTarget(target: OrbitTarget): void {
   if (target.inclinationToleranceDeg !== undefined && !(target.inclinationToleranceDeg > 0))
     throw new RangeError("inclinationToleranceDeg must be positive");
 }
+
+/** High-level collection of mission feasibility and bounded guidance studies. */
+export class MissionPlanningEngine {
+  assess(simulation: LaunchSimulation, target: OrbitTarget): TargetAssessment { return assessOrbitTarget(simulation, target); }
+  sweep(model: LaunchModel, target: OrbitTarget, options: GuidanceSweepOptions): GuidanceSweepResult { return sweepLaunchGuidance(model, target, options); }
+  idealDeltaV(model: LaunchModel): number { return idealStagedDeltaVMps(model); }
+  circularSpeed(altitudeKm: number): number { return circularSpeedAtAltitudeMps(altitudeKm); }
+}
