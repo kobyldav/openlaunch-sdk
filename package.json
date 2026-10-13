@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.9.0",
-  "description": "TypeScript space SDK: Earth-observation product intelligence, orbit traffic audits, launch 3DOF physics and bounded mission targeting.",
+  "version": "1.0.0",
+  "description": "Space engineering TypeScript SDK with georeferenced GeoTIFF raster analysis, EO data, SGP4 space traffic and 3DOF launch simulation.",
   "keywords": [
     "space",
     "spaceflight",
@@ -43,7 +43,13 @@
     "raster-assets",
     "earth-surface-temperature",
     "orbit-targeting",
-    "targeting-sweep"
+    "targeting-sweep",
+    "geotiff",
+    "cog",
+    "raster",
+    "ndvi",
+    "terrain-mesh",
+    "change-detection"
   ],
   "license": "MIT",
   "type": "module",
@@ -126,7 +132,7 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
@@ -138,7 +144,8 @@
     "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs",
     "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs",
     "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs",
-    "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs"
+    "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs",
+    "example:raster": "npm run build && node scripts/geospatial-raster-demo.mjs"
   },
   "engines": {
     "node": ">=18"
