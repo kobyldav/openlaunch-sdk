@@ -119,6 +119,8 @@ test("pressure and axial limits produce explicit sample diagnostics",()=>{
   }));
   assert.ok(limited.throttledSamples>0);
   assert.ok(limited.maxQPa>0);
+  assert.ok(limited.maxQPa<45_000, "deterministic reference profile must stay below nominal Max-Q target");
+  assert.ok(limited.maxAxialAccelerationG<=4.5+1e-6);
   assert.ok(limited.telemetry.some(p=>p.throttleLimiter==="max-q" || p.throttleLimiter==="both"));
   assert.ok(limited.telemetry.every(p=>p.effectiveThrottle<=p.commandedThrottle+1e-10));
   assert.ok(limited.telemetry.every(p=>p.effectiveThrottle>=0 && p.effectiveThrottle<=1));
