@@ -114,6 +114,8 @@ The simulator stops at the configured duration, optional burnout termination or 
 
 ### Telemetry and events
 
+The result also includes `finalOrbit`: an instantaneous **two-body osculating** orbit assessment (inclination, eccentricity, apogee, perigee and period when bound). A `bound-orbit-candidate` means only that the instantaneous modeled conic has perigee above 160 km; it is NOT confirmation of sustained insertion. Degenerate orbital geometry can return `null`.
+
 The result includes:
 - UTC timestamp and elapsed seconds;
 - TEME-approx position (km) and velocity (km/s);
