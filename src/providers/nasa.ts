@@ -9,7 +9,7 @@ export class NasaClient {
   private readonly scienceHttp: HttpClient;
   readonly apiKey: string;
   constructor(options: NasaOptions = {}) {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation available");
     this.apiKey = options.apiKey ?? "DEMO_KEY";
     const cache = options.cache === false ? undefined : options.cache ?? new MemoryCache(500);
