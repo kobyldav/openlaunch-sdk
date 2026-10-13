@@ -2,6 +2,7 @@ import { computeForces, guidanceAt, initialLaunchState, launchInitialMass, telem
 import { rk4LaunchStep } from "./integrator.js";
 import { assessLaunchOrbit } from "./orbit-analysis.js";
 import { norm } from "./math.js";
+import { PHYSICS } from "../science/constants.js";
 import type {
   DerivativeState, LaunchEvent, LaunchEventKind, LaunchModel, LaunchSimulation,
   LaunchStage, LaunchTelemetry,
@@ -21,7 +22,6 @@ const EPSILON_PROPELLANT_KG = 0.01;
 export function simulateLaunch(model: LaunchModel): LaunchSimulation {
   validateLaunchModel(model);
   const startMass = launchInitialMass(model);
-  const startMs = model.liftoff.getTime();
   const stepSeconds = model.stepSeconds ?? 1;
   const maxSamples = model.maxSamples ?? 20_000;
 
@@ -57,7 +57,7 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
   const snapshot = (): LaunchTelemetry =>
     telemetryAt(model, state, context(), stageIndex, propellantRemainingKg);
 
-  const recordEvent = (kind: LaunchEventKind, detail?: string): void => {
+  const recordEvent = (kind: LaunchEventKind, detail?: string, massBeforeKg?: number): void => {
     const current = snapshot();
     events.push({
       kind,
@@ -67,6 +67,7 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
       massKg: state.massKg,
       stageIndex,
       ...(detail === undefined ? {} : { detail }),
+      ...(massBeforeKg === undefined ? {} : { massBeforeKg, massAfterKg: state.massKg }),
     });
   };
 
@@ -92,14 +93,33 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
     maxAltitudeKm = Math.max(maxAltitudeKm,next.altitudeKm);
   };
 
+  const fairingPolicy=model.vehicle.fairingSeparation;
+  const fairingRequestedAt=model.vehicle.fairingJettisonSeconds ?? fairingPolicy?.earliestSeconds;
+
+  const fairingConditionsSatisfied = (): boolean => {
+    if (fairingJettisoned || fairingRequestedAt === undefined || elapsedSeconds + EPSILON_SECONDS < fairingRequestedAt) return false;
+    if (!fairingPolicy) return true;
+    const current=snapshot();
+    if (fairingPolicy.minAltitudeKm !== undefined && current.altitudeKm < fairingPolicy.minAltitudeKm) return false;
+    if (fairingPolicy.maxDynamicPressurePa !== undefined && current.dynamicPressurePa > fairingPolicy.maxDynamicPressurePa) return false;
+    return true;
+  };
+
+  const releaseFairing = (): void => {
+    const massBeforeKg=state.massKg;
+    state={...state,massKg:state.massKg-(model.vehicle.fairingMassKg ?? 0)};
+    fairingJettisoned=true;
+    recordEvent(
+      "fairing-jettison",
+      fairingPolicy ? "Released when earliest-time, altitude and dynamic-pressure conditions were satisfied" : "Scheduled time-based release",
+      massBeforeKg,
+    );
+  };
+
   recordEvent("liftoff","Requested simulation initial state, not evidence of an actual liftoff");
   recordEvent("engine-ignition",model.vehicle.stages[0]!.name);
   ignitedStageIndex=0;
-  if (model.vehicle.fairingJettisonSeconds === 0) {
-    fairingJettisoned = true;
-    state = { ...state, massKg: state.massKg - (model.vehicle.fairingMassKg ?? 0) };
-    recordEvent("fairing-jettison", "Fairing separation at T+0");
-  }
+  if(fairingConditionsSatisfied()) releaseFairing();
   sample();
 
   let iterations=0;
@@ -122,9 +142,8 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
       dt=Math.min(dt,engineReadyAtSeconds-elapsedSeconds);
     }
 
-    const fairingAt = model.vehicle.fairingJettisonSeconds;
-    if (!fairingJettisoned && fairingAt !== undefined && fairingAt > elapsedSeconds + EPSILON_SECONDS) {
-      dt=Math.min(dt,fairingAt-elapsedSeconds);
+    if (!fairingJettisoned && fairingRequestedAt !== undefined && fairingRequestedAt > elapsedSeconds + EPSILON_SECONDS) {
+      dt=Math.min(dt,fairingRequestedAt-elapsedSeconds);
     }
 
     if (engineOn()) {
@@ -150,15 +169,7 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
 
     if (state.massKg <= 0 || !Number.isFinite(norm(state.positionM))) throw new Error("Rocket state is nonphysical");
 
-    if (
-      !fairingJettisoned &&
-      fairingAt !== undefined &&
-      elapsedSeconds + EPSILON_SECONDS >= fairingAt
-    ) {
-      fairingJettisoned=true;
-      state={...state,massKg:state.massKg-(model.vehicle.fairingMassKg ?? 0)};
-      recordEvent("fairing-jettison","Instantaneous fairing mass separation");
-    }
+    if(fairingConditionsSatisfied()) releaseFairing();
 
     if (currentStage && propellantRemainingKg <= EPSILON_PROPELLANT_KG && elapsedSeconds >= engineReadyAtSeconds) {
       // Project any remaining sub-10-gram propellant off the state when snapping.
@@ -167,8 +178,9 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
       recordEvent("engine-cutoff",currentStage.name+" propellant exhausted");
 
       if (stageIndex !== null && stageIndex < model.vehicle.stages.length-1) {
-        recordEvent("stage-separation",currentStage.name+" dry mass released");
+        const massBeforeKg=state.massKg;
         state={...state,massKg:state.massKg-currentStage.dryMassKg};
+        recordEvent("stage-separation",currentStage.name+" dry mass released",massBeforeKg);
         stageIndex += 1;
         propellantRemainingKg=model.vehicle.stages[stageIndex]!.propellantMassKg;
         engineReadyAtSeconds=elapsedSeconds+(currentStage.coastAfterSeparationSeconds ?? 0);
@@ -208,11 +220,25 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
   recordEvent("simulation-end",termination);
   events.sort((a,b)=>a.elapsedSeconds-b.elapsedSeconds);
 
+  const maxAxialAccelerationG=Math.max(...telemetry.map(p=>p.thrustN/(p.massKg*PHYSICS.standardGravity)));
+  const throttledSamples=telemetry.filter(p=>p.throttleLimiter!=="none").length;
+  const constraintViolations:string[]=[];
+  if(model.flightConstraints?.maxDynamicPressurePa !== undefined && maxQPa > model.flightConstraints.maxDynamicPressurePa*1.01) {
+    constraintViolations.push("Maximum modeled dynamic pressure exceeded requested maxDynamicPressurePa; idealized throttle control is not a hard bound.");
+  }
+  if(model.flightConstraints?.maxAxialAccelerationG !== undefined && maxAxialAccelerationG > model.flightConstraints.maxAxialAccelerationG*1.01) {
+    constraintViolations.push("Modeled thrust acceleration exceeded requested maxAxialAccelerationG.");
+  }
+  if(fairingRequestedAt !== undefined && !fairingJettisoned) {
+    constraintViolations.push("Fairing release conditions were not met within the simulation interval; fairing mass was retained.");
+  }
+
   return {
     model,trajectory,telemetry,events,
     initialMassKg:startMass,finalMassKg:state.massKg,
     finalOrbit: assessLaunchOrbit(trajectory[trajectory.length - 1]!),
-    maxQPa,maxQTime,maxAltitudeKm,totalSimulatedSeconds:elapsedSeconds,
+    maxQPa,maxQTime,maxAxialAccelerationG,throttledSamples,constraintViolations,
+    maxAltitudeKm,totalSimulatedSeconds:elapsedSeconds,
     termination,
     frame:"TEME-approx-GMST",
     limitations:[
@@ -222,6 +248,8 @@ export function simulateLaunch(model: LaunchModel): LaunchSimulation {
       "Earth-fixed/TEME alignment uses a GMST-only frame approximation; no IERS EOP or polar motion.",
       "Vehicle values, throttle schedules and launch azimuth must be supplied and independently validated.",
       "Unmodeled maneuvers, dispersions and covariance prevent operational collision-risk claims.",
+      "Throttle limit is a local first-order heuristic: dynamic-pressure and axial-g limits are best effort, not guarantees.",
+      "Fairing release policies apply modeled time/altitude/pressure conditions; no fairing thermal or structural qualification.",
     ],
   };
 }
