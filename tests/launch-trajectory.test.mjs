@@ -148,3 +148,45 @@ test("seeded launch Monte Carlo yields deterministic uncertainty envelope", () =
   assert.ok(a.dispersion.at(-1).maxDeviationKm>0);
   assert.ok(a.dispersion.every(p=>p.p95DeviationKm>=p.p50DeviationKm));
 });
+
+test("instantaneous osculating orbit assessment recognizes a bound LEO candidate", async () => {
+  const { assessLaunchOrbit } = await import("../dist/index.js");
+  const r=6778.137;
+  const v=Math.sqrt(398600.4418/r);
+  const assessed=assessLaunchOrbit({
+    time:liftoff,
+    positionTemeKm:{x:r,y:0,z:0},
+    velocityTemeKmS:{x:0,y:v,z:0},
+  });
+  assert.ok(assessed);
+  assert.equal(assessed.classification,"bound-orbit-candidate");
+  assert.ok(assessed.perigeeAltitudeKm>390 && assessed.perigeeAltitudeKm<410);
+  assert.ok(assessed.periodMinutes>80 && assessed.periodMinutes<110);
+  assert.ok(Math.abs(assessed.inclinationDeg)<0.1);
+});
+
+test("final orbit diagnostics do not claim insertion for an early ascent", () => {
+  const result=simulateLaunch(fixture({durationSeconds:8}));
+  assert.ok(result.finalOrbit);
+  assert.equal(result.finalOrbit.model,"instantaneous-two-body-osculating");
+  assert.equal(result.finalOrbit.classification,"suborbital");
+});
+
+test("fairing event at T+0 occurs exactly at the initial state", () => {
+  const model=fixture({
+    vehicle:{...fixture().vehicle,fairingJettisonSeconds:0},
+    durationSeconds:5,
+  });
+  const result=simulateLaunch(model);
+  const event=result.events.find(e=>e.kind==="fairing-jettison");
+  assert.ok(event);
+  assert.equal(event.elapsedSeconds,0);
+  assert.equal(result.telemetry[0].massKg,result.initialMassKg-30);
+});
+
+test("numerical integration is broadly step-convergent for a fixed guidance model", () => {
+  const coarse=simulateLaunch(fixture({stepSeconds:1,durationSeconds:20}));
+  const fine=simulateLaunch(fixture({stepSeconds:0.25,durationSeconds:20}));
+  assert.ok(Math.abs(coarse.maxAltitudeKm-fine.maxAltitudeKm)<1);
+  assert.ok(Math.abs(coarse.finalMassKg-fine.finalMassKg)<20);
+});
