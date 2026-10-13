@@ -53,7 +53,7 @@ export class CopernicusClient {
   private tokenCache?: { value: string; expiresAt: number };
 
   constructor(options: CopernicusOptions = {}) {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation available");
     this.fetchImpl = fetchImpl;
     if (options.accessToken) this.staticToken = options.accessToken;

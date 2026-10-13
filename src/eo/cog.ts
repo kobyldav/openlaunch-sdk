@@ -58,7 +58,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
   if(!Number.isSafeInteger(maxPixels)||maxPixels<1||maxPixels>16_777_216)throw new RangeError("Invalid maxPixels");
   if(!Number.isSafeInteger(maxBlocks)||maxBlocks<1||maxBlocks>4096)throw new RangeError("Invalid maxBlocks");
   if(!Number.isSafeInteger(maxBlockBytes)||maxBlockBytes<1024||maxBlockBytes>64*1024*1024)throw new RangeError("Invalid maxBlockBytes");
-  const fetchImpl=options.fetch??globalThis.fetch;
+  const fetchImpl=options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
   if(!fetchImpl)throw new Error("A fetch implementation is required");
 
   const controller=new AbortController();

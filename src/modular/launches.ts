@@ -41,7 +41,7 @@ export class LaunchDataClient {
   static readonly PRODUCTION_BASE_URL=LL2_PRODUCTION_BASE_URL;
   static readonly DEVELOPMENT_BASE_URL=LL2_DEVELOPMENT_BASE_URL;
   constructor(options:LaunchDataClientOptions={}){
-    const fetchImpl=options.fetch??globalThis.fetch;
+    const fetchImpl=options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if(!fetchImpl)throw new Error("A Fetch API implementation is required");
     const cache=options.cache===false?undefined:options.cache??new MemoryCache(300);
     this.http=new HttpClient({
