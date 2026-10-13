@@ -26,7 +26,7 @@ function queryToParams(query: CelesTrakQuery, defaultFormat: CelesTrakFormat = "
 export class CelesTrakClient {
   private readonly http: HttpClient;
   constructor(options: CelesTrakOptions = {}) {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation available");
     const cache = options.cache === false ? undefined : options.cache ?? new MemoryCache(200);
     this.http = new HttpClient({ baseUrl: "https://celestrak.org/NORAD/elements/", fetchImpl, ...(cache ? { cache } : {}), cacheTtlMs: options.cacheTtlMs ?? 30 * 60_000, retries: 2, retryDelayMs: 750, timeoutMs: options.timeoutMs ?? 30_000, headers: {}, maxConcurrency: 2, minRequestIntervalMs: 250, deduplicate: true, circuitBreaker: { failureThreshold: 4, cooldownMs: 30_000 }, ...(options.onTelemetry ? { onTelemetry: options.onTelemetry } : {}) });
