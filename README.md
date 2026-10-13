@@ -17,6 +17,47 @@ The goal is not to hide public data behind a paywall. The goal is to provide a c
 
 ---
 
+## v0.8.1 — Practical ascent constraints and fairing safety gates
+
+The v0.8.0 demo was intentionally an illustrative, high-thrust case: it produced **Max-Q ~156 kPa**, and an unconditional T+25 s fairing jettison happened at only **~10.7 km**. This is not a plausible mission configuration. v0.8.1 makes these weaknesses visible and lets you model safer *assumptions* without hiding failure.
+
+```ts
+const study = {
+  ...model,
+  flightConstraints: {
+    maxDynamicPressurePa: 45_000,   // reference target, not a guaranteed cap
+    maxAxialAccelerationG: 4.5,     // approximate axial *thrust* acceleration
+    maxQResponseSeconds: 6,        // first-order q-rate response horizon
+  },
+  vehicle: {
+    ...model.vehicle,
+    fairingJettisonSeconds: undefined, // use event-gated release instead
+    fairingSeparation: {
+      earliestSeconds: 30,
+      minAltitudeKm: 80,
+      maxDynamicPressurePa: 1_500,
+    },
+  },
+};
+
+const flight = space.trajectory.simulate(study);
+console.log(flight.maxQPa, flight.maxAxialAccelerationG);
+console.log(flight.throttledSamples, flight.constraintViolations);
+console.log(flight.finalOrbit?.classification, flight.finalOrbit?.perigeeAltitudeKm);
+```
+
+The controller estimates local `dq/dt` from atmospheric-relative motion, ambient density and modeled forces. It limits thrust **at each RK4 evaluation** and includes a small nominal headroom below the requested max-Q target to reduce finite-step overshoot. Acceleration limiting uses `thrust / (mass*g0)`, not resultant inertial acceleration. `effectiveThrottle`, `commandedThrottle`, and `throttleLimiter` are available on every telemetry sample.
+
+**Neither constraint is a hard flight-control limit.** Gravity, drag, atmospheric uncertainty, speed, timestep, trajectory choice and throttle authority can still cause exceedance. Check `constraintViolations` and refine the timestep. The controller does not solve pitch/target-orbit optimization or stability.
+
+For fairing release, the new **optional** `fairingSeparation` requires all criteria to be satisfied before discarding fairing mass. If the criteria never become true during the scenario, the fairing stays attached and `constraintViolations` records that fact. For legacy scripts, fixed `fairingJettisonSeconds` still works; do not specify both modes simultaneously. `stage-separation` and `fairing-jettison` events now expose `massBeforeKg` and `massAfterKg` to audit discrete mass drops.
+
+The offline demonstration now samples the nearest telemetry to requested 20-second checkpoints, **separates inertial speed from air-relative speed**, and prominently prints the osculating final-orbit verdict. A rocket may reach hundreds of kilometres altitude and still have perigee below Earth's surface: that is a *suborbital* trajectory, not insertion.
+
+Live satellite screening remains a research-grade geometric exercise: no inferred Falcon 9 trajectory, certified flight corridor or collision probability.
+
+---
+
 ## New in v0.8.0 — Launch Trajectory Engine
 
 v0.8 adds a generic **3DOF multistage ascent simulator** instead of treating rocket trajectories as a launch date plus guessed ground track:
