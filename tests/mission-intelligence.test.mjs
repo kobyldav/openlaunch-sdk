@@ -5,6 +5,7 @@ import {
   landsatC2SurfaceTemperature, landsatC2StUncertaintyKelvin,
   sentinel2SclClass, summarizeSentinel2Scl,
   ObservationDiscoveryClient, EarthIntelligenceClient,
+  downloadEoPreview, downloadEoAsset,
   reconcileAccessWithScenes,
   Sgp4Satellite, SampledTemeTrajectory, auditTrajectoryAgainstCatalog,
   OpenLaunch, simulateLaunch, sweepLaunchGuidance,
@@ -180,4 +181,50 @@ test("Bounded orbit guidance returns honest infeasible verdict with scored varia
   assert.ok(circularSpeedAtAltitudeMps(200)>7000);
   assert.equal(sdk.mission.assess(simulateLaunch(model()),t).achieved,false);
   assert.throws(()=>sweepLaunchGuidance(model(),t,{pitchOffsetsDeg:[0,1],headingOffsetsDeg:[0,1],maxCandidates:3}),/maxCandidates/);
+});
+
+test("Preview downloader fetches actual bounded bytes without claiming decoded pixels",async()=>{
+  const item={...landsat,assets:{
+    preview:{href:"https://example.test/preview.png",roles:["thumbnail"],type:"image/png"},
+  }};
+  let actualUrl,actualRedirect;
+  const result=await downloadEoPreview(item,{
+    allowedHosts:["example.test"],
+    fetch:async(url,init)=>{
+      actualUrl=url;actualRedirect=init.redirect;
+      return new Response(new Uint8Array([137,80,78,71]),{
+        status:200,headers:{"content-type":"image/png","content-length":"4"},
+      });
+    },
+  });
+  assert.equal(actualUrl,"https://example.test/preview.png");
+  assert.equal(actualRedirect,"error");
+  assert.equal(result.sourceItemId,item.id);
+  assert.equal(result.contentType,"image/png");
+  assert.equal(result.byteLength,4);
+  assert.equal(result.decodedPixels,false);
+  assert.deepEqual([...result.bytes],[137,80,78,71]);
+});
+
+test("Image downloader enforces host allowlist and actual transfer byte limits",async()=>{
+  const asset=inspectEoProduct(landsat).assets[0];
+  await assert.rejects(
+    downloadEoAsset(asset,{allowedHosts:["other.test"],fetch:async()=>new Response("foo")}),
+    /allowedHosts/,
+  );
+  await assert.rejects(
+    downloadEoAsset({...asset,href:"http://127.0.0.1/internal"},{fetch:async()=>new Response("foo")}),
+    /HTTPS/,
+  );
+  await assert.rejects(
+    downloadEoAsset(asset,{maxBytes:3,fetch:async()=>new Response(new Uint8Array([1,2,3,4]))}),
+    /maxBytes/,
+  );
+});
+
+test("Absent preview is an explicit missing capability, not a synthetic image",async()=>{
+  const item={...landsat,assets:{
+    b04:{href:"https://example.test/b04.tif",roles:["data"],"eo:bands":[{name:"B04"}]},
+  }};
+  await assert.rejects(downloadEoPreview(item),/no preview/);
 });
