@@ -103,6 +103,7 @@ test("Monitoring snapshot never confuses provider outages with complete data",as
     now:new Date("2026-10-13T11:00:00Z"),
   });
   assert.equal(result.optical.length,0);
+  assert.equal(result.recommendedSensor,"radar");
   assert.equal(result.sourceFailures.length,1);
   assert.ok(result.limitations.some(x=>/incomplete/i.test(x)));
 });
@@ -227,4 +228,20 @@ test("Absent preview is an explicit missing capability, not a synthetic image",a
     b04:{href:"https://example.test/b04.tif",roles:["data"],"eo:bands":[{name:"B04"}]},
   }};
   await assert.rejects(downloadEoPreview(item),/no preview/);
+});
+
+test("Thermal discovery never treats a Landsat reflectance-only scene as temperature data",async()=>{
+  const item={...landsat,assets:{
+    red:{href:"https://example.test/red.tif",roles:["data"],"eo:bands":[{name:"red"}]},
+  }};
+  const pc={stac:{search:async()=>({features:[item]})}};
+  const discovery=new ObservationDiscoveryClient({stac:{search:async()=>({features:[]})}},pc);
+  const r=await discovery.discover({
+    area:point(14.4,50.1),
+    from:new Date("2026-09-01"),to:new Date("2026-10-13"),
+    layers:["thermal"],
+  });
+  assert.equal(r.scenes.length,0);
+  assert.equal(r.queryStatuses[0].status,"ok");
+  assert.equal(r.queryStatuses[0].excludedWithoutRequiredAsset,1);
 });
