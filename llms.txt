@@ -1,6 +1,6 @@
 # OpenLaunch SDK
 
-> Open-source TypeScript space-computation SDK for spaceflight data, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, geospatial intelligence, weather, mission analysis and spacecraft engineering.
+> Open-source TypeScript space-computation SDK for generic multistage 3DOF launch simulations, SGP4/SDP4 satellite tracking, space-traffic geometry, Earth observation, geospatial intelligence, weather, mission analysis and spacecraft engineering.
 
 ## Start here
 - README.md — package overview and API guide
@@ -13,10 +13,12 @@
 - docs/VALIDATION.md — validation boundaries
 - docs/EARTH_INTELLIGENCE.md — STAC, Copernicus, Planetary Computer, weather and EO orchestration
 - docs/ORBIT_TRAFFIC.md — SGP4/SDP4, passes, closest approach, RTN, sensor access and CZML
+- docs/LAUNCH_TRAJECTORY.md — 3DOF multistage ascent, RK4, J2, aerodynamic forces, guidance, Monte Carlo and satellite screening
 
 ## Canonical source
 - src/index.ts — root public exports
 - src/client.ts — OpenLaunch client and provider/resource wiring
+- src/trajectory/ — generic multistage launch dynamics; not a real Falcon trajectory inferred from a launch time
 - src/providers/ — LL2, NASA, CelesTrak, STAC, Copernicus, Planetary Computer and Open-Meteo integrations
 - src/geo/ — reusable WGS84 AOI primitives
 - src/eo/ — scene ranking and spectral-index helpers
