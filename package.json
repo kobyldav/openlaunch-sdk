@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "0.8.1",
-  "description": "TypeScript space computation SDK: SGP4/SDP4, multistage 3DOF launch simulation with constrained throttle and conditional fairing, traffic screening, Earth observation and mission engineering.",
+  "version": "0.9.0",
+  "description": "TypeScript space SDK: Earth-observation product intelligence, orbit traffic audits, launch 3DOF physics and bounded mission targeting.",
   "keywords": [
     "space",
     "spaceflight",
@@ -37,7 +37,13 @@
     "trajectory",
     "runge-kutta",
     "aerodynamics",
-    "monte-carlo"
+    "monte-carlo",
+    "mission-planning",
+    "satellite-imagery",
+    "raster-assets",
+    "earth-surface-temperature",
+    "orbit-targeting",
+    "targeting-sweep"
   ],
   "license": "MIT",
   "type": "module",
@@ -99,6 +105,11 @@
       "types": "./dist/trajectory/index.d.ts",
       "import": "./dist/trajectory/index.js",
       "require": "./dist-cjs/trajectory/index.js"
+    },
+    "./mission": {
+      "types": "./dist/mission/index.d.ts",
+      "import": "./dist/mission/index.js",
+      "require": "./dist-cjs/mission/index.js"
     }
   },
   "files": [
@@ -126,7 +137,8 @@
     "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
     "example:orbit-traffic": "npm run build && node scripts/orbit-traffic-demo.mjs",
     "example:launch": "npm run build && node scripts/launch-trajectory-demo.mjs",
-    "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs"
+    "test:launch-offline": "npm run build && node scripts/launch-trajectory-demo.mjs",
+    "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs"
   },
   "engines": {
     "node": ">=18"
