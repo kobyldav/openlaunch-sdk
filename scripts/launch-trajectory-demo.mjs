@@ -5,19 +5,21 @@ const space=new OpenLaunch();
 const model={
   liftoff:new Date("2019-06-05T12:00:00Z"),
   site:{name:"Illustrative Atlantic-coast pad",latitudeDeg:28.56,longitudeDeg:-80.58,altitudeM:3},
-  durationSeconds:170,
-  stepSeconds:1,
+  durationSeconds:240,
+  stepSeconds:0.5,
+  flightConstraints:{maxDynamicPressurePa:45_000,maxAxialAccelerationG:4.5,maxQResponseSeconds:6},
   guidance:[
     {timeSeconds:0,pitchDeg:90,headingDeg:90,throttle:1},
     {timeSeconds:20,pitchDeg:85,headingDeg:90,throttle:1},
     {timeSeconds:80,pitchDeg:50,headingDeg:90,throttle:1},
     {timeSeconds:170,pitchDeg:15,headingDeg:90,throttle:0.9},
+    {timeSeconds:240,pitchDeg:10,headingDeg:90,throttle:0.9},
   ],
   vehicle:{
     name:"Generic illustrative two-stage launch vehicle (NOT Falcon 9)",
     payloadMassKg:100,
     fairingMassKg:30,
-    fairingJettisonSeconds:25,
+    fairingSeparation:{earliestSeconds:30,minAltitudeKm:80,maxDynamicPressurePa:1500},
     dragCoefficient:0.25,
     referenceAreaM2:2,
     stages:[
@@ -30,7 +32,7 @@ const model={
   },
 };
 
-console.log("=== OpenLaunch v0.8 | generic launch-vehicle study ===");
+console.log("=== OpenLaunch v0.8.1 | constrained generic launch study ===");
 console.log("NOT actual SpaceX launch data or a flight-qualified profile.");
 const result=space.trajectory.simulate(model);
 console.log("\nSummary:",{
@@ -38,24 +40,46 @@ console.log("\nSummary:",{
   finalMassKg:result.finalMassKg,
   maxAltitudeKm:result.maxAltitudeKm,
   maxQkPa:result.maxQPa/1000,
+  requestedMaxQkPa:model.flightConstraints.maxDynamicPressurePa/1000,
+  maxAxialAccelerationG:result.maxAxialAccelerationG,
+  throttledSamples:result.throttledSamples,
+  constraintViolations:result.constraintViolations,
   maxQTime:result.maxQTime.toISOString(),
   termination:result.termination,
   steps:result.trajectory.length,
   frame:result.frame,
+  finalOrbit:result.finalOrbit ? {
+    classification:result.finalOrbit.classification,
+    perigeeAltitudeKm:result.finalOrbit.perigeeAltitudeKm,
+    apogeeAltitudeKm:result.finalOrbit.apogeeAltitudeKm,
+    eccentricity:result.finalOrbit.eccentricity,
+    periodMinutes:result.finalOrbit.periodMinutes,
+  } : null,
 });
 
 console.log("\nFlight events:");
 console.table(result.events.map(e=>({
   event:e.kind,tPlusSeconds:e.elapsedSeconds.toFixed(2),
   altitudeKm:e.altitudeKm.toFixed(2),massKg:e.massKg.toFixed(1),stage:e.stageIndex,
+  releasedMassKg:e.massBeforeKg !== undefined ? (e.massBeforeKg-e.massAfterKg).toFixed(1) : "-",
 })));
 
-console.log("\nTelemetry every 20 seconds:");
-console.table(result.telemetry.filter(p=>Math.abs(p.elapsedSeconds/20-Math.round(p.elapsedSeconds/20))<0.002).map(p=>({
-  t:p.elapsedSeconds,altitudeKm:p.altitudeKm.toFixed(2),
-  speedMps:p.inertialSpeedMps.toFixed(0),qPa:p.dynamicPressurePa.toFixed(0),
-  massKg:p.massKg.toFixed(1),
-})));
+console.log("\nTelemetry near every 20 seconds:");
+const checkpoints = Array.from({length:Math.ceil(result.totalSimulatedSeconds/20)+1},(_,i)=>Math.min(i*20,result.totalSimulatedSeconds));
+console.table(checkpoints.map(t=>{
+  const p=result.telemetry.reduce((best,item)=>
+    Math.abs(item.elapsedSeconds-t) < Math.abs(best.elapsedSeconds-t) ? item : best,
+  );
+  return {
+    requestedT:t,actualT:p.elapsedSeconds.toFixed(2),
+    altitudeKm:p.altitudeKm.toFixed(2),
+    speedMps:p.inertialSpeedMps.toFixed(0),
+    qPa:p.dynamicPressurePa.toFixed(0),
+    massKg:p.massKg.toFixed(1),
+    throttle:p.effectiveThrottle.toFixed(2),
+    limiter:p.throttleLimiter,
+  };
+}));
 
 const envelope=space.trajectory.monteCarlo(model,{runs:12,seed:202608,pitchSigmaDeg:0.2});
 console.log("\nMonte Carlo dispersion:",{
