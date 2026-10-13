@@ -4,11 +4,13 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
 
-## v0.8 launch trajectory examples
+## v0.8–v0.8.1 launch trajectory examples
 
 Folder `15-launch-trajectory/` includes a typed generic two-stage launch model and examples for staging, mass/atmosphere telemetry, max-Q, deterministic Monte Carlo dispersion, historical-epoch satellite screening, Cesium CZML and guidance sensitivity. The model is **illustrative only** and is not a SpaceX flight profile.
 
 Live-independent executable demo: `npm run example:launch`. Include `-- --czml` to generate `launch-demo.czml`.
+
+New in v0.8.1: `15-launch-trajectory/08-constraints-and-fairing.ts` demonstrates modeled dynamic-pressure limiting, axial acceleration throttling, deferred fairing release and final-orbit diagnostics.
 
 Full numeric and frame documentation: [Launch Trajectory](../docs/LAUNCH_TRAJECTORY.md).
 
