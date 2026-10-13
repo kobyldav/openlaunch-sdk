@@ -110,7 +110,7 @@ export interface LaunchSimulation {
   maxQTime: Date;
   maxAltitudeKm: number;
   totalSimulatedSeconds: number;
-  termination: "duration" | "ground-impact";
+  termination: "duration" | "ground-impact" | "burnout";
   frame: "TEME-approx-GMST";
   limitations: readonly string[];
 }
