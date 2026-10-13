@@ -147,8 +147,9 @@
     "example:mission": "npm run build && node scripts/mission-intelligence-demo.mjs",
     "example:raster": "npm run build && node scripts/geospatial-raster-demo.mjs",
     "build:packages": "node scripts/build-workspaces.mjs",
-    "test:packages": "node --test tests/packages.test.mjs",
-    "pack:check:packages": "node scripts/pack-workspaces.mjs"
+    "test:packages": "npm run typecheck:packages && node --test tests/packages.test.mjs",
+    "pack:check:packages": "node scripts/pack-workspaces.mjs",
+    "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit"
   },
   "engines": {
     "node": ">=18"
