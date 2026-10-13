@@ -137,7 +137,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
-    "prepublishOnly": "npm run check && npm run pack:check && npm run pack:check:packages",
+    "prepublishOnly": "npm run check && npm run pack:check && npm run pack:check:packages && npm run test:packed",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
     "test:earth-live": "npm run build && node scripts/earth-live-smoke.mjs",
     "example:rotterdam": "npm run build && node scripts/rotterdam-monitor.mjs",
@@ -149,7 +149,8 @@
     "build:packages": "node scripts/build-workspaces.mjs",
     "test:packages": "npm run typecheck:packages && node --test tests/packages.test.mjs",
     "pack:check:packages": "node scripts/pack-workspaces.mjs",
-    "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit"
+    "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit",
+    "test:packed": "node scripts/test-packed-consumers.mjs"
   },
   "engines": {
     "node": ">=18"
