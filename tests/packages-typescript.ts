@@ -18,8 +18,8 @@ const raster: RasterGrid = {
   values: new Float64Array([1]),
 };
 const launches = new LaunchDataClient();
-const orbit = new OrbitEngine();
-const traffic = new TrafficEngine();
+const orbit = OrbitEngine;
+const traffic = TrafficEngine;
 const target: OrbitTarget = { perigeeAltitudeKm: 250, apogeeAltitudeKm: 250 };
 const check: Array<unknown> = [
   cache,http,builder,earth,area,raster,launches,orbit,traffic,target,
