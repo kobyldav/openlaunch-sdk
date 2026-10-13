@@ -4,6 +4,12 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
 
+## v0.9 Mission & Earth intelligence
+
+`npm run example:mission` is a fully offline, reproducible integration scenario exercising EO metadata (thermal/masks/DEM), scene discovery, orbit-target guidance scoring and satellite screening diagnostics. It uses explicitly synthetic imagery metadata: no real satellite preview is falsely represented as downloaded.
+
+See [Mission & Earth Intelligence](../docs/MISSION_INTELLIGENCE.md).
+
 ## v0.8–v0.8.1 launch trajectory examples
 
 Folder `15-launch-trajectory/` includes a typed generic two-stage launch model and examples for staging, mass/atmosphere telemetry, max-Q, deterministic Monte Carlo dispersion, historical-epoch satellite screening, Cesium CZML and guidance sensitivity. The model is **illustrative only** and is not a SpaceX flight profile.
