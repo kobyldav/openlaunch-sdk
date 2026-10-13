@@ -229,7 +229,8 @@ function isUnsafeHost(h:string):boolean {
   if(host.includes(":"))return true; // deny all literal IPv6 addresses for server-side range reads
   const octets=host.split(".");
   if(octets.length!==4||octets.some(v=>!/^\d+$/.test(v)))return false;
-  const [a,b]=octets.map(Number);
+  const parts=octets.map(Number);
+  const a=parts[0]!,b=parts[1]!;
   return a===0||a===10||a===127||a===169&&b===254||a===172&&b>=16&&b<=31||
     a===192&&b===168||a===100&&b>=64&&b<=127||a>=224;
 }
