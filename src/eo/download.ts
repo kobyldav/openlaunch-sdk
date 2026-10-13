@@ -43,7 +43,7 @@ export async function downloadEoAsset(asset: EoAssetInfo, options: EoDownloadOpt
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const fetchImpl = options.fetch ?? globalThis.fetch;
+    const fetchImpl = options.fetch ?? (typeof globalThis.fetch === "function" ? globalThis.fetch.bind(globalThis) : undefined);
     if (!fetchImpl) throw new Error("No fetch implementation provided");
     const response = await fetchImpl(url.toString(), {
       method: "GET", redirect: "error", signal: controller.signal,
