@@ -138,7 +138,7 @@ npm run build:packages
 - `tests/packages.test.mjs`: ESM and CJS imports for all six installed workspaces, functional mocked Earth STAC and LL2 requests, absence of orbit/engineering modules and `satellite.js` in web-only manifests, preserve legacy API
 - `scripts/pack-workspaces.mjs`: checks independently packed tarballs contain ESM, CJS and declarations and no raw source or node_modules
 - `packages/build-report.json`: prints raw compiled module count and uncompressed byte count per workspace for direct, auditable comparison
-- `npm ci` in CI: ensures package-lock has valid workspace links for reproducible installations
+- `npm ci` in CI: ensures package-lock has valid workspace links for reproducible installations\n- `npm run test:packed`: builds real scoped npm tarballs and installs Earth, Raster, Launches, Orbit and Engineering in **separate temporary consumer projects**, then checks ESM/CJS imports and dependency isolation
 - CI matrix: Node 18 / 20 / 22
 
 **Bundle-size distinction:** raw tarball size is **not the same** as browser bundle size; bundled size also depends on your bundler and tree-shaking. A follow-up real bundler benchmark should measure minified+gzip browser output and actual cold install size separately.
@@ -156,7 +156,7 @@ npm run build:packages
 
 Measurements use `npm pack --dry-run` from CI. They exclude external npm dependencies and do **not** equal minified/gzip browser JS bundles or real network install times. The domain packages have separate, tested ESM and CJS entrypoints.
 
-**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and three separately isolated npm tarball installation smoke checks. All succeeded on Node 18, 20 and 22.
+**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and five separately isolated npm tarball installation smoke checks (Earth, Raster, Launches, Orbit, Engineering). All succeeded on Node 18, 20 and 22.
 
 ## Publication prerequisites and dependency order
 
