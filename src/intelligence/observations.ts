@@ -74,7 +74,7 @@ export class ObservationDiscoveryClient {
     if (maxCloud !== undefined && (!Number.isFinite(maxCloud) || maxCloud < 0 || maxCloud > 100))
       throw new RangeError("maxCloudCoverPercent must be in [0,100]");
 
-    const layers = [...new Set(options.layers ?? ["optical", "radar", "thermal", "elevation"])];
+    const layers: ObservationLayer[] = [...new Set<ObservationLayer>(options.layers ?? ["optical", "radar", "thermal", "elevation"])];
     for (const layer of layers) if (!(layer in COLLECTIONS)) throw new RangeError("Unknown observation layer: " + layer);
 
     const settled = await Promise.all(layers.map(async layer => {
