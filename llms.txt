@@ -13,6 +13,7 @@
 - docs/VALIDATION.md — validation boundaries
 - docs/EARTH_INTELLIGENCE.md — STAC, Copernicus, Planetary Computer, weather and EO orchestration
 - docs/ORBIT_TRAFFIC.md — SGP4/SDP4, passes, closest approach, RTN, sensor access and CZML
+- docs/MISSION_INTELLIGENCE.md — v0.9 EO scene layers/download/pixel math, acquisition correlation, orbital traffic audits and guidance feasibility
 - docs/LAUNCH_TRAJECTORY.md — 3DOF multistage ascent, RK4, J2, aerodynamic forces, guidance, Monte Carlo and satellite screening
 
 ## Canonical source
