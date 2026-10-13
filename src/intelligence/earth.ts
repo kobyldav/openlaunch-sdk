@@ -4,6 +4,7 @@ import { downloadEoPreview, downloadEoAsset, type EoAssetDownload, type EoDownlo
 import { inspectEoProduct } from "../eo/products.js";
 import { decodeGeoTiff, type GeoTiffDecodeOptions } from "../eo/geotiff.js";
 import type { RasterGrid } from "../eo/raster.js";
+import { readCogWindowUrl, type CogReadOptions, type CogReadResult } from "../eo/cog.js";
 import { centerOf } from "../geo/types.js";
 import { rankScenes, type SceneScore } from "../eo/scenes.js";
 import type { StacFeatureCollection, StacItem } from "../providers/stac.js";
@@ -83,6 +84,16 @@ export class EarthIntelligenceClient {
     const downloaded = await downloadEoAsset(asset, options);
     const raster = await decodeGeoTiff(downloaded.bytes, options);
     return { ...raster, source: item.id + ":" + assetKey };
+  }
+
+
+  /** Efficiently fetch intersecting COG TIFF tiles via HTTPS Range requests. */
+  readRasterWindow(
+    item: StacItem,assetKey:string,area:AreaOfInterest,options:CogReadOptions,
+  ):Promise<CogReadResult> {
+    const asset=inspectEoProduct(item).assets.find(a=>a.key===assetKey);
+    if(!asset)throw new RangeError("Selected STAC asset does not exist: "+assetKey);
+    return readCogWindowUrl(asset.href,area,options);
   }
 
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
