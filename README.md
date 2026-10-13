@@ -91,7 +91,7 @@ The generated distribution contains just the transitively needed compiled module
 
 Measurements use `npm pack --dry-run` from CI. They exclude external npm dependencies and do **not** equal minified/gzip browser JS bundles or real network install times. The domain packages have separate, tested ESM and CJS entrypoints.
 
-**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and three separately isolated npm tarball installation smoke checks. All succeeded on Node 18, 20 and 22.
+**CI proof:** 95 passing unique Node regression/package tests, plus 12 independent workspace tests rerun after offline demos, and five separately isolated npm tarball installation smoke checks. All succeeded on Node 18, 20 and 22.
 
 Full architecture, commands, migration strategy and remaining risks: [Modular workspaces v1.1](./docs/MONOREPO_V1_1.md).
 
