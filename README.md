@@ -45,6 +45,8 @@ Details and security/integration examples: [Live Earth v1.2 architecture](docs/L
 
 ---
 
+Read [Space Data Foundation v1.3](docs/SPACE_DATA_FOUNDATION_V1_3.md) for the 18-layer Earth registry, availability probes and math extraction.
+
 ## Why OpenLaunch?
 
 OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. It now includes STAC observation catalogs, real georeferenced TIFF pixel processing, SGP4/SDP4 satellite tracking, space-traffic geometry and generic launch-simulation tools.
@@ -60,7 +62,8 @@ OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. I
 | `@openlaunch/raster` | GeoTIFF/COG reads, spatial clips, NDVI / NDWI / NDMI / NBR, quality masks, change analysis, DEM mesh | `@openlaunch/core` |
 | `@openlaunch/launches` | Launch Library 2, NASA, launch resources and normalization | `@openlaunch/core` |
 | `@openlaunch/orbit` | TLE/OMM, SGP4/SDP4, ground passes, space-traffic checks, swath/CZML | `@openlaunch/core`, `satellite.js` |
-| `@openlaunch/engineering` | Rocket and trajectory simulations, mission targeting, spacecraft math | `@openlaunch/core`, `@openlaunch/orbit` |
+| `@openlaunch/math` | Independent vector/matrix/quaternion algebra, numerics, statistics and control | `@openlaunch/core` |
+| `@openlaunch/engineering` | Optional rocket and mission engineering and trajectory simulations | `@openlaunch/core`, `@openlaunch/orbit`, `@openlaunch/math` |
 | `openlaunch-sdk` | Backward-compatible **umbrella** API with all functions | `satellite.js` |
 
 Every scoped package has separate **ESM, CommonJS and TypeScript declaration** entrypoints. The monorepo uses npm workspaces and a build step that copies only the reachable, compiled modules into each package. The original TypeScript source remains under `src/` for now; it has **not** yet been physically moved to `packages/*/src`.

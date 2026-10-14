@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.2.0",
-  "description": "Modular space and near-real-time Earth observation SDK with NASA GIBS, EUMETView, FIRMS, Sentinel-5P and official video embeds",
+  "version": "1.3.0",
+  "description": "Modular Earth observation, space livestream metadata, imagery, satellite tracking and optional engineering",
   "keywords": [
     "space",
     "spaceflight",
@@ -57,7 +57,9 @@
     "firms",
     "sentinel-5p",
     "live-earth",
-    "satellite-video"
+    "satellite-video",
+    "space-observatory",
+    "satellite-layer-data"
   ],
   "license": "MIT",
   "type": "module",
