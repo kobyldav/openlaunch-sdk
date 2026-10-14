@@ -10,11 +10,13 @@ OpenLaunch v1.2 exposes one SDK-owned definition for map layer switches. The **w
 | Landsat thermal / Copernicus DEM | Existing Planetary Computer and raster modules | Check real band availability and authorization |
 | Vegetation/water/moisture, scene changes | Existing raster and spectral index functions | Pixel values need real calibration, masks and matching grids |
 | MODIS Terra / VIIRS S-NPP | `nasaGibsTileTemplate(layer,date)` | Dated NASA GIBS WMTS tile, **not** confirmation of an available image |
+| Meteosat / MTG EUMETView | `eumetviewCapabilitiesUrl()`, `eumetviewGetMapUrl({layer,bounds3857,width,height,time})` | WMS request generation, not automatic frame discovery or a continuous video stream |
 | NASA FIRMS VIIRS/MODIS | `fetchFirmsHotspots({mapKey,area,...})`, `parseFirmsCsv()` | Backend key and quota; hotspots are **not fire boundaries** |
+| Sentinel-5P Process | `sentinel5pProcessInput("NO2")` + existing Copernicus Process client | Product identifier only; validated evalscript and physical units still needed |
 | Atmospheric catalog (e.g. TROPOMI) | `discoverAtmosphereScenes(collection,area,from,to,client)` | Generic STAC search; no automatic NO₂ raster/calibration |
 | NASA ISS live source | `issLiveSource()` | Official external NASA Live page, no fabricated direct player URL |
 
-**Not finished:** Meteosat rapid imagery, a provider-authenticated EUMETSAT tile/time catalog, Sentinel-5P NO₂ unit-correct rendering, embedded ISS video player, universal raster file codecs and arbitrary EPSG reprojection. The catalog records these limitations with `implemented:false` for Meteosat. No external source is a guaranteed live view over Czechia.
+**Not finished:** automatic EUMETView layer/time selection and image caching, Sentinel-5P NO₂ unit-correct rendering, embedded ISS video player, universal raster file codecs and arbitrary EPSG reprojection. EUMETView WMS GetMap URL construction works, but the chosen layer ID must come from live GetCapabilities and freshness must be verified. The catalog records these limitations with `implemented:false` for Meteosat. No external source is a guaranteed live view over Czechia.
 
 ### Provider details
 
