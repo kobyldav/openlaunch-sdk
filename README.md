@@ -1,5 +1,20 @@
 # OpenLaunch SDK
 
+## v1.2 – Satellite map layer data interfaces
+
+OpenLaunch adds a typed `earthLayerCatalog()` for consistent layer switches in external web applications. Available now: NASA GIBS MODIS/VIIRS dated WMTS URL templates, authenticated NASA FIRMS fire hotspot CSV parsing, generic STAC atmosphere queries, and an official NASA ISS Live landing-page descriptor. Known unsupported integration: Meteosat imagery streaming (catalog entry is explicitly `implemented:false`). None of these methods invents acquisition timestamps or claims that a dated tile is available. Use `@openlaunch/earth` or the original root package; no new engineering dependencies.
+
+```ts
+import { earthLayerCatalog, nasaGibsTileTemplate, issLiveSource } from "@openlaunch/earth";
+const categories = earthLayerCatalog(); // source, actual status, method, freshness, limits
+const modis = nasaGibsTileTemplate("nasa-modis-terra", "2026-10-13");
+console.log(modis.tileTemplate); // WMTS template; validate availability against NASA
+console.log(issLiveSource().landingPage); // external source, never fake camera stream
+```
+
+Run `npm run example:earth-layers`; see [technical documentation](docs/EARTH_LAYERS_V1_2.md).
+
+
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
 OpenLaunch v1.1.0 has **six independent npm workspaces** and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
