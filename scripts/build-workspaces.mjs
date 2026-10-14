@@ -24,7 +24,7 @@ const packages = {
     entries: ["cache", "errors", "http", "query", "types", "utils", "mappers", "resources/base", "resources/raw", "resources/generic"],
   },
   earth: {
-    entries: ["modular/earth", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "eo/products", "eo/scenes", "eo/download"],
+    entries: ["modular/earth", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "intelligence/layers", "eo/products", "eo/scenes", "eo/download"],
   },
   raster: {
     entries: ["eo/index", "geo/index"],
