@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0 – satellite web-layer interfaces (feature branch)
+
+- Typed Earth layer registry with source/freshness/auth/resolution/provenance capabilities and explicit status.
+- NASA GIBS dated MODIS/VIIRS Web Mercator WMTS templates; link to capabilities validation.
+- NASA FIRMS bbox source query, protected MAP_KEY, bounded CSV decode to UTC heat hotspots.
+- NASA ISS official external-view source descriptor without fabricated playable stream.
+- Generic STAC discovery for a caller-selected atmosphere collection (no implied Sentinel-5P raster decoding).
+- Meteosat kept explicitly unavailable until a real EUMETSAT product is authenticated and validated.
+- Fully backwards-compatible v1.1 monorepo packages; changes only in new v1.2 branch.
+
+
 ## 0.9.0 - 2026-10-13
 
 Mission & Earth Intelligence: cross-version functional gap closure.
