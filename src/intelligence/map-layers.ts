@@ -1,3 +1,4 @@
+import { probeSpaceImage, type SpaceImageAvailability, type SpaceImageProbe } from "./layer-health.js";
 import type {BBox,AreaOfInterest} from "../geo/types.js";
 import {NasaGibsClient, type GibsLayerId, type GibsTileDescriptor} from "../providers/gibs.js";
 import {MeteosatClient, type MeteosatMapOptions, type MeteosatMapDescriptor, type MeteosatWmsLayer} from "../providers/meteosat.js";
@@ -100,6 +101,11 @@ export class SpaceMapClient{
     return {...item};
   }
   videoStream(id:SpaceStreamId):SpaceStreamDescriptor{return this.videos.get(id);}
+  /** One explicit provider image verification request; cache/throttle this on the backend. */
+  probeImage(request:SpaceImageProbe):Promise<SpaceImageAvailability>{
+    return probeSpaceImage({gibs:this.gibs,meteosat:this.meteosat},request);
+  }
+
   nasaDailyTiles(layer:GibsLayerId,date:Date|string):GibsTileDescriptor{return this.gibs.tileTemplate(layer,date);}
   /** UTC-day playback frames: requested days only, not confirmed acquisitions. */
   nasaDailyTimeline(layer:GibsLayerId,from:Date|string,to:Date|string,maxDays=31):GibsTileDescriptor[]{
