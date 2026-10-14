@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.1.0",
-  "description": "Backwards-compatible OpenLaunch umbrella SDK plus six independently installable domain workspaces.",
+  "version": "1.2.0",
+  "description": "Modular space and near-real-time Earth observation SDK with NASA GIBS, EUMETView, FIRMS, Sentinel-5P and official video embeds",
   "keywords": [
     "space",
     "spaceflight",
@@ -49,7 +49,15 @@
     "raster",
     "ndvi",
     "terrain-mesh",
-    "change-detection"
+    "change-detection",
+    "meteosat",
+    "eumetsat",
+    "gibs",
+    "viirs",
+    "firms",
+    "sentinel-5p",
+    "live-earth",
+    "satellite-video"
   ],
   "license": "MIT",
   "type": "module",
@@ -150,7 +158,8 @@
     "test:packages": "npm run typecheck:packages && node --test tests/packages.test.mjs",
     "pack:check:packages": "node scripts/pack-workspaces.mjs",
     "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit",
-    "test:packed": "node scripts/test-packed-consumers.mjs"
+    "test:packed": "node scripts/test-packed-consumers.mjs",
+    "example:live-earth": "npm run build && node scripts/live-earth-demo.mjs"
   },
   "engines": {
     "node": ">=18"
