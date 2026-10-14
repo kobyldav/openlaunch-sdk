@@ -30,7 +30,7 @@ const layerDefs:readonly EarthLayerDescriptor[]=[
  {id:"landsat-thermal",label:"Povrchová teplota Landsat",category:"observations",kind:"thermal",source:"Landsat Collection 2 Level-2",method:"stac",freshness:"latest-available",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Only scenes with an actual L2 ST asset; land surface temperature is not air temperature."],provenanceUrl:"https://planetarycomputer.microsoft.com/"},
  {id:"nasa-modis-terra",label:"MODIS Terra – reálná barevná kompozice",category:"observations",kind:"optical",source:"NASA GIBS / MODIS Terra",method:"wmts",freshness:"latest-available",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["A requested date is not proof of available imagery or acquisition within the AOI."],provenanceUrl:doc},
  {id:"nasa-viirs-snpp",label:"VIIRS Suomi-NPP – reálná barevná kompozice",category:"observations",kind:"optical",source:"NASA GIBS / VIIRS S-NPP",method:"wmts",freshness:"latest-available",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Layer/time availability must be checked against NASA GIBS capabilities."],provenanceUrl:doc},
- {id:"meteosat-clouds",label:"Meteosat – živá oblačnost",category:"live",kind:"clouds",source:"EUMETSAT",method:"provider-process",freshness:"near-real-time",requiresAuth:true,enabledByDefault:false,implemented:false,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Provider product selection, rights, credentials and actual frame availability not integrated. Not live video."],provenanceUrl:"https://data.eumetsat.int/"},
+ {id:"meteosat-clouds",label:"Meteosat – živá oblačnost",category:"live",kind:"clouds",source:"EUMETSAT",method:"provider-process",freshness:"near-real-time",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["WMS GetCapabilities must confirm chosen layer and time; snapshot retrieval is not a live video stream. Product rights can vary."],provenanceUrl:"https://data.eumetsat.int/"},
  {id:"sentinel-5p-no2",label:"Sentinel-5P – NO₂",category:"analyses",kind:"atmosphere",source:"Copernicus Sentinel-5P TROPOMI",method:"stac",freshness:"latest-available",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Generic STAC discovery only; specialized NO2 unit conversion and raster visualization are not implemented."],provenanceUrl:"https://dataspace.copernicus.eu/"},
  {id:"active-fires",label:"Aktivní požáry NASA FIRMS",category:"analyses",kind:"fire-hotspots",source:"NASA FIRMS VIIRS/MODIS",method:"firms-csv",freshness:"near-real-time",requiresAuth:true,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Requires FIRMS MAP_KEY. Hotspots are detections, not verified fire boundaries."],provenanceUrl:"https://firms.modaps.eosdis.nasa.gov/api/area/"},
  {id:"vegetation-ndvi",label:"Vegetace (NDVI)",category:"analyses",kind:"vegetation",source:"Derived from calibrated optical raster",method:"derived-raster",freshness:"archive",requiresAuth:false,enabledByDefault:false,implemented:true,acquisitionTime:null,lastUpdated:null,spatialResolutionM:null,cadenceMinutes:null,limitations:["Requires actual aligned red/NIR data with radiometric calibration and quality mask."],provenanceUrl:"https://github.com/kobyldav/openlaunch-sdk/blob/main/docs/RASTER_V1.md"},
@@ -109,4 +109,30 @@ export async function discoverAtmosphereScenes(
  if(!/^[a-z0-9][a-z0-9._-]{0,127}$/i.test(collection))throw new RangeError("Invalid STAC collection");
  if(!(from instanceof Date&&to instanceof Date&&Number.isFinite(+from)&&Number.isFinite(+to)&&from<=to))throw new RangeError("Invalid time range");
  return client.stac.search({collections:[collection],intersects:area.geometry,datetime:{from,to},limit:30});
+}
+
+/** EUMETView's published OGC WMS endpoint. Read GetCapabilities for actual layer identifiers and times. */
+export const EUMETVIEW_WMS="https://view.eumetsat.int/geoserver/wms";
+export function eumetviewCapabilitiesUrl():string{
+ return EUMETVIEW_WMS+"?SERVICE=WMS&VERSION=1.3.0&REQUEST=GetCapabilities";
+}
+export interface EumetviewMapOptions {
+ /** Layer identifier taken from live GetCapabilities, never a guessed display name. */
+ layer:string;bounds3857:readonly [number,number,number,number];
+ width:number;height:number;time?:string;format?:"image/png"|"image/jpeg";
+}
+/** Standard WMS 1.3.0 GetMap URL with true provider-chosen layer/time. */
+export function eumetviewGetMapUrl(options:EumetviewMapOptions):string{
+ const {layer,bounds3857,width,height}=options;
+ if(!/^[A-Za-z0-9_.:-]{1,200}$/.test(layer))throw new RangeError("Invalid EUMETView WMS layer");
+ if(bounds3857.length!==4||bounds3857.some(n=>!Number.isFinite(n))||bounds3857[0]!>=bounds3857[2]!||bounds3857[1]!>=bounds3857[3]!)throw new RangeError("Invalid WMS bbox");
+ if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width>2048||height>2048)throw new RangeError("WMS image dimensions exceed 2048");
+ if(options.time!==undefined&&(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$/.test(options.time)||!Number.isFinite(Date.parse(options.time))))throw new RangeError("WMS time must be ISO UTC");
+ const p=new URLSearchParams({SERVICE:"WMS",VERSION:"1.3.0",REQUEST:"GetMap",LAYERS:layer,STYLES:"",CRS:"EPSG:3857",BBOX:bounds3857.join(","),WIDTH:String(width),HEIGHT:String(height),FORMAT:options.format??"image/png",TRANSPARENT:"TRUE"});
+ if(options.time)p.set("TIME",options.time);
+ return EUMETVIEW_WMS+"?"+p.toString();
+}
+/** Typed Sentinel-5P OGC Process request arguments; actual layer + band must be from Copernicus provider docs. */
+export function sentinel5pProcessInput(product:"NO2"|"SO2"|"O3"|"CH4"|"CO"|"HCHO"): {dataType:"sentinel-5p-l2";product:string;limitations:string[]}{
+ return {dataType:"sentinel-5p-l2",product,limitations:["Use a provider-validated evalscript and calibration for selected gas/band; not ground-level air quality."]};
 }
