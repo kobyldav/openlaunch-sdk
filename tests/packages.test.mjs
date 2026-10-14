@@ -10,7 +10,7 @@ const names=["core","earth","raster","launches","orbit","engineering"];
 const require=createRequire(import.meta.url);
 const publicFunctions={
  core:["HttpClient","MemoryCache","query"],
- earth:["EarthCatalogClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
+ earth:["EarthCatalogClient","SpaceMapClient","NasaGibsClient","MeteosatClient","NasaFirmsClient","Sentinel5pClient","SpaceVideoClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
  raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","calibrateRasterFromStac","elevationToLocalMesh"],
  launches:["LaunchDataClient","LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
  orbit:["Sgp4Satellite","OrbitEngine","TrafficEngine"],
