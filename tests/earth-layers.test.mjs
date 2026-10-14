@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { EarthCatalogClient,earthLayerCatalog,nasaGibsTileTemplate,nasaGibsCapabilitiesUrl,issLiveSource,parseFirmsCsv,fetchFirmsHotspots,discoverAtmosphereScenes,bbox,PlanetaryComputerClient } from "../dist/index.js";
+import { earthLayerCatalog,nasaGibsTileTemplate,nasaGibsCapabilitiesUrl,issLiveSource,parseFirmsCsv,fetchFirmsHotspots,discoverAtmosphereScenes,bbox,PlanetaryComputerClient } from "../dist/index.js";
+import { EarthCatalogClient } from "@openlaunch/earth";
 test("Earth layer switch registry is honest about status and freshness",()=>{
  const list=earthLayerCatalog();assert.ok(list.length>=13);assert.equal(new Set(list.map(x=>x.id)).size,list.length);
  assert.equal(list.find(x=>x.id==="meteosat-clouds").implemented,false);
