@@ -2,7 +2,7 @@
 
 ## v1.2 – Satellite map layer data interfaces
 
-OpenLaunch adds a typed `earthLayerCatalog()` for consistent layer switches in external web applications. Available now: NASA GIBS MODIS/VIIRS dated WMTS URL templates, authenticated NASA FIRMS fire hotspot CSV parsing, generic STAC atmosphere queries, and an official NASA ISS Live landing-page descriptor. Known unsupported integration: Meteosat imagery streaming (catalog entry is explicitly `implemented:false`). None of these methods invents acquisition timestamps or claims that a dated tile is available. Use `@openlaunch/earth` or the original root package; no new engineering dependencies.
+OpenLaunch adds a typed `earthLayerCatalog()` for consistent layer switches in external web applications. Available now: NASA GIBS MODIS/VIIRS dated WMTS URL templates, authenticated NASA FIRMS fire hotspot CSV parsing, generic STAC atmosphere queries, and an official NASA ISS Live landing-page descriptor. Meteosat EUMETView WMS request construction is supported, but a continuous video stream and automatic verified latest-frame selection are not. None of these methods invents acquisition timestamps or claims that a dated tile is available. Use `@openlaunch/earth` or the original root package; no new engineering dependencies.
 
 ```ts
 import { earthLayerCatalog, nasaGibsTileTemplate, issLiveSource } from "@openlaunch/earth";
