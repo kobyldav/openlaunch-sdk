@@ -198,3 +198,15 @@ test("NDWI NDMI NBR produce georeferenced, masked raster map values",()=>{
   assert.ok(Number.isNaN(water.values[2]));
   assert.deepEqual(burn.transform,a.transform);
 });
+
+test("FIRMS backend key is redacted from network error messages",async()=>{
+  const secret="TESTMAPKEY_SECRET";
+  const client=new NasaFirmsClient(secret,{
+    fetch:async url=>{throw new Error("Network failure: "+String(url));},
+  });
+  await assert.rejects(client.hotspots([12,48,19,52]),error=>{
+    assert.match(error.message,/REDACTED/);
+    assert.equal(error.message.includes(secret),false);
+    return true;
+  });
+});
