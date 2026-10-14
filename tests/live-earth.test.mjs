@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  SpaceMapClient, EarthCatalogClient, OpenLaunch, bbox, nasaGibsTileTemplate,
+  SpaceMapClient, OpenLaunch, bbox, nasaGibsTileTemplate,
   NasaGibsClient, GIBS_PRESETS, MeteosatClient, meteosatWmsMapUrl,
   NasaFirmsClient, parseFirmsCsv, Sentinel5pClient, s5pVisualScript,
   SpaceVideoClient, buildProcessRequest, CopernicusClient, METEOSAT_EUROPE_STREAM,
 } from "../dist/index.js";
+import { EarthCatalogClient } from "../dist/modular/earth.js";
 
 test("Satellite map registry contains exactly the four web categories and unique 18 IDs",()=>{
   const sdk=new SpaceMapClient();
