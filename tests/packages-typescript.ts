@@ -3,6 +3,7 @@ import { EarthCatalogClient, SpaceMapClient, bbox, StacClient } from "@openlaunc
 import { decodeGeoTiff, readCogWindowUrl, ndviRaster, type RasterGrid } from "@openlaunch/raster";
 import { LaunchDataClient, LaunchesResource } from "@openlaunch/launches";
 import { Sgp4Satellite, OrbitEngine, TrafficEngine } from "@openlaunch/orbit";
+import { matrixMul, vec3, LinearKalmanFilter } from "@openlaunch/math";
 import { simulateLaunch, sweepLaunchGuidance, type LaunchModel, type OrbitTarget } from "@openlaunch/engineering";
 
 // Static TypeScript consumer smoke: every public entry resolves to matching
@@ -26,6 +27,6 @@ const target: OrbitTarget = { perigeeAltitudeKm: 250, apogeeAltitudeKm: 250 };
 const check: Array<unknown> = [
   cache,http,builder,earth,maps,earthLayers,area,raster,launches,orbit,traffic,target,
   decodeGeoTiff,readCogWindowUrl,ndviRaster,StacClient,LaunchesResource,
-  Sgp4Satellite,simulateLaunch,sweepLaunchGuidance,
+  Sgp4Satellite,simulateLaunch,sweepLaunchGuidance,matrixMul,vec3,LinearKalmanFilter,
 ];
 void check;

@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const repo=fileURLToPath(new URL("../",import.meta.url));
 const tmp=await mkdtemp(join(tmpdir(),"openlaunch-packed-"));
-const names=["core","earth","raster","launches","orbit","engineering"];
+const names=["core","earth","raster","launches","orbit","math","engineering"];
 const tests={
  earth:{symbol:"EarthCatalogClient",absent:["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]},
  raster:{symbol:"readCogWindowUrl",absent:["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]},
@@ -39,6 +39,7 @@ try{
     await writeFile(join(consumer,"package.json"),JSON.stringify({name:"consumer-"+name,private:true,type:"module"}));
     const installs=[archives.core];
     if(name==="orbit" || name==="engineering")installs.push(satelliteArchive,archives.orbit);
+    if(name==="engineering")installs.push(archives.math);
     if(name!=="orbit")installs.push(archives[name]);
     npm(["install","--offline","--ignore-scripts","--no-audit","--no-fund","--package-lock=false",...installs],consumer);
     const code=`import { ${test.symbol} } from "@openlaunch/${name}"; if(typeof ${test.symbol}!=="function")throw new Error("Missing export");`;

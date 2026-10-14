@@ -24,7 +24,7 @@ const packages = {
     entries: ["cache", "errors", "http", "query", "types", "utils", "mappers", "resources/base", "resources/raw", "resources/generic"],
   },
   earth: {
-    entries: ["modular/earth", "intelligence/map-layers", "providers/gibs", "providers/meteosat", "providers/firms", "providers/sentinel5p", "providers/space-video", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "eo/products", "eo/scenes", "eo/download"],
+    entries: ["modular/earth", "intelligence/map-layers", "intelligence/layer-health", "providers/gibs", "providers/meteosat", "providers/firms", "providers/sentinel5p", "providers/space-video", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "eo/products", "eo/scenes", "eo/download"],
   },
   raster: {
     entries: ["eo/index", "geo/index"],
@@ -35,6 +35,9 @@ const packages = {
   orbit: {
     entries: ["orbit/index", "traffic/index", "sensors/index", "scenario/index", "providers/celestrak"],
   },
+  math: {
+    entries: ["science/vector", "science/matrix", "science/quaternion", "science/numerics", "science/statistics", "science/units", "science/control", "science/navigation"],
+  },
   engineering: {
     entries: ["science/index", "trajectory/index", "mission/index"],
   },
@@ -42,9 +45,11 @@ const packages = {
 
 const coreModules = new Set(packages.core.entries);
 const orbitPrefixes = ["orbit/", "traffic/", "sensors/", "scenario/"];
+const mathModules = new Set(packages.math.entries);
 const orbitEntries = new Set(packages.orbit.entries);
 const mapping = (packageName, file) => {
   if (packageName !== "core" && coreModules.has(file)) return "core";
+  if (packageName === "engineering" && mathModules.has(file)) return "math";
   if (packageName === "engineering" && (orbitPrefixes.some(p=>file.startsWith(p)) || file === "providers/celestrak")) return "orbit";
   return null;
 };
