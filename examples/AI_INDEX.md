@@ -1,5 +1,16 @@
 # AI / LLM indexing guide for OpenLaunch examples
 
+## v1.2 live satellite data: sources, stream and verification
+
+- `SpaceMapClient` from `@openlaunch/earth` exposes `layers()` and web-safe descriptors for 18 sources in four groups.
+- NASA GIBS WMTS daily imagery: `maps.nasaDailyTimeline`, `maps.gibs.fetchTile`.
+- Meteosat weather WMS: `maps.meteosatCapabilities`, `maps.meteosat.fetchMap`.
+- FIRMS real wildfire hotspot candidates: `maps.activeFires` using backend MAP_KEY.
+- Sentinel-5P atmosphere: `maps.airQuality` using Copernicus OAuth; outputs colorized image, NOT ground concentration.
+- Official NASA ISS / EUMETSAT Meteosat player links: `maps.videoStream`; not owned streams, uptime unverified.
+- Per-scene time and actual declared pixel GSD: `maps.sceneMetadata`, `maps.sceneFreshness`.
+- Examples: `examples/18-live-earth/`; docs: `docs/LIVE_EARTH_V1_2.md`.
+
 ## Package identity
 
 `openlaunch-sdk` is a TypeScript space-computation SDK that combines:
