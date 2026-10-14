@@ -46,7 +46,14 @@ export class NasaFirmsClient{
     if(!Number.isInteger(maxRows)||maxRows<1||maxRows>100_000)throw new RangeError("Invalid FIRMS maxRows");
     if(options.date!==undefined&&!/^\d{4}-\d{2}-\d{2}$/.test(options.date))throw new RangeError("FIRMS date must use YYYY-MM-DD");
     const url=`${ENDPOINT}/${encodeURIComponent(this.key)}/${source}/${bounds.join(",")}/${days}${options.date?"/"+options.date:""}`;
-    const result=await boundedProviderGet(url,{...this.options,maxBytes:this.options.maxBytes??8*1024*1024});
+    // FIRMS sends MAP_KEY in URL path. Never leak that secret in errors or logs.
+    let result:Awaited<ReturnType<typeof boundedProviderGet>>;
+    try {
+      result=await boundedProviderGet(url,{...this.options,maxBytes:this.options.maxBytes??8*1024*1024});
+    } catch(error) {
+      const detail=(error instanceof Error?error.message:String(error)).replaceAll(this.key,"[REDACTED]");
+      throw new Error("NASA FIRMS request failed: "+detail);
+    }
     const csv=new TextDecoder().decode(result.bytes);
     if(/<html|<!doctype/i.test(csv.slice(0,200)))throw new Error("FIRMS returned HTML instead of CSV");
     const parsed=parseFirmsCsv(csv,{bounds,maxRows});
