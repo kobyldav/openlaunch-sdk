@@ -73,7 +73,7 @@ test("Monolith remains backward-compatible and distinct from modular packages",a
   assert.equal(typeof whole.readCogWindowUrl,"function");
   const pkg=JSON.parse(await readFile(path.join(root,"package.json"),"utf8"));
   assert.deepEqual(pkg.workspaces,["packages/*"]);
-  assert.equal(pkg.version,"1.1.0");
+  assert.equal(pkg.version,"1.2.0");
 });
 test("Package build-report shows isolated module sizes",async()=>{
   const report=JSON.parse(await readFile(path.join(root,"packages/build-report.json"),"utf8"));
