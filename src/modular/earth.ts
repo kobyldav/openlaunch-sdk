@@ -30,10 +30,7 @@ export class EarthCatalogClient {
     this.planetaryComputer = new PlanetaryComputerClient(options.planetaryComputer);
     this.weather = new OpenMeteoClient(options.weather);
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
-    this.maps = new SpaceMapClient({
-      ...(options.copernicus ? {copernicus:options.copernicus}:{}),
-      ...(options.planetaryComputer ? {planetaryComputer:options.planetaryComputer}:{}),
-    });
+    this.maps = new SpaceMapClient({copernicusClient:this.copernicus,planetaryComputerClient:this.planetaryComputer});
   }
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
     return this.observations.discover(options);
