@@ -103,7 +103,7 @@ test("Sentinel-5P color scripts whitelist official bands and do not confuse colu
   const s=s5pVisualScript("NO2");
   assert.match(s,/input:\["NO2","dataMask"\]/);
   assert.match(s,/sampleType:"AUTO"/);
-  assert.throws(()=>s5pVisualScript("evalscript\");throw new Error"),/Unsupported/);
+  assert.throws(()=>s5pVisualScript("invalid-injection"),/Unsupported/);
   const d=buildProcessRequest({area:bbox(12,48,19,52),dataType:"sentinel-5p-l2",
     from:"2026-10-13T00:00:00Z",to:"2026-10-13T23:00:00Z",
     evalscript:s,width:256,height:256,minQa:75,timeliness:"NRTI"});
