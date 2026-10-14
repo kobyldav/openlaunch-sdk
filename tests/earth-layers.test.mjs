@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { earthLayerCatalog,nasaGibsTileTemplate,nasaGibsCapabilitiesUrl,issLiveSource,parseFirmsCsv,fetchFirmsHotspots,discoverAtmosphereScenes,bbox,PlanetaryComputerClient } from "../dist/index.js";
+import { earthLayerCatalog,nasaGibsTileTemplate,nasaGibsCapabilitiesUrl,issLiveSource,parseFirmsCsv,fetchFirmsHotspots,discoverAtmosphereScenes,eumetviewGetMapUrl,eumetviewCapabilitiesUrl,sentinel5pProcessInput,bbox,PlanetaryComputerClient } from "../dist/index.js";
 import { EarthCatalogClient } from "@openlaunch/earth";
 test("Earth layer switch registry is honest about status and freshness",()=>{
  const list=earthLayerCatalog();assert.ok(list.length>=13);assert.equal(new Set(list.map(x=>x.id)).size,list.length);
- assert.equal(list.find(x=>x.id==="meteosat-clouds").implemented,false);
+ assert.equal(list.find(x=>x.id==="meteosat-clouds").implemented,true);
  assert.equal(list.find(x=>x.id==="iss-live-camera").acquisitionTime,null);
  assert.equal(list.find(x=>x.id==="sentinel-5p-no2").method,"stac");
  assert.ok(list.every(x=>x.acquisitionTime===null && x.spatialResolutionM===null));
@@ -47,4 +47,12 @@ test("Earth standalone facade exposes layer interface",()=>{
  const sdk=new EarthCatalogClient();
  assert.ok(sdk.layers.catalog().length>5);
  assert.equal(sdk.layers.issVideo().id,"iss-live-camera");
+});
+
+test("EUMETView GetMap URL requires actual layer and precise bounds",()=>{
+ const url=eumetviewGetMapUrl({layer:"some:configured_layer",bounds3857:[1200000,6200000,1900000,6900000],width:512,height:512,time:"2026-10-13T12:00:00Z"});
+ assert.match(url,/REQUEST=GetMap/);assert.match(url,/TIME=2026-10-13T12%3A00%3A00Z/);
+ assert.match(eumetviewCapabilitiesUrl(),/GetCapabilities/);
+ assert.throws(()=>eumetviewGetMapUrl({layer:"../foo",bounds3857:[0,0,1,1],width:512,height:512}),/Invalid EUMETView/);
+ assert.equal(sentinel5pProcessInput("NO2").dataType,"sentinel-5p-l2");
 });
