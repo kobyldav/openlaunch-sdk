@@ -89,7 +89,7 @@ test("FIRMS requires server-only map key and returns actual area observations",a
   let called=0;
   const client=new NasaFirmsClient("TESTMAPKEY_123",{fetch:async(url)=>{
     called++;
-    assert.match(url,/\/api\/area\/csv\/TESTMAPKEY_123\/VIIRS_SNPP_NRT\/12,48,19,52\/2/);
+    assert.match(url,/\/api\/area\/csv\/TESTMAPKEY_123\/VIIRS_NOAA21_NRT\/12,48,19,52\/2/);
     return new Response("latitude,longitude,acq_date,acq_time,satellite,instrument\n50,14,2026-10-13,2350,NPP,VIIRS\n",{headers:{"content-type":"text/csv"}});
   }});
   const r=await client.hotspots([12,48,19,52],{days:2});
