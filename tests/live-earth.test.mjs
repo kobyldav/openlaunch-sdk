@@ -159,3 +159,27 @@ test("Both OpenLaunch and standalone EarthCatalogClient expose map layers",()=>{
   assert.equal(new OpenLaunch().earth.maps.layers().length,18);
   assert.equal(new EarthCatalogClient().maps.layers().length,18);
 });
+
+test("NASA dated frame timeline is bounded and preserves requested dates only",()=>{
+  const sdk=new SpaceMapClient();
+  const frames=sdk.nasaDailyTimeline("MODIS_Terra_CorrectedReflectance_TrueColor","2026-10-10","2026-10-12");
+  assert.deepEqual(frames.map(f=>f.requestedDate),["2026-10-10","2026-10-11","2026-10-12"]);
+  assert.ok(frames.every(f=>f.verifiedAvailable===false&&f.observedAt===null));
+  assert.throws(()=>sdk.nasaDailyTimeline(GIBS_PRESETS[0].id,"2026-01-01","2026-10-01"),/maxDays/);
+  assert.throws(()=>sdk.nasaDailyTimeline(GIBS_PRESETS[0].id,"2026-10-12","2026-10-10"),/reversed/);
+});
+test("STAC scene detail reports only provider-declared pixel sizes and cloud metadata",()=>{
+  const sdk=new SpaceMapClient();
+  const scene={
+    type:"Feature",id:"S2-CZECHIA",collection:"sentinel-2-l2a",geometry:null,
+    properties:{datetime:"2026-10-12T10:15:00Z","eo:cloud_cover":12},
+    assets:{B04:{href:"https://trusted.invalid/red.tif",type:"image/tiff",roles:["data"],gsd:10},
+            thumbnail:{href:"https://trusted.invalid/preview.jpg",type:"image/jpeg",roles:["thumbnail"]}},
+  };
+  const detail=sdk.sceneMetadata(scene,new Date("2026-10-14T10:15:00Z"));
+  assert.deepEqual(detail.providerResolutionMetres,[10]);
+  assert.equal(detail.cloudCoverPercent,12);
+  assert.equal(detail.freshness.observationTime,"2026-10-12T10:15:00.000Z");
+  assert.equal(detail.freshness.freshness,"stale");
+  assert.equal(detail.availableAssets,2);
+});
