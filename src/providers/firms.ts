@@ -37,7 +37,7 @@ export class NasaFirmsClient{
       bounds[0]! < -180||bounds[2]!>180||bounds[1]! < -90||bounds[3]!>90||
       bounds[0]!>=bounds[2]!||bounds[1]!>=bounds[3]!)
       throw new RangeError("Invalid FIRMS longitude/latitude bounding box");
-    const source=options.source??"VIIRS_SNPP_NRT";
+    const source=options.source??"VIIRS_NOAA21_NRT";
     const sources:readonly string[]=["VIIRS_SNPP_NRT","VIIRS_NOAA20_NRT","VIIRS_NOAA21_NRT","MODIS_NRT"];
     if(!sources.includes(source))throw new RangeError("Unknown FIRMS instrument source");
     const days=options.days??1;
