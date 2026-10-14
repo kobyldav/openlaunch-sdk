@@ -98,7 +98,7 @@ test("FIRMS requires server-only map key and returns actual area observations",a
   assert.equal(r.observations[0].acquiredAt,"2026-10-13T23:50:00.000Z");
   await assert.rejects(client.hotspots([12,48,19,52],{days:6}),/between 1 and 5/);
   assert.throws(()=>new NasaFirmsClient("x"),/MAP_KEY/);
-  await assert.rejects(new SpaceMapClient().activeFires([12,48,19,52]),/MAP_KEY/);
+  assert.throws(()=>new SpaceMapClient().activeFires([12,48,19,52]),/MAP_KEY/);
 });
 test("Sentinel-5P color scripts whitelist official bands and do not confuse column with surface pollution",()=>{
   const s=s5pVisualScript("NO2");
@@ -121,7 +121,7 @@ test("Sentinel-5P renders actual Copernicus provider PNG response, labels timest
   const r=await s5p.render({area:bbox(14,49,15,50),from:"2026-10-12T00:00:00Z",to:"2026-10-13T00:00:00Z",species:"NO2",minQa:75,width:256,height:256});
   assert.deepEqual([...r.bytes],[137,80,78,71]);
   assert.equal(r.unit,"mol/m²");assert.equal(r.observedAt,null);
-  assert.match(r.caution,/not ground-level concentration/);
+  assert.match(r.caution,/not surface concentrations/);
   assert.equal(observed[0].body.input.data[0].type,"sentinel-5p-l2");
 });
 test("S5P STAC lookup delegates to real Copernicus collection rather than fake pixels",async()=>{
