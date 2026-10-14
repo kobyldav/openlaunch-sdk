@@ -126,7 +126,7 @@ test("Sentinel-5P renders actual Copernicus provider PNG response, labels timest
 });
 test("S5P STAC lookup delegates to real Copernicus collection rather than fake pixels",async()=>{
   const cp=new CopernicusClient({fetch:async(url,options)=>{
-    assert.match(url,/\/v1\/search$/);
+    assert.match(String(url),/\/v1\/search$/);
     assert.equal(JSON.parse(options.body).collections[0],"sentinel-5p-l2-no2-offl");
     return new Response(JSON.stringify({type:"FeatureCollection",features:[]}),{headers:{"content-type":"application/json"}});
   }});
