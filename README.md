@@ -57,7 +57,7 @@ OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. I
 | --- | --- | --- |
 | `@openlaunch/core` | Typed HTTP requests, caching, rate limits, retries, telemetry, normalized models | None |
 | `@openlaunch/earth` | STAC search, Copernicus, Planetary Computer, weather, AOI discovery | `@openlaunch/core` |
-| `@openlaunch/raster` | GeoTIFF/COG reads, spatial clips, NDVI, quality masks, change analysis, DEM mesh | `@openlaunch/core` |
+| `@openlaunch/raster` | GeoTIFF/COG reads, spatial clips, NDVI / NDWI / NDMI / NBR, quality masks, change analysis, DEM mesh | `@openlaunch/core` |
 | `@openlaunch/launches` | Launch Library 2, NASA, launch resources and normalization | `@openlaunch/core` |
 | `@openlaunch/orbit` | TLE/OMM, SGP4/SDP4, ground passes, space-traffic checks, swath/CZML | `@openlaunch/core`, `satellite.js` |
 | `@openlaunch/engineering` | Rocket and trajectory simulations, mission targeting, spacecraft math | `@openlaunch/core`, `@openlaunch/orbit` |
