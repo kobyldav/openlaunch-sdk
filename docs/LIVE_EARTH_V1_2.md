@@ -29,7 +29,7 @@ const video = maps.layers("live-video");
 | --- | --- | --- |
 | observations | sentinel2-optical, sentinel1-radar, landsat-temperature | Copernicus / Planetary Computer STAC |
 | observations | meteosat-weather | Live EUMETView WMS capabilities and map requests |
-| observations | nasa-modis-terra, nasa-viirs-snpp | NASA GIBS dated WMTS imagery |
+| observations | nasa-modis-terra, nasa-viirs-noaa20 | NASA GIBS dated WMTS imagery |
 | analyses | vegetation-ndvi, water-ndwi, moisture-ndmi, burn-scar-nbr | Raster-derived scientific index grids: `ndviRaster`, `ndwiRaster`, `ndmiRaster`, `nbrRaster` |
 | analyses | atmosphere-no2, atmosphere-so2 | Sentinel-5P Level 2 Copernicus Process API |
 | analyses | fires-viirs | NASA FIRMS authenticated hotspot API |
