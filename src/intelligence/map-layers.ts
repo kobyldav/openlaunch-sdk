@@ -59,6 +59,8 @@ export interface SpaceMapOptions {
   copernicus?:CopernicusOptions;
   planetaryComputer?:PlanetaryComputerOptions;
   firmsMapKey?:string;
+  copernicusClient?:CopernicusClient;
+  planetaryComputerClient?:PlanetaryComputerClient;
 }
 export interface SceneFreshness {
   observationTime:string|null;
@@ -79,8 +81,8 @@ export class SpaceMapClient{
   private readonly firms:NasaFirmsClient|null;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
-    const copernicus=new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
-    const pc=new PlanetaryComputerClient({...options.planetaryComputer,...(options.fetch?{fetch:options.fetch}:{})});
+    const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
+    const pc=options.planetaryComputerClient??new PlanetaryComputerClient({...options.planetaryComputer,...(options.fetch?{fetch:options.fetch}:{})});
     this.observations=new ObservationDiscoveryClient(copernicus,pc);
     this.gibs=new NasaGibsClient(http);
     this.meteosat=new MeteosatClient(http);
