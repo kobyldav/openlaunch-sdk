@@ -2,11 +2,48 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.1.0 has **six independent npm workspaces** and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.2.0 builds on six independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
-[Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
+[Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** Source code for v1.1.0 is available in this repository. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.2.0 is under development on a separate feature branch; v1.1.0 remains in main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Live Earth & Satellite Map layers (v1.2.0)
+
+**One SDK for all space-related map data:** `SpaceMapClient` exposes 18 typed layers grouped into Observations, Analyses, Terrain/History and Live Video. Your frontend only renders SDK results. Satellite imagery and streams still originate from official NASA, EUMETSAT and Copernicus services.
+
+| Added capability | SDK endpoint | Data type |
+| --- | --- | --- |
+| Meteosat weather/clouds | `maps.meteosatCapabilities()`, `maps.meteosat.fetchMap()` | EUMETView WMS |
+| MODIS Terra/Aqua and VIIRS imagery | `maps.nasaDailyTiles()`, `maps.nasaDailyTimeline()`, `maps.gibs.fetchTile()` | NASA GIBS WMTS/XYZ |
+| NO₂, SO₂, CO, CH₄, ozone, HCHO and aerosols | `maps.airQuality()` | Sentinel-5P Copernicus PNG |
+| Near-real-time fire detections | `maps.activeFires()` | NASA FIRMS VIIRS/MODIS points |
+| Official ISS and Meteosat video | `maps.videoStream()` | Third-party video embed descriptors |
+| True metadata for scene detail cards | `maps.sceneMetadata()`, `maps.sceneFreshness()` | STAC pixel size, UTC time, cloud %, freshness |
+
+```ts
+import { SpaceMapClient } from "@openlaunch/earth";
+
+const maps = new SpaceMapClient();
+// All four of the planned selector categories are filled by the SDK:
+const menu = maps.layers();
+const current = maps.layers("observations");
+const daily = maps.nasaDailyTimeline(
+  "MODIS_Terra_CorrectedReflectance_TrueColor", "2026-10-10", "2026-10-14"
+);
+const iss = maps.videoStream("iss-earth-live"); // official watch + iframe URL
+console.log(menu, current, daily, iss);
+```
+
+Or with the backward-compatible umbrella API: `new OpenLaunch().earth.maps.layers()`.
+
+**Important:** `LIVE VIDEO` is an external provider stream, never a geo-aligned map raster. Meteosat near-real-time frames have provider delay; NOAA/NASA daily tiles are not continuous. The SDK reports `observedAt:null` and `liveVerified:false` until source-specific evidence exists — no fabricated live status. NASA FIRMS MAP_KEY and Copernicus OAuth credentials must stay on your **backend**, not in public web code.
+
+**Source release:** v1.2.0 is on `feature/live-earth-layers-v1.2.0`, with a draft PR. The `main` release remains v1.1.0 until explicit merge. The six scoped `@openlaunch/*` npm packages are still not published to the registry.
+
+Details and security/integration examples: [Live Earth v1.2 architecture](docs/LIVE_EARTH_V1_2.md). Try offline: `npm run example:live-earth`.
+
+---
 
 ## Why OpenLaunch?
 
@@ -179,7 +216,7 @@ npm run check                # source/examples TS + regression tests + offline d
 npm run test:packages        # public ESM/CommonJS and TypeScript workspace tests
 npm run test:packed          # isolated installs from real locally built npm archives
 npm run pack:check:packages  # validate all six npm package tarballs
-npm run example:raster       # actual TIFF byte decoder, NDVI, AOI and DEM demo
+npm run example:raster       # actual TIFF byte decoder, NDVI, AOI and DEM demo\nnpm run example:live-earth   # offline satellite map selector, sources and streams
 npm run example:mission      # synthetic EO catalog + mission diagnostic
 npm run example:launch       # generic staged launch/Max-Q simulation
 ```
@@ -234,6 +271,6 @@ Generated `dist/`, `dist-cjs/` and `packages/*/dist/` outputs are build artifact
 | [Examples](examples/README.md) | Typed cookbook and demos |
 | [Changelog](CHANGELOG.md) | Version history |
 
-## License and contribution
+The live Earth source-provider extension is documented in [docs/LIVE_EARTH_V1_2.md](docs/LIVE_EARTH_V1_2.md).\n\n## License and contribution
 
 **MIT** — see [LICENSE](LICENSE). Issues and pull requests are welcome. Keep tests green on the supported Node versions, avoid breaking legacy `openlaunch-sdk` imports and clearly label simulated vs provider-observed data. The `@openlaunch` npm scope must be verified and intentionally published before independent consumers can install these packages from the registry.
