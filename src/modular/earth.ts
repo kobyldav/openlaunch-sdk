@@ -1,3 +1,4 @@
+import { earthLayerCatalog, nasaGibsTileTemplate, issLiveSource, fetchFirmsHotspots } from "../intelligence/layers.js";
 import { CopernicusClient, type CopernicusOptions } from "../providers/copernicus.js";
 import { PlanetaryComputerClient, type PlanetaryComputerOptions } from "../providers/planetary-computer.js";
 import { OpenMeteoClient, type OpenMeteoOptions } from "../providers/openmeteo.js";
@@ -29,6 +30,7 @@ export class EarthCatalogClient {
     this.weather = new OpenMeteoClient(options.weather);
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
   }
+  readonly layers = { catalog: earthLayerCatalog, nasaTile: nasaGibsTileTemplate, issVideo: issLiveSource, fires: fetchFirmsHotspots };
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
     return this.observations.discover(options);
   }
