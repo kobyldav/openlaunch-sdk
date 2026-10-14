@@ -8,6 +8,7 @@ import {CopernicusClient, type CopernicusOptions} from "../providers/copernicus.
 import {PlanetaryComputerClient, type PlanetaryComputerOptions} from "../providers/planetary-computer.js";
 import {ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport} from "./observations.js";
 import type {StacItem} from "../providers/stac.js";
+import {inspectEoProduct} from "../eo/products.js";
 import type {BoundedHttpOptions} from "../providers/eo-bounded.js";
 
 export type MapCategory="observations"|"analyses"|"terrain-history"|"live-video";
@@ -100,6 +101,18 @@ export class SpaceMapClient{
   }
   videoStream(id:SpaceStreamId):SpaceStreamDescriptor{return this.videos.get(id);}
   nasaDailyTiles(layer:GibsLayerId,date:Date|string):GibsTileDescriptor{return this.gibs.tileTemplate(layer,date);}
+  /** UTC-day playback frames: requested days only, not confirmed acquisitions. */
+  nasaDailyTimeline(layer:GibsLayerId,from:Date|string,to:Date|string,maxDays=31):GibsTileDescriptor[]{
+    const fromDate=new Date(from),toDate=new Date(to);
+    if(!Number.isFinite(fromDate.getTime())||!Number.isFinite(toDate.getTime())||
+      !Number.isInteger(maxDays)||maxDays<1||maxDays>366)
+      throw new RangeError("Invalid NASA GIBS date window or maxDays");
+    const start=Date.UTC(fromDate.getUTCFullYear(),fromDate.getUTCMonth(),fromDate.getUTCDate());
+    const end=Date.UTC(toDate.getUTCFullYear(),toDate.getUTCMonth(),toDate.getUTCDate());
+    const count=Math.floor((end-start)/86_400_000)+1;
+    if(count<1||count>maxDays)throw new RangeError("GIBS timeline exceeds maxDays or is reversed");
+    return Array.from({length:count},(_,i)=>this.nasaDailyTiles(layer,new Date(start+i*86_400_000)));
+  }
   meteosatCapabilities():Promise<{layers:MeteosatWmsLayer[];fetchedAt:string;endpoint:string}>{return this.meteosat.capabilities();}
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
@@ -110,6 +123,21 @@ export class SpaceMapClient{
     return this.firms.hotspots(bounds,options);
   }
   airQuality(request:S5pRasterRequest):ReturnType<Sentinel5pClient["render"]>{return this.s5p.render(request);}
+  /** Actual per-product resolution and temporal provenance for detail cards. */
+  sceneMetadata(item:StacItem,now:Date=new Date()):{
+    id:string;collection:string|null;providerResolutionMetres:number[];
+    kinds:string[];availableAssets:number;cloudCoverPercent:number|null;freshness:SceneFreshness;
+  }{
+    const product=inspectEoProduct(item);
+    const clouds=item.properties["eo:cloud_cover"];
+    return {
+      id:item.id,collection:item.collection??null,
+      providerResolutionMetres:[...product.availableResolutionsM],
+      kinds:[...product.availableKinds],availableAssets:product.assets.length,
+      cloudCoverPercent:typeof clouds==="number"&&Number.isFinite(clouds)?clouds:null,
+      freshness:this.sceneFreshness(item,now),
+    };
+  }
   /** STAC acquisition timestamp only. This never indicates live stream uptime. */
   sceneFreshness(item:StacItem,now:Date=new Date(),recentWithinMinutes=360):SceneFreshness{
     const time=item.properties.datetime??item.properties.start_datetime;
