@@ -65,7 +65,7 @@ export class EarthIntelligenceClient {
     this.planetaryComputer = options.planetaryComputer ?? new PlanetaryComputerClient();
     this.weather = options.weather ?? new OpenMeteoClient();
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
-    this.maps = new SpaceMapClient();
+    this.maps = new SpaceMapClient({copernicusClient:this.copernicus,planetaryComputerClient:this.planetaryComputer});
   }
 
   downloadPreview(item: StacItem, options: EoDownloadOptions = {}): Promise<EoAssetDownload> {
