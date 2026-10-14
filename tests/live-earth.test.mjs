@@ -5,6 +5,7 @@ import {
   NasaGibsClient, GIBS_PRESETS, MeteosatClient, meteosatWmsMapUrl,
   NasaFirmsClient, parseFirmsCsv, Sentinel5pClient, s5pVisualScript,
   SpaceVideoClient, buildProcessRequest, CopernicusClient, METEOSAT_EUROPE_STREAM,
+  ndwiRaster,ndmiRaster,nbrRaster,
 } from "../dist/index.js";
 import { EarthCatalogClient } from "../dist/modular/earth.js";
 
@@ -182,4 +183,18 @@ test("STAC scene detail reports only provider-declared pixel sizes and cloud met
   assert.equal(detail.freshness.observationTime,"2026-10-12T10:15:00.000Z");
   assert.equal(detail.freshness.freshness,"stale");
   assert.equal(detail.availableAssets,2);
+});
+
+test("NDWI NDMI NBR produce georeferenced, masked raster map values",()=>{
+  const a={width:3,height:1,crs:"EPSG:4326",transform:[14,.01,0,51,0,-.01]};
+  const green={...a,values:new Float64Array([.8,.4,NaN])};
+  const nir={...a,values:new Float64Array([.2,.6,.7])};
+  const swir={...a,values:new Float64Array([.1,.2,.3])};
+  const water=ndwiRaster(green,nir),moisture=ndmiRaster(nir,swir),burn=nbrRaster(nir,swir);
+  assert.equal(water.source,"NDWI");
+  assert.ok(Math.abs(water.values[0]-.6)<1e-12);
+  assert.ok(Math.abs(moisture.values[0]-(1/3))<1e-12);
+  assert.equal(burn.source,"NBR");
+  assert.ok(Number.isNaN(water.values[2]));
+  assert.deepEqual(burn.transform,a.transform);
 });
