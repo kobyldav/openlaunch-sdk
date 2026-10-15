@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.4.0 (development) — Meteosat WMS Time-aware timeline
+
+- XML capabilities parser now extracts nested layer title, exact ID, inherited Time dimension and derived WMS chronology.
+- `meteosatAdvertisedTimes()` bounds and sorts timestamps, supports explicit ISO UTC dates and fixed-duration intervals without inventing observations.
+- `MeteosatClient.timeline()` and `SpaceMapClient.meteosatTimeline()` return map-ready descriptors with `verifiedAcquisition:false` and `verifiedAvailable:false`.
+- Opt-in real capabilities smoke, fully offline deterministic Fedora smoke and comprehensive regression tests.
+- Package version alignment across seven independent SDK workspaces, preserving legacy exports.
+
+
 ## 1.3.0 (development) — Space Data Foundation
 
 - v1.2 Live Earth implementation from PR #11 is the single unified 18-layer SDK registry; no duplicate provider client implementation from PR #12

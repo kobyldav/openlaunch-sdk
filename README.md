@@ -2,11 +2,29 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.2.0 builds on six independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.4.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.2.0 is under development on a separate feature branch; v1.1.0 remains in main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.4.0 Meteosat timeline features are developed in a feature branch; v1.3.0 is merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Meteosat provider-time timeline (v1.4 development)
+
+EUMETView WMS GetCapabilities now supplies actual advertised Time dimensions, inherited across nested WMS layers. `SpaceMapClient.meteosatTimeline()` converts explicit timestamps and fixed-cadence ISO8601 intervals into a bounded animation list, with WMS URLs for each advertised time. This **is not proof of acquisition, image availability or video**.
+
+```ts
+const maps = new SpaceMapClient();
+const capabilities = await maps.meteosatCapabilities();
+const layer = capabilities.layers.find(x=>x.timeDimension);
+if (!layer) throw new Error("No time-aware Meteosat layer advertised");
+const frames = await maps.meteosatTimeline({
+  layer: layer.id, bounds3857:[1300000,6200000,1900000,6900000],
+  width:256,height:256,maxFrames:12
+});
+console.log(frames.frames.map(x=>x.advertisedTime));
+```
+
+Offline local Fedora smoke: `npm run example:meteosat-timeline`. Opt-in live provider capability check: `METEOSAT_LIVE=1 npm run example:meteosat-timeline` (requires EUMETView access; no guarantee a public timestamp is available). Technical guide: [METEOSAT_TIMELINE_V1_4.md](docs/METEOSAT_TIMELINE_V1_4.md).
 
 ## Live Earth & Satellite Map layers (v1.2.0)
 
