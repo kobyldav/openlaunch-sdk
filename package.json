@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.3.0",
-  "description": "Modular Earth observation, space livestream metadata, imagery, satellite tracking and optional engineering",
+  "version": "1.4.0",
+  "description": "OpenLaunch modular space data SDK with time-aware Meteosat timelines, NASA GIBS, imagery, orbits and optional engineering",
   "keywords": [
     "space",
     "spaceflight",
@@ -161,7 +161,8 @@
     "pack:check:packages": "node scripts/pack-workspaces.mjs",
     "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit",
     "test:packed": "node scripts/test-packed-consumers.mjs",
-    "example:live-earth": "npm run build && node scripts/live-earth-demo.mjs"
+    "example:live-earth": "npm run build && node scripts/live-earth-demo.mjs",
+    "example:meteosat-timeline": "npm run build && node scripts/meteosat-timeline-smoke.mjs"
   },
   "engines": {
     "node": ">=18"
