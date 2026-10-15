@@ -4,6 +4,12 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
 
+## v1.2 Satellite maps and Live Earth
+
+`npm run example:live-earth` prints the 18-layer SDK catalog, official NASA GIBS map templates, EUMETView WMS request, sample FIRMS parsing and official stream descriptors **without network calls**.
+
+Five new typed examples in `examples/18-live-earth` cover selector metadata, dated GIBS maps, server-only NASA FIRMS, Meteosat WMS/video, and Sentinel-5P NO2. See [Live Earth v1.2](../docs/LIVE_EARTH_V1_2.md).
+
 ## v1.0 Real GeoTIFF & Raster Analytics
 
 `npm run example:raster` demonstrates actual binary TIFF parsing, NDVI, AOI clipping, NDVI change statistics and a small DEM triangle mesh. The input is explicitly generated offline; see `examples/17-raster` for trusted remote COG byte-range, calibration, cloud masking, change detection and local 3D examples.

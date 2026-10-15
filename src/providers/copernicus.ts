@@ -27,6 +27,9 @@ export interface CopernicusProcessOptions {
   height?: number;
   format?: "image/png" | "image/jpeg" | "image/tiff";
   mosaickingOrder?: "mostRecent" | "leastRecent" | "leastCC";
+  /** Sentinel-5P QA threshold, percent 0..100. */
+  minQa?: number;
+  timeliness?: "NRTI" | "OFFL" | "RPRO";
   maxCloudCoverage?: number;
 }
 
@@ -217,6 +220,7 @@ export function buildProcessRequest(options: CopernicusProcessOptions): Record<s
     timeRange: { from: iso(options.from), to: iso(options.to) },
   };
   if (options.mosaickingOrder) dataFilter.mosaickingOrder = options.mosaickingOrder;
+  if (options.timeliness) dataFilter.timeliness = options.timeliness;
   if (options.maxCloudCoverage !== undefined) dataFilter.maxCloudCoverage = options.maxCloudCoverage;
 
   return {
@@ -231,7 +235,9 @@ export function buildProcessRequest(options: CopernicusProcessOptions): Record<s
           geometry: options.area.geometry,
           properties: { crs: "http://www.opengis.net/def/crs/OGC/1.3/CRS84" },
         },
-      data: [{ type: options.dataType, dataFilter }],
+      data: [{ type: options.dataType, dataFilter,
+        ...(options.minQa !== undefined ? { processing: { minQa: options.minQa } } : {}),
+      }],
     },
     output: {
       width: options.width ?? 1024,

@@ -1,4 +1,5 @@
 import type { AreaOfInterest } from "../geo/types.js";
+import { SpaceMapClient } from "./map-layers.js";
 import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type ObservationDiscoveryReport } from "./observations.js";
 import { downloadEoPreview, downloadEoAsset, type EoAssetDownload, type EoDownloadOptions } from "../eo/download.js";
 import { inspectEoProduct } from "../eo/products.js";
@@ -57,12 +58,14 @@ export class EarthIntelligenceClient {
   readonly planetaryComputer: PlanetaryComputerClient;
   readonly weather: OpenMeteoClient;
   readonly observations: ObservationDiscoveryClient;
+  readonly maps: SpaceMapClient;
 
   constructor(options: EarthIntelligenceOptions = {}) {
     this.copernicus = options.copernicus ?? new CopernicusClient();
     this.planetaryComputer = options.planetaryComputer ?? new PlanetaryComputerClient();
     this.weather = options.weather ?? new OpenMeteoClient();
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
+    this.maps = new SpaceMapClient({copernicusClient:this.copernicus,planetaryComputerClient:this.planetaryComputer});
   }
 
   downloadPreview(item: StacItem, options: EoDownloadOptions = {}): Promise<EoAssetDownload> {

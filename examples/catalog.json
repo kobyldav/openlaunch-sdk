@@ -1529,6 +1529,61 @@
       ],
       "network": false,
       "description": "v1.0 bounded pixel-level geospatial processing and explicit engineering limitations."
+    },
+    {
+      "path": "18-live-earth/01-layer-selector.ts",
+      "title": "Build full 18-layer web map menu without provider requests",
+      "category": "live-earth",
+      "symbols": [
+        "SpaceMapClient",
+        "layers",
+        "videoStream"
+      ],
+      "network": false,
+      "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "18-live-earth/02-gibs-day-slider.ts",
+      "title": "Daily NASA GIBS WMTS frame timeline",
+      "category": "live-earth",
+      "symbols": [
+        "nasaDailyTimeline"
+      ],
+      "network": false,
+      "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "18-live-earth/03-nasa-firms-hotspots.ts",
+      "title": "Read real NASA FIRMS VIIRS NOAA-21 hotspot points from server",
+      "category": "live-earth",
+      "symbols": [
+        "SpaceMapClient",
+        "activeFires"
+      ],
+      "network": true,
+      "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "18-live-earth/04-meteosat-wms-and-stream.ts",
+      "title": "Fetch EUMETView WMS layer identifiers and render official stream",
+      "category": "live-earth",
+      "symbols": [
+        "meteosatCapabilities",
+        "videoStream"
+      ],
+      "network": true,
+      "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "18-live-earth/05-sentinel5p-no2.ts",
+      "title": "Render Sentinel-5P NO2 quality-filtered PNG with Copernicus OAuth",
+      "category": "live-earth",
+      "symbols": [
+        "airQuality",
+        "Sentinel5pClient"
+      ],
+      "network": true,
+      "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
     }
   ]
 }

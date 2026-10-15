@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.1.0",
-  "description": "Backwards-compatible OpenLaunch umbrella SDK plus six independently installable domain workspaces.",
+  "version": "1.3.0",
+  "description": "Modular Earth observation, space livestream metadata, imagery, satellite tracking and optional engineering",
   "keywords": [
     "space",
     "spaceflight",
@@ -49,7 +49,17 @@
     "raster",
     "ndvi",
     "terrain-mesh",
-    "change-detection"
+    "change-detection",
+    "meteosat",
+    "eumetsat",
+    "gibs",
+    "viirs",
+    "firms",
+    "sentinel-5p",
+    "live-earth",
+    "satellite-video",
+    "space-observatory",
+    "satellite-layer-data"
   ],
   "license": "MIT",
   "type": "module",
@@ -132,7 +142,7 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs && node scripts/build-workspaces.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && npm run test:packages",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && node scripts/live-earth-demo.mjs && npm run test:packages",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
@@ -150,7 +160,8 @@
     "test:packages": "npm run typecheck:packages && node --test tests/packages.test.mjs",
     "pack:check:packages": "node scripts/pack-workspaces.mjs",
     "typecheck:packages": "tsc -p tsconfig.workspaces.json --noEmit",
-    "test:packed": "node scripts/test-packed-consumers.mjs"
+    "test:packed": "node scripts/test-packed-consumers.mjs",
+    "example:live-earth": "npm run build && node scripts/live-earth-demo.mjs"
   },
   "engines": {
     "node": ">=18"

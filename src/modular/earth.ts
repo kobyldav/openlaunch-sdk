@@ -5,6 +5,7 @@ import { ObservationDiscoveryClient, type ObservationDiscoveryOptions, type Obse
 import { downloadEoAsset, downloadEoPreview, type EoDownloadOptions, type EoAssetDownload } from "../eo/download.js";
 import { inspectEoProduct, type EoAssetInfo, type EoProduct } from "../eo/products.js";
 import type { StacItem } from "../providers/stac.js";
+import { SpaceMapClient } from "../intelligence/map-layers.js";
 
 /**
  * Lean entrypoint for STAC and Earth Observation discovery.
@@ -22,12 +23,14 @@ export class EarthCatalogClient {
   readonly planetaryComputer: PlanetaryComputerClient;
   readonly weather: OpenMeteoClient;
   readonly observations: ObservationDiscoveryClient;
+  readonly maps: SpaceMapClient;
 
   constructor(options: EarthCatalogOptions = {}) {
     this.copernicus = new CopernicusClient(options.copernicus);
     this.planetaryComputer = new PlanetaryComputerClient(options.planetaryComputer);
     this.weather = new OpenMeteoClient(options.weather);
     this.observations = new ObservationDiscoveryClient(this.copernicus, this.planetaryComputer);
+    this.maps = new SpaceMapClient({copernicusClient:this.copernicus,planetaryComputerClient:this.planetaryComputer});
   }
   discoverObservations(options: ObservationDiscoveryOptions): Promise<ObservationDiscoveryReport> {
     return this.observations.discover(options);

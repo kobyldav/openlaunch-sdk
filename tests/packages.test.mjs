@@ -6,14 +6,15 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("../", import.meta.url));
-const names=["core","earth","raster","launches","orbit","engineering"];
+const names=["core","earth","raster","launches","orbit","math","engineering"];
 const require=createRequire(import.meta.url);
 const publicFunctions={
  core:["HttpClient","MemoryCache","query"],
- earth:["EarthCatalogClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
- raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","calibrateRasterFromStac","elevationToLocalMesh"],
+ earth:["EarthCatalogClient","SpaceMapClient","NasaGibsClient","MeteosatClient","NasaFirmsClient","Sentinel5pClient","SpaceVideoClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
+ raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","ndwiRaster","ndmiRaster","nbrRaster","calibrateRasterFromStac","elevationToLocalMesh"],
  launches:["LaunchDataClient","LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
  orbit:["Sgp4Satellite","OrbitEngine","TrafficEngine"],
+ math:["vec3","matrixMul","quatNormalize","LinearKalmanFilter"],
  engineering:["simulateLaunch","sweepLaunchGuidance","idealStagedDeltaVMps"],
 };
 
@@ -55,14 +56,14 @@ test("Launches package constructs a resource without full OpenLaunch class",asyn
   assert.equal((await client.upcoming({limit:1})).results.length,0);
 });
 test("Earth, launches and raster have no satellite.js or orbit/engineering dependency",async()=>{
-  for(const n of ["earth","launches","raster"]){
+  for(const n of ["earth","launches","raster","math"]){
     const file=path.join(root,"packages",n,"package.json");
     const manifest=JSON.parse(await readFile(file,"utf8"));
     for(const unwanted of ["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]){
       assert.equal(Object.hasOwn(manifest.dependencies??{},unwanted),false,n+" unexpectedly depends on "+unwanted);
     }
     // Only modules reachable from that package's own entrypoint are packaged.
-    for(const dir of ["orbit","traffic","trajectory","science","mission"]){
+    for(const dir of (n==="math"?["orbit","traffic","trajectory","mission"]:["orbit","traffic","trajectory","science","mission"])){
       await assert.rejects(stat(path.join(root,"packages",n,"dist","esm",dir)),{code:"ENOENT"});
     }
   }
@@ -73,11 +74,11 @@ test("Monolith remains backward-compatible and distinct from modular packages",a
   assert.equal(typeof whole.readCogWindowUrl,"function");
   const pkg=JSON.parse(await readFile(path.join(root,"package.json"),"utf8"));
   assert.deepEqual(pkg.workspaces,["packages/*"]);
-  assert.equal(pkg.version,"1.1.0");
+  assert.equal(pkg.version,"1.3.0");
 });
 test("Package build-report shows isolated module sizes",async()=>{
   const report=JSON.parse(await readFile(path.join(root,"packages/build-report.json"),"utf8"));
-  assert.equal(report.length,6);
+  assert.equal(report.length,7);
   for(const item of report){
     assert.ok(item.modules>0&&item.bytes>0);
     assert.ok(item.bytes<3_000_000,item.pkg+" package unexpectedly exceeds 3 MB uncompressed");
@@ -102,4 +103,13 @@ test("Small standalone facades support one-line Earth and launch data clients",a
   });
   assert.equal((await launches.launches.upcoming({limit:1})).results.length,0);
   assert.ok(launches.config);
+});
+
+test("Engineering re-exports math without bundling math implementations",async()=>{
+ const e=JSON.parse(await readFile(path.join(root,"packages/engineering/package.json"),"utf8"));
+ assert.equal(e.dependencies["@openlaunch/math"],"^1.3.0");
+ const index=await readFile(path.join(root,"packages/engineering/dist/esm/science/index.js"),"utf8");
+ assert.match(index,/@openlaunch\/math\/internal\/science\/matrix/);
+ const m=await import("@openlaunch/math");
+ assert.equal(m.matrixMul([[2]],[[3]])[0][0],6);
 });

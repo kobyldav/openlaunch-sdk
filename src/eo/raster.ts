@@ -173,6 +173,18 @@ export function ndviRaster(red:RasterGrid,nir:RasterGrid,options:{minDenominator
   }
   return {...red,values:output,source:"NDVI",unit:"unitless"};
 }
+/** Georeferenced Normalized Difference Water Index (green - NIR)/(green + NIR). */
+export function ndwiRaster(green:RasterGrid,nir:RasterGrid):RasterGrid{
+  return {...ndviRaster(nir,green),source:"NDWI"};
+}
+/** Georeferenced vegetation moisture index (NIR - SWIR1)/(NIR + SWIR1). */
+export function ndmiRaster(nir:RasterGrid,swir1:RasterGrid):RasterGrid{
+  return {...ndviRaster(swir1,nir),source:"NDMI"};
+}
+/** Georeferenced Normalized Burn Ratio (NIR - SWIR2)/(NIR + SWIR2). */
+export function nbrRaster(nir:RasterGrid,swir2:RasterGrid):RasterGrid{
+  return {...ndviRaster(swir2,nir),source:"NBR"};
+}
 /** Follow-up minus baseline at corresponding, georeferenced pixels. */
 export function rasterDifference(baseline:RasterGrid,followup:RasterGrid):RasterDifference {
   validateRaster(baseline);validateRaster(followup);assertAligned(baseline,followup);
