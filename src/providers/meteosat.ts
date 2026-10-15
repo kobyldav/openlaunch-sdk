@@ -184,7 +184,7 @@ export function parseMeteosatCapabilities(xml:string):MeteosatWmsLayer[]{
     const parentLayer=[...stack].reverse().find(n=>n.layer)?.layer;
     const node:TagNode={tag,attrs,text:""};
     if(tag==="layer"){
-      const item:LayerNode={parent:parentLayer};
+      const item:LayerNode={...(parentLayer?{parent:parentLayer}:{})};
       node.layer=item;
       layers.push(item);
       if(layers.length>2000)throw new RangeError("Too many WMS layers");
