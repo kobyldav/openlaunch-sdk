@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.6.0 (development) — Meteosat Validated Image Cache
+
+- Added `MeteosatImageCache`: 5-minute TTL, bounded LRU byte budget, single-flight identical requests and defensive copies.
+- Integrated cache with `SpaceMapClient.meteosatPlayback()`, `probeImage()`, and direct `meteosatImage()` retrieval.
+- Image cache never retains errors, malformed images or WMS images without explicit TIME.
+- Added `meteosatCacheStats()`, `clearMeteosatCache()` and offline Fedora smoke.
+- Updated all seven packages to v1.6 development versions; compatibility retained.
+
+
 ## 1.5.0 (development) — Meteosat Frame Verification
 
 - Added bounded and sequential `SpaceMapClient.meteosatPlayback()`, selecting provider-advertised timeline frames and verifying image delivery.
