@@ -6,7 +6,7 @@ OpenLaunch v1.5.0 development builds on seven independent npm workspaces and kee
 
 [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.5 Meteosat playback is in a separate feature branch based on v1.4, while main remains on v1.3 until prior versions are accepted. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.5 Meteosat playback is in a separate feature branch based on v1.4, while v1.4 has already been merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
 
 ## Meteosat frame playback (v1.5 development)
 
@@ -14,7 +14,7 @@ OpenLaunch v1.5.0 development builds on seven independent npm workspaces and kee
 
 Offline Fedora test: `npm run example:meteosat-playback`. Detailed usage and limits: [METEOSAT_PLAYBACK_V1_5.md](docs/METEOSAT_PLAYBACK_V1_5.md).
 
-## Meteosat provider-time timeline (v1.4 development)
+## Meteosat provider-time timeline (v1.4, merged)
 
 EUMETView WMS GetCapabilities now supplies actual advertised Time dimensions, inherited across nested WMS layers. `SpaceMapClient.meteosatTimeline()` converts explicit timestamps and fixed-cadence ISO8601 intervals into a bounded animation list, with WMS URLs for each advertised time. This **is not proof of acquisition, image availability or video**.
 

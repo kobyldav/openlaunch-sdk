@@ -1,6 +1,8 @@
 # OpenLaunch v1.5 — Meteosat frame playback SDK
 
-Status: **development**, dependent on `feature/meteosat-timeline-v1.4.0` (PR #14).
+Status: **development**. Builds on the v1.4 Meteosat timeline already merged into `main` via PR #14.
+
+**Parallel work:** PR #15 proposes a metadata-only frame availability checker with the same public method name `meteosatPlayback()`. PR #16 adds actual image bytes. These PRs are alternatives and must not both be merged unchanged. Select a single SDK contract before releasing v1.5.
 
 ## New SDK-only function
 
