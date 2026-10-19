@@ -12,7 +12,7 @@ export interface MeteosatKvOptions {
   /** Used for deterministic tests. Real requests should use system time. */
   now?: () => number;
   /** Web Crypto provider injection for Node 18 runtimes without global crypto. */
-  digest?: (data: Uint8Array) => Promise<ArrayBuffer>;
+  digest?: (data: ArrayBuffer) => Promise<ArrayBuffer>;
 }
 const magic = [79, 76, 77, 49]; // OLM1
 const headerSize = 13;
@@ -51,7 +51,7 @@ function decode(buffer: ArrayBuffer): MeteosatSharedImageRecord | null {
 export class MeteosatCloudflareKvStore implements MeteosatSharedImageStore {
   private readonly prefix: string;
   private readonly now: () => number;
-  private readonly digest: (data: Uint8Array) => Promise<ArrayBuffer>;
+  private readonly digest: (data: ArrayBuffer) => Promise<ArrayBuffer>;
   constructor(private readonly kv: MeteosatKvNamespace, options: MeteosatKvOptions={}) {
     const prefix=options.prefix??"openlaunch:meteosat:v1";
     if (!/^[a-zA-Z0-9:_-]{1,96}$/.test(prefix)) throw new RangeError("Invalid KV prefix");
@@ -69,7 +69,11 @@ export class MeteosatCloudflareKvStore implements MeteosatSharedImageStore {
       parsed.searchParams.get("REQUEST")!=="GetMap" ||
       !parsed.searchParams.has("TIME"))
       throw new TypeError("Expected an official, explicitly timed EUMETView GetMap URL");
-    const sum=await this.digest(new TextEncoder().encode(url));
+    // Copy into a true ArrayBuffer for TS 5.9 Web Crypto BufferSource typing.
+    const encoded=new TextEncoder().encode(url);
+    const data=new ArrayBuffer(encoded.byteLength);
+    new Uint8Array(data).set(encoded);
+    const sum=await this.digest(data);
     const hex=[...new Uint8Array(sum)].map(x=>x.toString(16).padStart(2,"0")).join("");
     return this.prefix+":"+hex;
   }
