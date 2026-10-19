@@ -1,3 +1,4 @@
+import { checkMeteosatPlayback, type MeteosatPlaybackOptions, type MeteosatPlaybackResult } from "./meteosat-playback.js";
 import { probeSpaceImage, type SpaceImageAvailability, type SpaceImageProbe } from "./layer-health.js";
 import type {BBox,AreaOfInterest} from "../geo/types.js";
 import {NasaGibsClient, type GibsLayerId, type GibsTileDescriptor} from "../providers/gibs.js";
@@ -121,6 +122,7 @@ export class SpaceMapClient{
   }
   meteosatCapabilities():Promise<{layers:MeteosatWmsLayer[];fetchedAt:string;endpoint:string}>{return this.meteosat.capabilities();}
   meteosatTimeline(options:MeteosatTimelineOptions):Promise<MeteosatFrameTimeline>{return this.meteosat.timeline(options);}
+  meteosatPlayback(options:MeteosatPlaybackOptions):Promise<MeteosatPlaybackResult>{return checkMeteosatPlayback(this.meteosat,this.gibs,options);}
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
     return this.observations.discover(options);
