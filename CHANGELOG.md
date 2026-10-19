@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.5.0 (development) — Meteosat verified-image playback data
+
+- New bounded Meteosat WMS playback method on MeteosatClient and SpaceMapClient; fetches actual provider image bytes for provider-advertised timestamps.
+- Per-frame available/unavailable/error/skipped-budget states; PNG/JPEG magic + MIME validation and strict memory/request limits.
+- Explicit acquisition-time unknown contract even when WMS responds with an image.
+- Offline Fedora smoke test, fixture-based regression tests, seven-workspace release metadata synchronized to 1.5.
+- No browser-side special handling, stream relaying or npm publication; build remains SDK-only.
+
+
 ## 1.4.0 (development) — Meteosat WMS Time-aware timeline
 
 - XML capabilities parser now extracts nested layer title, exact ID, inherited Time dimension and derived WMS chronology.

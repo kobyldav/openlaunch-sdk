@@ -14,6 +14,7 @@ const builder = query().limit(2);
 const earth = new EarthCatalogClient();
 const maps = new SpaceMapClient();
 const earthLayers = maps.layers("observations");
+const weatherPlayback = maps.meteosatPlayback({layer:"demo:clouds",bounds3857:[0,0,100,100],width:32,height:32,maxFrames:2});
 const area = bbox(14, 49.9, 14.1, 50);
 const raster: RasterGrid = {
   width: 1, height: 1, crs: "EPSG:4326",
@@ -25,7 +26,7 @@ const orbit = OrbitEngine;
 const traffic = TrafficEngine;
 const target: OrbitTarget = { perigeeAltitudeKm: 250, apogeeAltitudeKm: 250 };
 const check: Array<unknown> = [
-  cache,http,builder,earth,maps,earthLayers,area,raster,launches,orbit,traffic,target,
+  cache,http,builder,earth,maps,earthLayers,weatherPlayback,area,raster,launches,orbit,traffic,target,
   decodeGeoTiff,readCogWindowUrl,ndviRaster,StacClient,LaunchesResource,
   Sgp4Satellite,simulateLaunch,sweepLaunchGuidance,matrixMul,vec3,LinearKalmanFilter,
 ];

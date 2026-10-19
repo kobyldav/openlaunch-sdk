@@ -39,6 +39,51 @@ export interface MeteosatFrameTimeline {
   caveats: readonly string[];
 }
 
+/** Bounded server-side frame download; no persistent cache or browser HTML dependency. */
+export interface MeteosatPlaybackOptions extends MeteosatTimelineOptions {
+  /** Max 12 advertised frames to download, oldest to newest. */
+  maxFrames?: number;
+  /** Overall retained bytes cap: 1 KiB–32 MiB. Default 12 MiB. */
+  maxTotalBytes?: number;
+}
+export interface MeteosatPlaybackFrame {
+  /** Provider-advertised WMS time, not independently proven acquisition. */
+  advertisedTime: string;
+  request: MeteosatMapDescriptor;
+  checkedAt: string;
+  status: "available" | "unavailable" | "error" | "skipped-budget";
+  contentType: string | null;
+  /** Actual fetched provider image bytes; null for all non-available statuses. */
+  image: Uint8Array | null;
+  byteLength: number;
+  acquiredAt: null;
+  verifiedAcquisition: false;
+  detail: string;
+}
+export interface MeteosatPlaybackResult {
+  provider: "EUMETView WMS";
+  layer: string;
+  status: MeteosatFrameTimeline["status"];
+  checkedAt: string;
+  frames: MeteosatPlaybackFrame[];
+  availableCount: number;
+  unavailableCount: number;
+  errorCount: number;
+  skippedCount: number;
+  totalBytes: number;
+  verifiedAcquisition: false;
+  caveats: readonly string[];
+}
+/** Reject misleading WMS error pages with an image content type. */
+export function isMeteosatImage(bytes:Uint8Array, contentType:string):boolean{
+  if(/^image\/png(?:\s*;|\s*$)/i.test(contentType))
+    return bytes.length>=8&&bytes[0]===137&&bytes[1]===80&&bytes[2]===78&&
+      bytes[3]===71&&bytes[4]===13&&bytes[5]===10&&bytes[6]===26&&bytes[7]===10;
+  if(/^image\/jpe?g(?:\s*;|\s*$)/i.test(contentType))
+    return bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255;
+  return false;
+}
+
 export interface MeteosatMapOptions{
   layer:string;
   bounds3857:BBox;
@@ -116,6 +161,77 @@ export class MeteosatClient{
         "Time dimension lists service-advertised dates, not verified actual satellite acquisition times.",
         "Each GetMap frame may still fail or return delayed imagery; verify desired frames explicitly.",
         "CORS, WMS quotas and image licensing are controlled by EUMETSAT.",
+      ],
+    };
+  }
+  /**
+   * Download actual WMS images in chronological order. Each frame is bounded
+   * and validated. A returned image does not prove source sensor acquisition
+   * or that the requested Time was honored by the upstream WMS server.
+   */
+  async playback(options:MeteosatPlaybackOptions):Promise<MeteosatPlaybackResult>{
+    const maxFrames=options.maxFrames??6;
+    const maxTotalBytes=options.maxTotalBytes??12*1024*1024;
+    if(!Number.isInteger(maxFrames)||maxFrames<1||maxFrames>12)
+      throw new RangeError("Meteosat playback maxFrames must be 1..12");
+    if(!Number.isSafeInteger(maxTotalBytes)||maxTotalBytes<1024||maxTotalBytes>32*1024*1024)
+      throw new RangeError("Meteosat maxTotalBytes must be 1024..33554432");
+    const timeline=await this.timeline({...options,maxFrames});
+    let totalBytes=0, exhausted=false;
+    const frames:MeteosatPlaybackFrame[]=[];
+    for(const frame of timeline.frames){
+      const checkedAt=()=>new Date().toISOString();
+      const common={
+        advertisedTime:frame.advertisedTime,request:frame.request,
+        acquiredAt:null as null,verifiedAcquisition:false as false,
+      };
+      if(exhausted){
+        frames.push({...common,checkedAt:checkedAt(),status:"skipped-budget",
+          image:null,contentType:null,byteLength:0,
+          detail:"Remaining frames skipped after total-byte limit was reached."});
+        continue;
+      }
+      try{
+        const response=await this.fetchMap({
+          layer:timeline.layer,bounds3857:frame.request.coordinateBounds3857,
+          width:frame.request.width,height:frame.request.height,
+          time:frame.advertisedTime,
+          ...(options.format?{format:options.format}:{}),
+        });
+        if(!isMeteosatImage(response.image,response.contentType))
+          throw new Error("WMS response has invalid image header or content type");
+        if(totalBytes+response.image.byteLength>maxTotalBytes){
+          exhausted=true;
+          frames.push({...common,checkedAt:checkedAt(),status:"skipped-budget",
+            image:null,contentType:null,byteLength:0,
+            detail:"Frame discarded because it would exceed the total-byte limit."});
+          continue;
+        }
+        totalBytes+=response.image.byteLength;
+        frames.push({...common,checkedAt:checkedAt(),status:"available",
+          image:response.image,contentType:response.contentType,
+          byteLength:response.image.byteLength,
+          detail:"Provider image bytes fetched; capture time and honored WMS TIME remain unverified."});
+      }catch(error){
+        const notFound=error instanceof Error&&/\b(?:HTTP 404|HTTP 410)\b/.test(error.message);
+        frames.push({...common,checkedAt:checkedAt(),status:notFound?"unavailable":"error",
+          image:null,contentType:null,byteLength:0,
+          detail:notFound?"Provider reports requested image not found (HTTP 404/410).":
+            "WMS image download or validation failed; availability is unknown."});
+      }
+    }
+    return {
+      provider:"EUMETView WMS",layer:timeline.layer,status:timeline.status,
+      checkedAt:new Date().toISOString(),frames,totalBytes,
+      availableCount:frames.filter(f=>f.status==="available").length,
+      unavailableCount:frames.filter(f=>f.status==="unavailable").length,
+      errorCount:frames.filter(f=>f.status==="error").length,
+      skippedCount:frames.filter(f=>f.status==="skipped-budget").length,
+      verifiedAcquisition:false,
+      caveats:[
+        ...timeline.caveats,
+        "Image validation checks MIME and file signatures, not full raster decoding or WMS timestamp provenance.",
+        "Keep this method on a cached, rate-limited backend; do not download image batches on every browser render.",
       ],
     };
   }

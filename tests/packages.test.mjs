@@ -10,7 +10,7 @@ const names=["core","earth","raster","launches","orbit","math","engineering"];
 const require=createRequire(import.meta.url);
 const publicFunctions={
  core:["HttpClient","MemoryCache","query"],
- earth:["EarthCatalogClient","SpaceMapClient","NasaGibsClient","MeteosatClient","NasaFirmsClient","Sentinel5pClient","SpaceVideoClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
+ earth:["EarthCatalogClient","SpaceMapClient","isMeteosatImage","NasaGibsClient","MeteosatClient","NasaFirmsClient","Sentinel5pClient","SpaceVideoClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
  raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","ndwiRaster","ndmiRaster","nbrRaster","calibrateRasterFromStac","elevationToLocalMesh"],
  launches:["LaunchDataClient","LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
  orbit:["Sgp4Satellite","OrbitEngine","TrafficEngine"],
@@ -74,7 +74,7 @@ test("Monolith remains backward-compatible and distinct from modular packages",a
   assert.equal(typeof whole.readCogWindowUrl,"function");
   const pkg=JSON.parse(await readFile(path.join(root,"package.json"),"utf8"));
   assert.deepEqual(pkg.workspaces,["packages/*"]);
-  assert.equal(pkg.version,"1.4.0");
+  assert.equal(pkg.version,"1.5.0");
 });
 test("Package build-report shows isolated module sizes",async()=>{
   const report=JSON.parse(await readFile(path.join(root,"packages/build-report.json"),"utf8"));
@@ -107,7 +107,7 @@ test("Small standalone facades support one-line Earth and launch data clients",a
 
 test("Engineering re-exports math without bundling math implementations",async()=>{
  const e=JSON.parse(await readFile(path.join(root,"packages/engineering/package.json"),"utf8"));
- assert.equal(e.dependencies["@openlaunch/math"],"^1.4.0");
+ assert.equal(e.dependencies["@openlaunch/math"],"^1.5.0");
  const index=await readFile(path.join(root,"packages/engineering/dist/esm/science/index.js"),"utf8");
  assert.match(index,/@openlaunch\/math\/internal\/science\/matrix/);
  const m=await import("@openlaunch/math");
