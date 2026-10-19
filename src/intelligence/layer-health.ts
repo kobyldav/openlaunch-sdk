@@ -1,3 +1,4 @@
+import { isVerifiedImageBytes } from "../providers/image-validation.js";
 import type { GibsLayerId, NasaGibsClient } from "../providers/gibs.js";
 import type { MeteosatClient, MeteosatMapOptions } from "../providers/meteosat.js";
 
@@ -23,14 +24,6 @@ export interface SpaceImageProbeClients {
   gibs: Pick<NasaGibsClient, "fetchTile">;
   meteosat: Pick<MeteosatClient, "fetchMap">;
 }
-function supportedImage(data: Uint8Array, contentType: string): boolean {
-  if (/image\/(?:jpeg|jpg)/i.test(contentType))
-    return data.length >= 3 && data[0] === 0xff && data[1] === 0xd8 && data[2] === 0xff;
-  if (/image\/png/i.test(contentType))
-    return data.length >= 8 && data[0] === 0x89 && data[1] === 0x50 && data[2] === 0x4e &&
-      data[3] === 0x47 && data[4] === 0x0d && data[5] === 0x0a && data[6] === 0x1a && data[7] === 0x0a;
-  return false;
-}
 export async function probeSpaceImage(
   clients: SpaceImageProbeClients,
   request: SpaceImageProbe,
@@ -47,7 +40,7 @@ export async function probeSpaceImage(
     const result = request.source === "nasa-gibs"
       ? await clients.gibs.fetchTile(request.layer, request.date, request.z, request.x, request.y)
       : await clients.meteosat.fetchMap(request.map);
-    if (!supportedImage(result.image, result.contentType))
+    if (!isVerifiedImageBytes(result.image, result.contentType))
       throw new Error("Provider did not return valid image magic bytes");
     return {
       provider, status: "available", checkedAt: now().toISOString(),

@@ -1,3 +1,4 @@
+import { MeteosatImageCache, type MeteosatImageCacheOptions, type MeteosatCachedImage, type MeteosatImageCacheStats } from "../providers/meteosat-cache.js";
 import { checkMeteosatPlayback, type MeteosatPlaybackOptions, type MeteosatPlaybackResult } from "./meteosat-playback.js";
 import { probeSpaceImage, type SpaceImageAvailability, type SpaceImageProbe } from "./layer-health.js";
 import type {BBox,AreaOfInterest} from "../geo/types.js";
@@ -64,6 +65,7 @@ export interface SpaceMapOptions {
   firmsMapKey?:string;
   copernicusClient?:CopernicusClient;
   planetaryComputerClient?:PlanetaryComputerClient;
+  meteosatCache?:MeteosatImageCacheOptions;
 }
 export interface SceneFreshness {
   observationTime:string|null;
@@ -78,6 +80,7 @@ export interface SceneFreshness {
 export class SpaceMapClient{
   readonly gibs:NasaGibsClient;
   readonly meteosat:MeteosatClient;
+  readonly meteosatCache:MeteosatImageCache;
   readonly s5p:Sentinel5pClient;
   readonly videos:SpaceVideoClient;
   readonly observations:ObservationDiscoveryClient;
@@ -89,6 +92,7 @@ export class SpaceMapClient{
     this.observations=new ObservationDiscoveryClient(copernicus,pc);
     this.gibs=new NasaGibsClient(http);
     this.meteosat=new MeteosatClient(http);
+    this.meteosatCache=new MeteosatImageCache(this.meteosat,options.meteosatCache);
     this.s5p=new Sentinel5pClient(copernicus);
     this.videos=new SpaceVideoClient();
     this.firms=options.firmsMapKey?new NasaFirmsClient(options.firmsMapKey,http):null;
@@ -104,7 +108,7 @@ export class SpaceMapClient{
   videoStream(id:SpaceStreamId):SpaceStreamDescriptor{return this.videos.get(id);}
   /** One explicit provider image verification request; cache/throttle this on the backend. */
   probeImage(request:SpaceImageProbe):Promise<SpaceImageAvailability>{
-    return probeSpaceImage({gibs:this.gibs,meteosat:this.meteosat},request);
+    return probeSpaceImage({gibs:this.gibs,meteosat:this.meteosatCache},request);
   }
 
   nasaDailyTiles(layer:GibsLayerId,date:Date|string):GibsTileDescriptor{return this.gibs.tileTemplate(layer,date);}
@@ -122,7 +126,11 @@ export class SpaceMapClient{
   }
   meteosatCapabilities():Promise<{layers:MeteosatWmsLayer[];fetchedAt:string;endpoint:string}>{return this.meteosat.capabilities();}
   meteosatTimeline(options:MeteosatTimelineOptions):Promise<MeteosatFrameTimeline>{return this.meteosat.timeline(options);}
-  meteosatPlayback(options:MeteosatPlaybackOptions):Promise<MeteosatPlaybackResult>{return checkMeteosatPlayback(this.meteosat,this.gibs,options);}
+  /** Download validated Meteosat pixels; same explicit TIME is cached per SDK instance. */
+  meteosatImage(options:MeteosatMapOptions):Promise<MeteosatCachedImage>{return this.meteosatCache.fetchMap(options);}
+  meteosatCacheStats():MeteosatImageCacheStats{return this.meteosatCache.stats();}
+  clearMeteosatCache():void{this.meteosatCache.clear();}
+  meteosatPlayback(options:MeteosatPlaybackOptions):Promise<MeteosatPlaybackResult>{return checkMeteosatPlayback(this.meteosatCache,this.gibs,options);}
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
     return this.observations.discover(options);

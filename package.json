@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.5.0",
-  "description": "OpenLaunch modular space data SDK with time-aware Meteosat timelines, NASA GIBS, imagery, orbits and optional engineering",
+  "version": "1.6.0",
+  "description": "OpenLaunch satellite imagery SDK with memory-bounded Meteosat image caching, NASA GIBS, orbital data and optional engineering",
   "keywords": [
     "space",
     "spaceflight",
@@ -142,7 +142,7 @@
   "scripts": {
     "clean": "node scripts/clean.mjs",
     "build": "npm run clean && tsc -p tsconfig.esm.json && tsc -p tsconfig.cjs.json && node scripts/finalize-cjs.mjs && node scripts/build-workspaces.mjs",
-    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && node scripts/live-earth-demo.mjs && node scripts/meteosat-timeline-smoke.mjs && node scripts/meteosat-playback-smoke.mjs && npm run test:packages",
+    "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && node scripts/live-earth-demo.mjs && node scripts/meteosat-timeline-smoke.mjs && node scripts/meteosat-playback-smoke.mjs && node scripts/meteosat-cache-smoke.mjs && npm run test:packages",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "check": "npm run typecheck && npm run examples:check && npm test",
@@ -163,7 +163,8 @@
     "test:packed": "node scripts/test-packed-consumers.mjs",
     "example:live-earth": "npm run build && node scripts/live-earth-demo.mjs",
     "example:meteosat-timeline": "npm run build && node scripts/meteosat-timeline-smoke.mjs",
-    "example:meteosat-playback": "npm run build && node scripts/meteosat-playback-smoke.mjs"
+    "example:meteosat-playback": "npm run build && node scripts/meteosat-playback-smoke.mjs",
+    "example:meteosat-cache": "npm run build && node scripts/meteosat-cache-smoke.mjs"
   },
   "engines": {
     "node": ">=18"

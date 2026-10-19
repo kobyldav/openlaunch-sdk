@@ -2,11 +2,28 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.4.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.6.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.4.0 Meteosat timeline features are developed in a feature branch; v1.3.0 is merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Meteosat image cache (v1.6 development)
+
+`SpaceMapClient` now owns a bounded per-process cache for **validated image bytes** with explicit Meteosat WMS TIME, short TTL (5 minutes), default 24 entries and 32 MiB budget. Errors, invalid imagery and default/latest WMS images are never cached. Concurrent identical requests share a single upstream request; returned byte buffers are defensively copied.
+
+```ts
+const maps = new SpaceMapClient({meteosatCache:{ttlMs:300000,maxEntries:24,maxBytes:32*1024*1024}});
+const image = await maps.meteosatImage({
+  layer: "provider:actual-layer", bounds3857:[1300000,6200000,1900000,6900000],
+  width:256,height:256,time:"2026-10-19T10:00:00Z"
+});
+console.log(image.cacheState, image.image.byteLength, maps.meteosatCacheStats());
+```
+
+The image URL is an official EUMETView WMS GetMap URL, **not** a confirmation of the acquisition timestamp. Memory cache is local to one SDK/backend instance; Cloudflare Workers may have different instance lifecycles. Cache image handling is not a public proxy endpoint.
+
+Offline Fedora test: `npm run example:meteosat-cache`. See [Meteosat Cache v1.6](docs/METEOSAT_CACHE_V1_6.md).
 
 ## Meteosat provider-time timeline (v1.4 development)
 
