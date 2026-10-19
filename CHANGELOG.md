@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.5.0 (development) — Meteosat Frame Verification
+
+- Added bounded and sequential `SpaceMapClient.meteosatPlayback()`, selecting provider-advertised timeline frames and verifying image delivery.
+- Each frame returns a georeferenced WMS URL, time, image availability, and playback flag; unverifiable capture time remains null.
+- Provider checks are limited to 12 frames per request, with errors and missing images kept distinct.
+- Added offline smoke and regression tests, updated all seven workspace versions.
+
+
 ## 1.4.0 (development) — Meteosat WMS Time-aware timeline
 
 - XML capabilities parser now extracts nested layer title, exact ID, inherited Time dimension and derived WMS chronology.

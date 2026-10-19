@@ -3,3 +3,4 @@ export * from "./observations.js";
 export * from "./acquisitions.js";
 export * from "./map-layers.js";
 export * from "./layer-health.js";
+export * from "./meteosat-playback.js";
