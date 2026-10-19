@@ -1,3 +1,4 @@
+import { webcrypto } from "node:crypto";
 import test from "node:test";
 import assert from "node:assert/strict";
 import { SpaceMapClient } from "../dist/intelligence/map-layers.js";
@@ -24,6 +25,8 @@ class TestKv {
    this.values.set(key,value.slice(0));
  }
 }
+const makeStore=(kv,options={})=>new MeteosatCloudflareKvStore(kv,{...options,
+  digest: data=>webcrypto.subtle.digest("SHA-256",data)});
 const wmsFetcher=(tracker)=>async url=>{
   if(new URL(String(url)).searchParams.get("REQUEST")==="GetCapabilities")
     return new Response(xml,{headers:{"content-type":"text/xml"}});
@@ -32,7 +35,7 @@ const wmsFetcher=(tracker)=>async url=>{
 };
 test("v1.7 second SDK instance reads shared KV without another EUMETSAT image request",async()=>{
  const kv=new TestKv();
- const store=new MeteosatCloudflareKvStore(kv,{prefix:"openlaunch:test"});
+ const store=makeStore(kv,{prefix:"openlaunch:test"});
  const trace={count:0};
  const one=new SpaceMapClient({fetch:wmsFetcher(trace),meteosatCache:{sharedStore:store}});
  const two=new SpaceMapClient({fetch:wmsFetcher(trace),meteosatCache:{sharedStore:store}});
@@ -54,7 +57,7 @@ test("v1.7 second SDK instance reads shared KV without another EUMETSAT image re
 });
 test("v1.7 expired remote records are ignored even while present in KV",async()=>{
  let time=10000;
- const kv=new TestKv(),store=new MeteosatCloudflareKvStore(kv,{now:()=>time});
+ const kv=new TestKv(),store=makeStore(kv,{now:()=>time});
  const supplier={fetchMap:async()=>({image:png.slice(),contentType:"image/png",descriptor:meteosatWmsMapUrl(opts)}),timeline:async()=>({})};
  const cache1=new MeteosatImageCache(supplier,{sharedStore:store,ttlMs:1000},()=>time);
  assert.equal((await cache1.fetchMap(opts)).cacheState,"miss");
@@ -64,17 +67,17 @@ test("v1.7 expired remote records are ignored even while present in KV",async()=
  assert.equal(cache2.stats().sharedMisses,1);
 });
 test("v1.7 rejects corrupt KV blobs and validates URL/namespace boundaries",async()=>{
- const kv=new TestKv(),store=new MeteosatCloudflareKvStore(kv);
+ const kv=new TestKv(),store=makeStore(kv);
  const key=await store.keyFor(meteosatWmsMapUrl(opts).url);
  kv.values.set(key,new TextEncoder().encode("<ServiceException/>").buffer);
  assert.equal(await store.get(meteosatWmsMapUrl(opts).url),null);
  await assert.rejects(store.keyFor("https://evil.example/anything?TIME=x&REQUEST=GetMap"),/official/);
  await assert.rejects(store.keyFor(meteosatWmsMapUrl({...opts,time:undefined}).url),/explicitly timed/);
- assert.throws(()=>new MeteosatCloudflareKvStore(kv,{prefix:"bad prefix"}),/prefix/);
+ assert.throws(()=>makeStore(kv,{prefix:"bad prefix"}),/prefix/);
 });
 test("v1.7 fails open on KV read/write errors and never writes untimed WMS frames",async()=>{
  const kv=new TestKv();kv.fail=true;
- const store=new MeteosatCloudflareKvStore(kv);
+ const store=makeStore(kv);
  const trace={count:0};
  const sdk=new SpaceMapClient({fetch:wmsFetcher(trace),meteosatCache:{sharedStore:store}});
  const a=await sdk.meteosatImage(opts);
@@ -87,7 +90,7 @@ test("v1.7 fails open on KV read/write errors and never writes untimed WMS frame
  assert.equal(trace.count,2);
 });
 test("v1.7 shared cache respects MIME/payload validation independently of local cache",async()=>{
- const kv=new TestKv(),store=new MeteosatCloudflareKvStore(kv);
+ const kv=new TestKv(),store=makeStore(kv);
  const url=meteosatWmsMapUrl(opts).url;
  await store.put(url,{image:new TextEncoder().encode("oops"),contentType:"image/png",expiresAt:Date.now()+300000});
  let downloaded=0;

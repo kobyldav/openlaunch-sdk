@@ -11,6 +11,8 @@ export interface MeteosatKvOptions {
   prefix?: string;
   /** Used for deterministic tests. Real requests should use system time. */
   now?: () => number;
+  /** Web Crypto provider injection for Node 18 runtimes without global crypto. */
+  digest?: (data: Uint8Array) => Promise<ArrayBuffer>;
 }
 const magic = [79, 76, 77, 49]; // OLM1
 const headerSize = 13;
@@ -49,11 +51,16 @@ function decode(buffer: ArrayBuffer): MeteosatSharedImageRecord | null {
 export class MeteosatCloudflareKvStore implements MeteosatSharedImageStore {
   private readonly prefix: string;
   private readonly now: () => number;
+  private readonly digest: (data: Uint8Array) => Promise<ArrayBuffer>;
   constructor(private readonly kv: MeteosatKvNamespace, options: MeteosatKvOptions={}) {
     const prefix=options.prefix??"openlaunch:meteosat:v1";
     if (!/^[a-zA-Z0-9:_-]{1,96}$/.test(prefix)) throw new RangeError("Invalid KV prefix");
     this.prefix=prefix;
     this.now=options.now??(()=>Date.now());
+    this.digest=options.digest??(async data=>{
+      if (!globalThis.crypto?.subtle) throw new Error("Web Crypto required for WMS cache keys");
+      return globalThis.crypto.subtle.digest("SHA-256",data);
+    });
   }
   async keyFor(url: string): Promise<string> {
     const parsed=new URL(url);
@@ -62,8 +69,7 @@ export class MeteosatCloudflareKvStore implements MeteosatSharedImageStore {
       parsed.searchParams.get("REQUEST")!=="GetMap" ||
       !parsed.searchParams.has("TIME"))
       throw new TypeError("Expected an official, explicitly timed EUMETView GetMap URL");
-    if (!globalThis.crypto?.subtle) throw new Error("Web Crypto required for WMS cache keys");
-    const sum=await globalThis.crypto.subtle.digest("SHA-256",new TextEncoder().encode(url));
+    const sum=await this.digest(new TextEncoder().encode(url));
     const hex=[...new Uint8Array(sum)].map(x=>x.toString(16).padStart(2,"0")).join("");
     return this.prefix+":"+hex;
   }

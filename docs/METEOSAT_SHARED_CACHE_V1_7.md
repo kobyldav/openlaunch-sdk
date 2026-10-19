@@ -27,7 +27,7 @@ KV binding is provided by the hosting application. No credentials, routes or har
 ## Safety and consistency
 
 - Only canonical official EUMETView WMS `GetMap` URLs with explicit `TIME` are accepted for KV keys.
-- SHA-256 via Web Crypto makes stable, short KV keys; record is a versioned binary blob with MIME and absolute expiration.
+- SHA-256 via Web Crypto makes stable, short KV keys; record is a versioned binary blob with MIME and absolute expiration. Cloudflare supplies global Web Crypto. For Node 18 host tests without global crypto, pass `digest: bytes => webcrypto.subtle.digest("SHA-256", bytes)` from `node:crypto` as an adapter option.
 - Read data is never considered valid unless in-date, within local byte budget, correct MIME and matching PNG/JPEG signature.
 - Failed read/write operations do not prevent the SDK from fetching images from the official provider.
 - Local LRU, same-process in-flight deduplication and isolated byte copies remain intact.
