@@ -2,11 +2,17 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.4.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.5.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.4.0 Meteosat timeline features are developed in a feature branch; v1.3.0 is merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.5 Meteosat playback is in a separate feature branch based on v1.4, while main remains on v1.3 until prior versions are accepted. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Meteosat frame playback (v1.5 development)
+
+`SpaceMapClient.meteosatPlayback()` now downloads bounded, actual WMS PNG/JPEG bytes for provider-advertised timestamps. It reports each frame as `available`, `unavailable`, `error` or `skipped-budget` and preserves EPSG:3857 bounds for your web map. Provider image delivery **does not prove the true acquisition time**.
+
+Offline Fedora test: `npm run example:meteosat-playback`. Detailed usage and limits: [METEOSAT_PLAYBACK_V1_5.md](docs/METEOSAT_PLAYBACK_V1_5.md).
 
 ## Meteosat provider-time timeline (v1.4 development)
 
