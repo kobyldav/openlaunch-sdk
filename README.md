@@ -2,11 +2,31 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.15.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.17.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.15.0 WGS84 UTM GeoTIFF/COG support is under development; v1.14.0 STAC Linked QA is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.17.0 optional JP2 Sentinel-2 SCL analysis is under development; v1.16.0 LZW GeoTIFF/COG is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Optional JPEG2000 / Sentinel-2 SCL JP2 (v1.17 development)
+
+`SpaceMapClient.analyzeObservationJp2Qa()` can resolve a Sentinel-2 SCL JP2 from the matching official STAC item, require exact asset `proj:epsg`, `proj:shape`, `proj:transform`, securely fetch bounded JP2 bytes and classify decoded grayscale mask pixels within the AOI. Codec integration is **optional and explicitly injected**, so no WASM bundle is automatically downloaded.
+
+```ts
+import {SpaceMapClient} from "@openlaunch/earth";
+import {createOpenJpegWasmBackend} from "@openlaunch/raster";
+// Install @cornerstonejs/codec-openjpeg separately in your secure backend.
+import {OpenJPEGWASM} from "@cornerstonejs/codec-openjpeg";
+const maps=new SpaceMapClient({
+  jp2AllowedHosts:["<reviewed JP2 storage host>"],
+  jp2Decoder:createOpenJpegWasmBackend(async()=>await OpenJPEGWASM),
+  jp2MaxBytes:2*1024*1024,
+  jp2MaxPixels:1_048_576,
+});
+const result=await maps.analyzeObservationJp2Qa({itemId:"<exact STAC ID>",area});
+```
+
+**Important:** test fixtures include a real independently OpenJPEG-encoded 8-bit JP2 but mock the codec implementation; production OpenJPEG WASM decoding has **not** been proven by CI. Only single-band 8-bit images, bounded full downloads and exact asset-level georeference are supported. Full-size Sentinel-2 JP2 exceeds these conservative defaults; windowed/reduced-resolution JP2 decoding and production validation remain future work. See [JP2 v1.17](docs/JP2_QA_V1_17.md). Fedora smoke: `npm run example:jp2-qa`.
 
 ## Native WGS84 UTM GeoTIFF/COG coordinates (v1.15 development)
 
