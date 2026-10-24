@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.10.0 (development) — Verified Satellite Preview Delivery
+
+- Added `SpaceMapClient.fetchObservationPreview()` for official STAC scene ID+provider+collection lookup followed by actual binary JPEG/PNG preview download.
+- Explicit server-configured hostname allowlist, HTTPS-only nonredirecting bounded download, content MIME and image signature checks, and safe errors that do not disclose signed URLs.
+- Optional Planetary Computer SAS signing through the existing provider adapter.
+- Only claimed proof is successful binary preview delivery. STAC timestamp stays provider metadata; no independent acquisition proof.
+- Offline regression suite and Fedora smoke, all seven workspaces aligned to 1.10.0.
+
+
 ## 1.9.0 (development) — Location-first Observation Explorer
 
 - Added `SpaceMapClient.exploreObservations()`: find historical Copernicus Sentinel-2/1 and Planetary Computer Landsat data by map point+radius or bounds and date interval without requiring mission selection.
