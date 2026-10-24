@@ -95,7 +95,7 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
   readHeader?():unknown;
   decode():void;
   getDecodedBuffer():Uint8Array|ArrayBuffer;
-  getFrameInfo():{width:number;height:number};
+  getFrameInfo():{width:number;height:number;componentCount?:number;bitsPerSample?:number;isSigned?:boolean};
   delete?():void;
  };
 }>):Jp2DecoderBackend {
@@ -109,10 +109,35 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
     if(!(encoded instanceof Uint8Array)||encoded.byteLength<bytes.length)
       throw new RangeError("OpenJPEG encoded buffer unavailable");
     encoded.set(bytes);
-    instance.readHeader?.();
+    // OpenJPEG decode() parses the header itself. Calling readHeader()
+    // first may consume the input stream and break a second decode pass.
     instance.decode();
-    const info=instance.getFrameInfo(),buffer=instance.getDecodedBuffer();
-    const values=buffer instanceof Uint8Array?buffer:new Uint8Array(buffer);
+    const info=instance.getFrameInfo();
+    if(!info||!Number.isSafeInteger(info.width)||!Number.isSafeInteger(info.height)||
+       info.width<1||info.height<1||
+       (info.componentCount!==undefined&&info.componentCount!==1)||
+       (info.bitsPerSample!==undefined&&info.bitsPerSample!==8)||
+       (info.isSigned!==undefined&&info.isSigned!==false))
+      throw new RangeError("OpenJPEG decoded format is not one unsigned 8-bit component");
+    const buffer=instance.getDecodedBuffer();
+    // Emscripten may return a typed_memory_view from a separate JS realm.
+    // ArrayBuffer.isView() works cross-realm whereas instanceof Uint8Array
+    // is not guaranteed. Never reinterpret 16-bit/signed words as SCL bytes.
+    let values:Uint8Array;
+    if(ArrayBuffer.isView(buffer)){
+      const view=buffer as ArrayBufferView & {BYTES_PER_ELEMENT?:number};
+      if(view.BYTES_PER_ELEMENT!==1||view.byteLength!==info.width*info.height)
+        throw new RangeError("OpenJPEG decoded buffer has unsupported sample width or dimensions");
+      values=new Uint8Array(view.buffer,view.byteOffset,view.byteLength);
+    }else if(Object.prototype.toString.call(buffer)==="[object ArrayBuffer]"){
+      const raw=buffer as ArrayBuffer;
+      if(raw.byteLength!==info.width*info.height)
+        throw new RangeError("OpenJPEG decoded ArrayBuffer length differs from frame");
+      values=new Uint8Array(raw);
+    }else{
+      throw new TypeError("OpenJPEG returned an unsupported pixel buffer");
+    }
+    // Copy from WASM memory BEFORE destructor (typed_memory_view becomes dangling).
     return {width:info.width,height:info.height,components:1,
       values:Uint8Array.from(values)};
   }finally{instance.delete?.();}

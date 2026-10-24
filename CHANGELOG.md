@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.18.0 (development) — Real OpenJPEG WASM integration verification
+
+- Dedicated GitHub Actions integration checks actual OpenJPEG/WASM decoded grayscale pixel data for a genuine independently encoded JP2 fixture, not only mock decode outputs.
+- Decoder bridge now rejects wrong component count, non-8-bit/signed samples and malformed output lengths, and copies WASM memory buffers before native decoder teardown.
+- Real STAC Sentinel-2 SCL JP2 selection and AOI quality classification exercised with actual decoder in the mandatory optional-codec CI job.
+- The optional codec is pinned only for integration testing; not a mandatory runtime dependency.
+- Existing v1.17 JP2 metadata validation, v1.16 TIFF LZW and UTM/COG features stay intact.
+- **Limitations**: full native large JP2 granules, true windowed JP2 decode, and live upstream provider confirmation remain separate work.
+
+
 ## 1.17.0 (development) — Optional JP2 QA adapter and scene-linked Sentinel-2 SCL
 
 - New `readJp2Header()` validates JP2 signature/box header and 8-bit one-band dimensions before decoding.

@@ -112,3 +112,35 @@ test("v1.17 provider errors cannot reveal JP2 signing secrets",async()=>{
   return true;
  });
 });
+
+test("v1.18 actual OpenJPEG adapter refuses deceptive component count and bit depth",async()=>{
+ const mock=(info)=>createOpenJpegWasmBackend(async()=>({J2KDecoder:class {
+   getEncodedBuffer(n){return new Uint8Array(n);}
+   readHeader(){}
+   decode(){}
+   getDecodedBuffer(){return Uint8Array.from([4,8,9,3,11,6]);}
+   getFrameInfo(){return info;}
+   delete(){}
+ }}));
+ const source={crs:"EPSG:4326",shape:[2,3],transform:[14,.01,0,51,0,-.01]};
+ const bad=[{width:3,height:2,componentCount:3,bitsPerSample:8},
+   {width:3,height:2,componentCount:1,bitsPerSample:16},
+   {width:3,height:2,componentCount:1,bitsPerSample:8,isSigned:true}];
+ for(const metadata of bad)
+   await assert.rejects(decodeJp2Raster(jp2,source,mock(metadata)),/JP2 codec rejected/);
+});
+test("v1.18 WASM buffer copy survives decoder release",async()=>{
+ let deleted=false;const source={crs:"EPSG:4326",shape:[2,3],transform:[14,.01,0,51,0,-.01]};
+ const pixels=Uint8Array.from([4,8,9,3,11,6]);
+ const codec=createOpenJpegWasmBackend(async()=>({J2KDecoder:class {
+  getEncodedBuffer(n){return new Uint8Array(n);}
+  readHeader(){}
+  decode(){}
+  getDecodedBuffer(){return pixels;}
+  getFrameInfo(){return {width:3,height:2,bitsPerSample:8,componentCount:1,isSigned:false};}
+  delete(){deleted=true;pixels.fill(255);}
+ }}));
+ const raster=await decodeJp2Raster(jp2,source,codec);
+ assert.equal(deleted,true);
+ assert.deepEqual([...raster.values],[4,8,9,3,11,6]);
+});
