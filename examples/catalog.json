@@ -1584,6 +1584,64 @@
       ],
       "network": true,
       "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "19-web-integration/01-live-earth-layers.ts",
+      "title": "01 live earth layers.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "layers",
+        "webMapDaily"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for layers, webMapDaily."
+    },
+    {
+      "path": "19-web-integration/02-verified-daily-tile.ts",
+      "title": "02 verified daily tile.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTile"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTile."
+    },
+    {
+      "path": "19-web-integration/03-lru-image-cache.ts",
+      "title": "03 lru image cache.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTileCached",
+        "webMapTileCacheStats"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTileCached, webMapTileCacheStats."
+    },
+    {
+      "path": "19-web-integration/04-bounded-tile-batch.ts",
+      "title": "04 bounded tile batch.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTilesBatch"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTilesBatch."
+    },
+    {
+      "path": "19-web-integration/05-stac-scene-and-preview.ts",
+      "title": "05 stac scene and preview.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapSearch",
+        "fetchObservationPreview"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapSearch, fetchObservationPreview."
     }
   ]
 }
