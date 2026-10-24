@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.9.0 (development) — Location-first Observation Explorer
+
+- Added `SpaceMapClient.exploreObservations()`: find historical Copernicus Sentinel-2/1 and Planetary Computer Landsat data by map point+radius or bounds and date interval without requiring mission selection.
+- Structured catalog results with STAC acquisition timestamp, asset kinds, declared resolution, preview pointer and cloud percentage; clear catalog-only and preview-unverified flags.
+- Sorted results, optional cloud threshold and static DEM opt-in, strict bounded input and cross-provider partial-error handling with sanitized provider failure messages.
+- No direct imagery download or fabricated live frames. Reuses existing SDK provider integrations.
+- Fully offline Fedora smoke and regression tests; all seven workspaces bumped to v1.9 development.
+
+
 ## 1.8.0 (development) — Space Archive & Playback
 
 - Unified `SpaceMapClient.archivePlayback()` across NASA GIBS daily WMTS requests and Meteosat time-advertised WMS images.
