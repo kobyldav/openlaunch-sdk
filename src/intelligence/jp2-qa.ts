@@ -50,8 +50,9 @@ function projection(asset:StacAsset):Jp2RasterReference {
    throw new RangeError("JP2 QA asset requires exact proj:shape");
  if(!Array.isArray(transform)||transform.length!==6||!transform.every(x=>typeof x==="number"&&Number.isFinite(x)))
    throw new RangeError("JP2 QA asset requires exact proj:transform");
- return {crs:`EPSG:${epsg}`,shape:[shape[0],shape[1]],
-   transform:[transform[0],transform[1],transform[2],transform[3],transform[4],transform[5]]};
+ const sh=shape as number[],tr=transform as number[];
+ return {crs:`EPSG:${epsg}`,shape:[sh[0]!,sh[1]!],
+   transform:[tr[0]!,tr[1]!,tr[2]!,tr[3]!,tr[4]!,tr[5]!]};
 }
 export async function analyzeStacJp2Qa(
  stac:Pick<StacClient,"item">,request:Jp2SceneQaRequest,options:Jp2SceneQaOptions
