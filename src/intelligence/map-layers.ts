@@ -1,3 +1,4 @@
+import { fetchWebMapDailyTile,type WebMapDailyTileRequest,type WebMapDailyTileOptions,type WebMapDailyTileResult } from "./web-map-tile.js";
 import {buildWebMapSearch,buildWebMapDaily,type WebMapSearchRequest,type WebMapSearchResult,type WebMapDailyRequest,type WebMapDailyResult} from "./web-map.js";
 import {analyzeStacJp2Qa,type Jp2SceneQaRequest,type Jp2SceneQaOptions,type Jp2SceneQaResult} from "./jp2-qa.js";
 import type {Jp2DecoderBackend} from "../eo/jp2.js";
@@ -91,6 +92,9 @@ export interface SpaceMapOptions {
   previewMaxBytes?:number;
   previewTimeoutMs?:number;
   previewSignPlanetary?:boolean;
+  /** Bounded official NASA GIBS tile image verification for web backends. */
+  webMapTileMaxBytes?:number;
+  webMapTileTimeoutMs?:number;
 }
 export interface SceneFreshness {
   observationTime:string|null;
@@ -113,6 +117,7 @@ export class SpaceMapClient{
   private readonly previewOptions:ObservationPreviewOptions;
   private readonly linkedQaOptions:LinkedQaOptions;
   private readonly jp2Options:Jp2SceneQaOptions;
+  private readonly webMapTileOptions:WebMapDailyTileOptions;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
     const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
@@ -140,6 +145,11 @@ export class SpaceMapClient{
       ...(options.previewTimeoutMs!==undefined?{timeoutMs:options.previewTimeoutMs}:{}),
       ...(options.previewSignPlanetary?{signPlanetary:true}:{}),
       ...(options.fetch?{fetch:options.fetch}:{})};
+    this.webMapTileOptions={
+      ...(options.fetch?{fetch:options.fetch}:{}),
+      ...(options.webMapTileMaxBytes!==undefined?{maxBytes:options.webMapTileMaxBytes}:{}),
+      ...(options.webMapTileTimeoutMs!==undefined?{timeoutMs:options.webMapTileTimeoutMs}:{})
+    };
     this.gibs=new NasaGibsClient(http);
     this.meteosat=new MeteosatClient(http);
     this.meteosatCache=new MeteosatImageCache(this.meteosat,options.meteosatCache);
@@ -213,6 +223,10 @@ export class SpaceMapClient{
   /** MapLibre/Leaflet NASA daily XYZ layer descriptor (availability unchecked). */
   webMapDaily(request:WebMapDailyRequest):WebMapDailyResult{
     return buildWebMapDaily(this,request);
+  }
+  /** Check/download one actual bounded NASA tile. Does not verify sensor acquisition. */
+  webMapDailyTile(request:WebMapDailyTileRequest):Promise<WebMapDailyTileResult>{
+    return fetchWebMapDailyTile(this,request,this.webMapTileOptions);
   }
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
