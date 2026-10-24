@@ -2,11 +2,30 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.10.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.11.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.10.0 Verified Satellite Preview Delivery is under development; v1.9.0 Observation Explorer is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.11.0 Best Available Satellite Preview is under development; v1.10.0 Verified Satellite Preview Delivery is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Best Available Satellite Preview (v1.11 development)
+
+Find a real STAC observation by location and obtain the highest-ranked *deliverable* preview without manually choosing a specific satellite. Uses existing `exploreObservations()` and `fetchObservationPreview()` SDK functions. Tries candidates **sequentially**, defaults to three attempts, hard maximum five.
+
+```ts
+import { SpaceMapClient } from "@openlaunch/earth";
+const maps = new SpaceMapClient({
+  previewAllowedHosts:["<real reviewed preview storage hostname>"],
+});
+const result = await maps.bestAvailablePreview({
+  area:{center:[14.42,50.08],radiusKm:10},
+  from:"2026-10-01",to:"2026-10-15",
+  layers:["optical"],strategy:"balanced",maxAttempts:3,
+});
+if (result.selected) console.log(result.selected.preview.contentType,result.selected.preview.image);
+```
+
+Ranking weighs declared scene-wide cloud percentage, provider acquisition metadata, the declared source resolution and optical suitability; `strategy:"recent"` emphasizes time. This heuristic does **not** compute AOI cloud cover or independently verify sensor capture. Each candidate must pass server-trusted HTTPS hostname restrictions, MIME and binary checks before being selected. Errors trigger bounded fallback and are sanitized. No raw/signed asset URLs are returned in the selected result. See [v1.11 Best Preview](docs/BEST_PREVIEW_V1_11.md). Offline Fedora smoke: `npm run example:best-preview`.
 
 ## Verified Satellite Previews (v1.10 development)
 

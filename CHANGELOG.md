@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.11.0 (development) — Best Available Satellite Preview
+
+- New `SpaceMapClient.bestAvailablePreview()` combines location-first multi-provider discovery with verified JPEG/PNG image delivery.
+- Catalog ranking supports balanced and recent strategies based on declared scene cloud %, acquisition time and product resolution, with optional optical priority.
+- Bounded sequential fallback (default three, max five) when higher-ranked preview is missing, denied or invalid.
+- Returns verified binary bytes only for a successful candidate, sanitized per-attempt statuses, no signed source URLs or fabricated acquisition proof.
+- Regression suite, mocked Fedora demonstration and version alignment for all seven workspaces.
+
+
 ## 1.10.0 (development) — Verified Satellite Preview Delivery
 
 - Added `SpaceMapClient.fetchObservationPreview()` for official STAC scene ID+provider+collection lookup followed by actual binary JPEG/PNG preview download.

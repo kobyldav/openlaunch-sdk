@@ -1,6 +1,6 @@
 {
   "name": "@openlaunch/math",
-  "version": "1.10.0",
+  "version": "1.11.0",
   "description": "Independent vectors, matrices, quaternions, numerics, statistics, units and control math",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.10.0"
+    "@openlaunch/core": "^1.11.0"
   }
 }
