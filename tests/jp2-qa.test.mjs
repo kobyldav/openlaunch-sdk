@@ -39,7 +39,7 @@ test("v1.17 injected JP2 backend gives georeferenced true decoded SCL pixel samp
 });
 test("v1.17 rejects oversized/mismatched/corrupt output before any QA claims",async()=>{
  await assert.rejects(decodeJp2Raster(jp2,ref,backend,{maxBytes:100}),/bytes exceed/);
- await assert.rejects(decodeJp2Raster(jp2,ref,backend,{maxPixels:5}),/pixel dimensions/);
+ await assert.rejects(decodeJp2Raster(jp2,ref,backend,{maxPixels:5}),/output dimensions/);
  await assert.rejects(decodeJp2Raster(jp2,{...ref,shape:[3,2]},backend),/shape/);
  await assert.rejects(decodeJp2Raster(jp2,ref,{decode:async()=>({width:4,height:2,components:1,values:samples})}),/dimensions/);
  await assert.rejects(decodeJp2Raster(jp2,ref,{decode:async()=>{throw Error("PRIVATE WASM error")}}),e=>e.message==="JP2 codec rejected the image");
@@ -84,7 +84,7 @@ test("v1.17 refuses guessed scene-level georeference and oversized asset before 
    {...asset,"proj:shape":[5000,5000]},
  ]){
   const {client,stats}=sdk({...item,assets:{SCL_20m:assetOverride}});
-  await assert.rejects(client.analyzeObservationJp2Qa({itemId:"S2-JP2",area}),/proj:|memory budget/);
+  await assert.rejects(client.analyzeObservationJp2Qa({itemId:"S2-JP2",area}),/proj:|memory budget|maxSourcePixels/);
   assert.equal(stats().download,0);
  }
 });

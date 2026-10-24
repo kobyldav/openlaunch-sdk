@@ -4,7 +4,7 @@ import {readJp2Header,decodeJp2Raster,createOpenJpegWasmBackend} from "@openlaun
 import {SpaceMapClient} from "@openlaunch/earth";
 import {bbox} from "@openlaunch/raster";
 // Independently encoded 32x32, 8-bit, all pixel value 4; JP2 lossless.
-const bytes=Uint8Array.from(Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAACAAAAAgAAQcHAAAAAAAPY29scgEAAAAAABEAAACZanAyY/9P/1EAKQAAAAAAIAAAACAAAAAAAAAAAAAAACAAAAAgAAAAAAAAAAAAAQcBAf9SAAwAAAABAAUEBAAB/1wAE0BASEhQSEhQSEhQSEhQSEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAGAAB/5PPtAgJ0YCAgICA/9k=","base64"));
+const bytes=Uint8Array.from(Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAIAAAACAAAQcHAAAAAAAPY29scgEAAAAAABEAAACZanAyY/9P/1EAKQAAAAAAIAAAACAAAAAAAAAAAAAAACAAAAAgAAAAAAAAAAAAAQcBAf9SAAwAAAABAAUEBAAB/1wAE0BASEhQSEhQSEhQSEhQSEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAGAAB/5PPtAgJ0YCAgICA/9k=","base64"));
 const require=createRequire(import.meta.url);
 const wasm=require.resolve("@cornerstonejs/codec-openjpeg/decodewasm");
 const moduleImport=await import("@cornerstonejs/codec-openjpeg/decodewasmjs");
