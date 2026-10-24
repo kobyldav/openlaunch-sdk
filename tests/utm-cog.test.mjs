@@ -4,8 +4,7 @@ import {deflateSync} from "node:zlib";
 import {bbox} from "../dist/geo/types.js";
 import {utmZone,lonLatToUtm,utmToLonLat} from "../dist/eo/utm.js";
 import {
-  lonLatToGridCrs,gridCrsToLonLat,validateRaster,clipRasterToAoi,
-  typeUnused
+  lonLatToGridCrs,gridCrsToLonLat,validateRaster,clipRasterToAoi
 } from "../dist/eo/raster.js";
 import {decodeGeoTiff} from "../dist/eo/geotiff.js";
 import {readCogWindowUrl} from "../dist/eo/cog.js";
