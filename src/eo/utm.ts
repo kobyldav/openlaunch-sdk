@@ -40,7 +40,7 @@ export function lonLatToUtm(lon:number,lat:number,crs:UtmCrs):[number,number] {
   if(Math.abs(diff)>6*RAD)throw new RangeError("Coordinate is outside the supported UTM zone vicinity");
   const phi=lat*RAD, sin=Math.sin(phi),cos=Math.cos(phi),tan=Math.tan(phi);
   const n=WGS84_A/Math.sqrt(1-E2*sin*sin);
-  const t=tan*t,c=EP2*cos*cos,a=diff*cos;
+  const t=tan*tan,c=EP2*cos*cos,a=diff*cos;
   const easting=MERCATOR_EASTING+K0*n*(a+(1-t+c)*a**3/6+
     (5-18*t+t*t+72*c-58*EP2)*a**5/120);
   const northing=K0*(meridianArc(phi)+n*tan*(a*a/2+
