@@ -2,11 +2,30 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.13.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.14.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.13.0 AOI Pixel Quality is under development; v1.12.0 Footprint Coverage is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.14.0 STAC Linked QA is under development; v1.13.0 AOI Pixel Quality is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## STAC-linked scene QA analysis (v1.14 development)
+
+`SpaceMapClient.analyzeObservationQa()` securely resolves a Sentinel-2 SCL or Landsat 8/9 QA_PIXEL asset from **the same official STAC scene ID** and analyzes actual raster mask pixels over the requested area. It uses the existing OpenLaunch bounded ranged COG reader; no arbitrary image URLs from a browser.
+
+```ts
+const maps=new SpaceMapClient({
+ qaAllowedHosts:["<backend-reviewed image storage hostname>"],
+ qaSignPlanetary:true // optional, for signed Landsat assets
+});
+const outcome=await maps.analyzeObservationQa({
+ provider:"copernicus",collection:"sentinel-2-l2a",
+ itemId:"<STAC ID from exploreObservations()>",
+ area:yourAoi,
+});
+console.log(outcome.quality.usablePercentOfAoi);
+```
+
+The backend sets trusted storage hostnames. Supported TIFF formats are limited to single-band EPSG:4326/3857 and uncompressed/Deflate. Many real Sentinel-2 masks use UTM/JP2 and therefore explicitly fail pending decoder support. Scene association is established **by STAC item's asset reference**, not independent cryptographic proof (`independentlyVerifiedSceneAssociation:false`). No SAS URL is returned. Read [v1.14 guide](docs/STAC_LINKED_QA_V1_14.md). Offline Fedora smoke: `npm run example:linked-qa`.
 
 ## AOI Pixel Quality from real masks (v1.13 development)
 
