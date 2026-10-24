@@ -65,7 +65,7 @@ function resolveArea(value:ExploreArea):AreaOfInterest {
   if("bounds" in value && value.bounds !== undefined) {
     if(!Array.isArray(value.bounds)||value.bounds.length!==4)
       throw new RangeError("bounds must be [west,south,east,north]");
-    return makeBbox(...value.bounds);
+    return makeBbox(value.bounds[0]!,value.bounds[1]!,value.bounds[2]!,value.bounds[3]!);
   }
   if("center" in value && value.center !== undefined) {
     const center=value.center;
