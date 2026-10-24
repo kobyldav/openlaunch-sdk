@@ -44,7 +44,7 @@ function projection(asset:StacAsset):Jp2RasterReference {
  // For native SCL 20 m this metadata MUST be on the asset. Scene-level
  // 10 m geometry cannot be silently reused for a different resolution band.
  const epsg=asset["proj:epsg"],shape=asset["proj:shape"],transform=asset["proj:transform"];
- if(!Number.isInteger(epsg)||(epsg!==4326&&epsg!==3857&&!utmZone(`EPSG:${epsg}`)))
+ if(typeof epsg!=="number"||!Number.isInteger(epsg)||(epsg!==4326&&epsg!==3857&&!utmZone(`EPSG:${epsg}`)))
    throw new RangeError("JP2 QA asset lacks supported explicit proj:epsg");
  if(!Array.isArray(shape)||shape.length!==2||!shape.every(x=>Number.isSafeInteger(x)&&x>0))
    throw new RangeError("JP2 QA asset requires exact proj:shape");
