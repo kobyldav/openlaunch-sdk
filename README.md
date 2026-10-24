@@ -2,11 +2,19 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.12.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.13.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.12.0 Footprint Coverage is under development; v1.11.0 Best Available Satellite Preview is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.13.0 AOI Pixel Quality is under development; v1.12.0 Footprint Coverage is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## AOI Pixel Quality from real masks (v1.13 development)
+
+`SpaceMapClient.analyzeAoiPixelQuality()` analyzes decoded, georeferenced Sentinel-2 L2A SCL or Landsat 8/9 C2 QA_PIXEL mask values **inside the user's actual polygon AOI**. It distinguishes clear/cloud/shadow/snow/unknown/nodata with null-safe percentages and optional science-pixel validity; no scene-cloud estimate is substituted for missing QA pixels.
+
+`SpaceMapClient.analyzeRemoteAoiPixelQuality()` optionally reads a REAL single-band QA COG via trusted HTTPS host and HTTP range requests, then classifies its decoded pixels. This is a provider-neutral SDK capability, not a website implementation. Native UTM-only/JP2/unsupported compression remains a documented limitation. Scene association/acquisition are not independently verified. See [Pixel Quality v1.13](docs/AOI_PIXEL_QUALITY_V1_13.md).
+
+Fedora smoke: `npm run example:aoi-pixel-quality`.
 
 ## Satellite Footprint Coverage (v1.12 development)
 

@@ -1,3 +1,4 @@
+import { analyzeAoiPixelQuality, analyzeRemoteAoiPixelQuality, type AoiPixelQualityInput, type AoiPixelQuality, type RemoteAoiPixelQualityRequest, type RemoteAoiPixelQuality } from "../eo/aoi-quality.js";
 import { findBestAvailableObservationPreview, type BestPreviewOptions, type BestPreviewReport } from "./best-preview.js";
 import { fetchVerifiedObservationPreview, type ObservationPreviewOptions, type ObservationPreviewRequest, type VerifiedObservationPreview } from "./observation-preview.js";
 import { exploreSpaceObservations, type ExploreObservationsOptions, type ExploreObservationsReport } from "./observation-explorer.js";
@@ -151,6 +152,14 @@ export class SpaceMapClient{
     return buildSpaceArchive({gibs:this.gibs,meteosat:this.meteosatCache},request);
   }
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
+  /** SCL / Landsat QA pixel classification over actual georeferenced AOI cells. */
+  analyzeAoiPixelQuality(input:AoiPixelQualityInput):AoiPixelQuality{
+    return analyzeAoiPixelQuality(input);
+  }
+  /** Fetch bounded remote QA COG data from allowlisted backend URL and classify. */
+  analyzeRemoteAoiPixelQuality(request:RemoteAoiPixelQualityRequest):Promise<RemoteAoiPixelQuality>{
+    return analyzeRemoteAoiPixelQuality(request);
+  }
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
     return exploreSpaceObservations(this.observations,options);

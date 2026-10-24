@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.13.0 (development) — AOI Pixel Quality from real raster masks
+
+- Sensor-specific Sentinel-2 L2A SCL and Landsat 8/9 Collection 2 QA_PIXEL classification of real georeferenced pixels in Polygon/MultiPolygon AOIs.
+- Separates clear, cloud, shadow, snow, ambiguous and no-data; reports honest usable fraction of AOI and cloud fraction of classified pixels.
+- Optional aligned science-band validity, mask size limits, null-safe zero-denominator handling.
+- Backend-only allowlisted remote single-band QA GeoTIFF/COG ranged reads using OpenLaunch raster infrastructure, without provider credentials in user responses.
+- Offline real TIFF byte-range regression, Fedora smoke and seven-package version alignment.
+
+
 ## 1.12.0 (development) — Satellite Footprint Coverage
 
 - New `estimateFootprintCoverage()` calculates bounded approximate STAC Polygon/MultiPolygon vs convex AOI polygon overlap, subtracting polygon holes where present.
