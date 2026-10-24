@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.8.0 (development) — Space Archive & Playback
+
+- Unified `SpaceMapClient.archivePlayback()` across NASA GIBS daily WMTS requests and Meteosat time-advertised WMS images.
+- Introduced common frame descriptors, chronology, attribution, delivery status, verified scope and check timestamp.
+- Optional bounded sequential verification for at most eight recent frames; NASA verifies only one requested tile per day, Meteosat checks the full WMS image.
+- Reuses existing Meteosat image/shared cache, supports unverified offline frames without provider imagery downloads.
+- Added deterministic Fedora smoke, provider failure tests and seven-workspace version alignment.
+
+
 ## 1.7.0 (development) — Shared Meteosat Image Cache
 
 - Optional, backend-neutral `MeteosatSharedImageStore` with cross-instance read/write support.
