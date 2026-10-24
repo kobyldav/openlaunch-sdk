@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.17.0",
-  "description": "OpenLaunch SDK: optional JPEG2000 JP2 SCL decoding adapter, LZW, geospatial EO and orbital datasets",
+  "version": "1.18.0",
+  "description": "OpenLaunch SDK: real OpenJPEG WASM JP2 verification, lossless GeoTIFF/COG and satellite quality analysis",
   "keywords": [
     "space",
     "spaceflight",
@@ -175,7 +175,8 @@
     "example:linked-qa": "npm run build && node scripts/stac-linked-qa-smoke.mjs",
     "example:utm-cog": "npm run build && node scripts/utm-cog-smoke.mjs",
     "example:lzw-geotiff": "npm run build && node scripts/lzw-geotiff-smoke.mjs",
-    "example:jp2-qa": "npm run build && node scripts/jp2-qa-smoke.mjs"
+    "example:jp2-qa": "npm run build && node scripts/jp2-qa-smoke.mjs",
+    "example:openjpeg-real": "npm run build && node scripts/jp2-openjpeg-real-smoke.mjs"
   },
   "engines": {
     "node": ">=18"

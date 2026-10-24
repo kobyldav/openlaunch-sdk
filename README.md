@@ -2,11 +2,23 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.17.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.18.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Real OpenJPEG WASM validation (v1.18 development)
+
+The v1.17 optional JPEG2000 adapter is now tested with the **actual** pinned OpenJPEG WASM package in a separate GitHub Actions workflow, not only against a mock. The test decodes the independently OpenJPEG-encoded 3×2 grayscale JP2 and asserts all six raw SCL values as well as STAC-linkage and cloud-classification semantics. `createOpenJpegWasmBackend()` now checks codec-reported channel count, bit depth, signedness and pixel-buffer size and copies output before releasing WASM memory.
+
+```bash
+npm ci
+npm install --no-save --package-lock=false --ignore-scripts @cornerstonejs/codec-openjpeg@1.3.6
+npm run example:openjpeg-real
+```
+
+The external codec remains **optional**, not added to the default SDK dependencies. Full-size native Sentinel-2 JP2 downloads, spatial window decoding and production-provider signing are not solved in this release. Run decoding on isolated backend workers with request, memory and CPU limits. See [OpenJPEG WASM verification](docs/OPENJPEG_WASM_V1_18.md).
 
 ## Optional JPEG2000 / Sentinel-2 SCL JP2 (v1.17 development)
 
