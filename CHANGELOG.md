@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.20.0 (development) — Web-ready satellite map contracts
+
+- `SpaceMapClient.webMapSearch()` offers one public map entry for a curated STAC layer, selected area, time interval and bounded scene metadata. No STAC signed preview/asset URL or raw provider error is returned.
+- Return full source provenance/status, declared-unverified image selectors, footprint and cloud metadata; empty provider catalog and offline provider remain distinct states.
+- `SpaceMapClient.webMapDaily()` maps two official NASA GIBS daily products to attribution-aware MapLibre/Leaflet XYZ descriptors. Never asserts live/acquisition availability.
+- Existing `fetchObservationPreview()` is the separate explicit bounded backend binary step; no duplicate provider integration in the web.
+- Offline integration test covers STAC→safe scene cards→verified PNG, NASA daily tiles, provider errors, unsupported layers and accidental URL/token leaks.
+- Seven independent workspaces aligned to 1.20.0, smoke and web integration guide.
+
+
 ## 1.19.0 (development) — JPEG2000 reduced-resolution AOI SCL analysis
 
 - Optional wavelet decomposition levels 0..4 via OpenJPEG WASM `decodeSubResolution()`; level 0 is fully backwards-compatible with v1.18.
