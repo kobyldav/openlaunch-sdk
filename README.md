@@ -2,11 +2,31 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.20.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.21.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Verified NASA GIBS daily map tiles (v1.21 development)
+
+`SpaceMapClient.webMapDailyTile({layer,date,z,x,y})` fetches exactly **one** trusted NASA daily map tile via HTTP GET with redirects disabled. Layer is restricted to the two curated MODIS/VIIRS presets already accepted by `webMapDaily()`. The SDK validates integer XYZ bounds, Content-Length and streamed size limits, exact MIME and JPEG/PNG file signature.
+
+Results distinguish `available`, `missing` (NASA 404/410), `unavailable` (upstream / timeout), and `invalid` (HTML/XML masquerading as image, MIME error or too many bytes). A verified tile is **verified binary delivery only**, never independent confirmation of satellite capture or a guarantee of cloud-free imagery.
+
+```ts
+const maps=new SpaceMapClient({webMapTileMaxBytes:512*1024,webMapTileTimeoutMs:8000});
+const result=await maps.webMapDailyTile({
+  layer:"nasa-modis-terra",date:"2026-10-17",z:5,x:17,y:11
+});
+if(result.status==="available"&&result.image){
+  // Backend emits result.image with result.contentType.
+}
+```
+
+Return verified bytes from a rate-limited, cache-aware backend. For interactive zoom/pan maps, keep existing NASA direct XYZ descriptors in `webMapDaily()` and use the new tile method to confirm a selected tile/date or build a hardened image proxy. This is **not** a background downloader and does not query all map tiles. The endpoint's availability is not checked live by CI (network fixtures only).
+
+[Full v1.21 guide](docs/WEB_GIBS_TILES_V1_21.md). Fedora smoke: `npm run example:web-map-tile`.
 
 ## Web map integration API (v1.20 development)
 

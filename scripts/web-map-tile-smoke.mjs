@@ -1,0 +1,24 @@
+import assert from "node:assert/strict";
+import {SpaceMapClient} from "@openlaunch/earth";
+const tile=Uint8Array.from([255,216,255,224,0,16,74,70,73,70,255,217]);
+let tileRequests=0;
+const maps=new SpaceMapClient({fetch:async(_url,init)=>{
+ assert.equal(init.redirect,"error");
+ tileRequests++;
+ return new Response(tile.slice(),{headers:{"content-type":"image/jpeg"}});
+}});
+const query={layer:"nasa-modis-terra",date:"2026-10-17",z:5,x:17,y:11};
+const ok=await maps.webMapDailyTile(query);
+assert.equal(ok.status,"available");
+assert.deepEqual([...ok.image],[...tile]);
+assert.equal(ok.imageVerified,true);
+assert.equal(ok.verifiedAcquisition,false);
+const missingMaps=new SpaceMapClient({fetch:async()=>new Response(null,{status:404})});
+const missing=await missingMaps.webMapDailyTile(query);
+assert.equal(missing.status,"missing");
+assert.equal(missing.image,null);
+console.log("PASS OpenLaunch v1.21 Web NASA GIBS Verified Tile");
+console.log("Image bytes validated:",ok.byteLength);
+console.log("NASA daily tile requests:",tileRequests);
+console.log("Missing date/tile handled:",missing.reason);
+console.log("Satellite acquisition verified:",ok.verifiedAcquisition);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.21.0 (development) — Bounded Verified NASA GIBS Web Tiles
+
+- New `SpaceMapClient.webMapDailyTile()` retrieves exactly one daily NASA GIBS XYZ tile from a fixed official HTTPS origin, with no untrusted href parameter.
+- Strict integer XYZ bounds, maximum zoom, GET-only, no redirects, maxBytes and timeout budgets; streamed size cap and MIME+JPEG/PNG signature validation.
+- Distinguishes actual delivered image, NASA missing tile, upstream failure and invalid/error-page binary response; never leaks provider URL/errors into result.
+- Explicit metadata `imageVerified`, `verifiedAcquisition:false`, `observedAt:null` avoids unsupported LIVE imagery claims.
+- Offline security tests for 404/410, invalid/XML masquerade, oversize, redirects, network and abort errors; npm smoke, docs, 7 package versions updated.
+- No claim that production NASA imagery is currently available; full map tiling/caching stays the responsibility of the backend.
+
+
 ## 1.20.0 (development) — Web-ready satellite map contracts
 
 - `SpaceMapClient.webMapSearch()` offers one public map entry for a curated STAC layer, selected area, time interval and bounded scene metadata. No STAC signed preview/asset URL or raw provider error is returned.
