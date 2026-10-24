@@ -95,7 +95,7 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
   readHeader?():unknown;
   decode():void;
   getDecodedBuffer():Uint8Array|ArrayBuffer;
-  getFrameInfo():{width:number;height:number};
+  getFrameInfo():{width:number;height:number;componentCount?:number;bitsPerSample?:number;isSigned?:boolean};
   delete?():void;
  };
 }>):Jp2DecoderBackend {
@@ -111,8 +111,20 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
     encoded.set(bytes);
     instance.readHeader?.();
     instance.decode();
-    const info=instance.getFrameInfo(),buffer=instance.getDecodedBuffer();
+    const info=instance.getFrameInfo();
+    if(!info||!Number.isSafeInteger(info.width)||!Number.isSafeInteger(info.height)||
+       info.width<1||info.height<1||
+       (info.componentCount!==undefined&&info.componentCount!==1)||
+       (info.bitsPerSample!==undefined&&info.bitsPerSample!==8)||
+       (info.isSigned!==undefined&&info.isSigned!==false))
+      throw new RangeError("OpenJPEG decoded format is not one unsigned 8-bit component");
+    const buffer=instance.getDecodedBuffer();
+    if(!(buffer instanceof Uint8Array)&&!(buffer instanceof ArrayBuffer))
+      throw new TypeError("OpenJPEG returned an unsupported pixel buffer");
     const values=buffer instanceof Uint8Array?buffer:new Uint8Array(buffer);
+    if(values.byteLength!==info.width*info.height)
+      throw new RangeError("OpenJPEG grayscale pixel count does not match frame info");
+    // Copy from WASM memory BEFORE destructor (typed_memory_view becomes dangling).
     return {width:info.width,height:info.height,components:1,
       values:Uint8Array.from(values)};
   }finally{instance.delete?.();}
