@@ -24,7 +24,7 @@ const packages = {
     entries: ["cache", "errors", "http", "query", "types", "utils", "mappers", "resources/base", "resources/raw", "resources/generic"],
   },
   earth: {
-    entries: ["modular/earth", "intelligence/map-layers", "intelligence/layer-health", "intelligence/space-archive", "intelligence/observation-explorer", "intelligence/observation-preview", "providers/meteosat-cache", "providers/meteosat-kv", "providers/gibs", "providers/meteosat", "providers/firms", "providers/sentinel5p", "providers/space-video", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "eo/products", "eo/scenes", "eo/download"],
+    entries: ["modular/earth", "intelligence/map-layers", "intelligence/layer-health", "intelligence/space-archive", "intelligence/observation-explorer", "intelligence/observation-preview", "intelligence/best-preview", "providers/meteosat-cache", "providers/meteosat-kv", "providers/gibs", "providers/meteosat", "providers/firms", "providers/sentinel5p", "providers/space-video", "geo/index", "providers/stac", "providers/copernicus", "providers/planetary-computer", "providers/openmeteo", "intelligence/observations", "eo/products", "eo/scenes", "eo/download"],
   },
   raster: {
     entries: ["eo/index", "geo/index"],
