@@ -1,5 +1,5 @@
 import type { AreaOfInterest } from "../geo/types.js";
-import type { RasterGrid, RasterTransform } from "./raster.js";
+import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import {
   clipRasterToAoi, lonLatToGridCrs, pixelToWorld,
   validateRaster, worldToPixel,
@@ -36,7 +36,8 @@ export interface CogReadResult {
  * Read only the intersecting TIFF strips/tiles from a remotely hosted COG.
  * HTTPS 206 Content-Range is mandatory: a server ignoring Range is rejected.
  *
- * No arbitrary reprojection. Supports single-band classic/BigTIFF,
+ * WGS84 UTM 326xx/327xx conversion is supported; no arbitrary projection.
+ * Supports single-band classic/BigTIFF,
  * uncompressed/Deflate TIFF strips or tiles, EPSG:4326 / EPSG:3857 only.
  * No multi-band JPEG, LZW, JP2, cloud-native GeoTIFF overviews, or full
  * arbitrary CRS pipeline. Requests a bounded TIFF IFD header then blocks.
@@ -199,13 +200,18 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
   }finally{clearTimeout(timer);}
 }
 function pixelBounds(
-  area:AreaOfInterest,crs:"EPSG:4326"|"EPSG:3857",transform:RasterTransform,width:number,height:number,
+  area:AreaOfInterest,crs:RasterCrs,transform:RasterTransform,width:number,height:number,
 ):{c0:number;c1:number;r0:number;r1:number}{
   const [w,s,e,n]=area.bbox;
   if(w>e)throw new RangeError("Antimeridian-crossing AOI requires tiling");
-  const positions:[[number,number],[number,number],[number,number],[number,number]]=[
-    lonLatToGridCrs(w,s,crs),lonLatToGridCrs(w,n,crs),lonLatToGridCrs(e,s,crs),lonLatToGridCrs(e,n,crs),
-  ];
+  // Sample the geographic boundary's projected envelope; UTM map edges
+  // curve relative to lon/lat and may have extrema away from the 4 corners.
+  const positions:[number,number][]=[];
+  const steps=area.geometry.type==="Point"?0:8;
+  for(let i=0;i<=steps;i++)for(let j=0;j<=steps;j++) {
+    const u=steps?i/steps:0,v=steps?j/steps:0;
+    positions.push(lonLatToGridCrs(w+(e-w)*u,s+(n-s)*v,crs));
+  }
   let cmin=Infinity,cmax=-Infinity,rmin=Infinity,rmax=-Infinity;
   for(const [x,y] of positions){
     const [col,row]=worldToPixel(transform,x,y);

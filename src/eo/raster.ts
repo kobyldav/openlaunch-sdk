@@ -1,8 +1,9 @@
+import { utmZone, lonLatToUtm, utmToLonLat } from "./utm.js";
 import type { AreaOfInterest, Position } from "../geo/types.js";
 
 /** Pixel-corner transform: x=a+b*col+c*row, y=d+e*col+f*row. */
 export type RasterTransform = readonly [a:number,b:number,c:number,d:number,e:number,f:number];
-export type RasterCrs = "EPSG:4326" | "EPSG:3857";
+export type RasterCrs = "EPSG:4326" | "EPSG:3857" | `EPSG:${number}`;
 export interface RasterGrid {
   width: number;
   height: number;
@@ -37,7 +38,8 @@ export function validateRaster(grid: RasterGrid): void {
   }
   if (grid.width*grid.height > 16_777_216) throw new RangeError("Raster exceeds 16,777,216 pixel safety limit");
   if (grid.values.length !== grid.width*grid.height) throw new RangeError("Raster samples must equal width*height");
-  if (grid.crs !== "EPSG:4326" && grid.crs !== "EPSG:3857") throw new RangeError("Only EPSG:4326/3857 supported");
+  if (grid.crs !== "EPSG:4326" && grid.crs !== "EPSG:3857" && !utmZone(grid.crs))
+    throw new RangeError("Only EPSG:4326/3857 and WGS84 UTM 326xx/327xx supported");
   if (grid.transform.length !== 6 || grid.transform.some(n=>!Number.isFinite(n))) throw new RangeError("Invalid affine geotransform");
   if (Math.abs(grid.transform[1]*grid.transform[5]-grid.transform[2]*grid.transform[4]) < 1e-15) {
     throw new RangeError("Non-invertible geotransform");
@@ -58,12 +60,14 @@ export function worldToPixel(transform: RasterTransform,x:number,y:number): [num
 export function lonLatToGridCrs(lon:number,lat:number,crs:RasterCrs): [number,number] {
   if(!Number.isFinite(lon)||!Number.isFinite(lat)||lon < -180||lon > 180||lat < -90||lat > 90) throw new RangeError("Invalid lon/lat");
   if(crs==="EPSG:4326")return [lon,lat];
+  if(crs!=="EPSG:3857")return lonLatToUtm(lon,lat,crs);
   // Web Mercator is undefined at poles; clamp to its standard latitude extent.
   const bound=Math.max(-85.0511287798,Math.min(85.0511287798,lat));
   return [MERCATOR_R*lon*Math.PI/180,MERCATOR_R*Math.log(Math.tan(Math.PI/4+bound*Math.PI/360))];
 }
 export function gridCrsToLonLat(x:number,y:number,crs:RasterCrs): [number,number] {
   if(crs==="EPSG:4326")return [x,y];
+  if(crs!=="EPSG:3857")return utmToLonLat(x,y,crs);
   return [x*180/(MERCATOR_R*Math.PI),(2*Math.atan(Math.exp(y/MERCATOR_R))-Math.PI/2)*180/Math.PI];
 }
 export function rasterStatistics(grid:RasterGrid): RasterStats {
@@ -112,10 +116,12 @@ export function clipRasterToAoi(grid:RasterGrid,area:AreaOfInterest):RasterGrid 
   validateRaster(grid);
   const [west,south,east,north]=area.bbox;
   if(west>east)throw new RangeError("Antimeridian-crossing AOIs need explicit tiling");
-  const projected: [number,number][]=[
-    lonLatToGridCrs(west,south,grid.crs),lonLatToGridCrs(west,north,grid.crs),
-    lonLatToGridCrs(east,south,grid.crs),lonLatToGridCrs(east,north,grid.crs),
-  ];
+  // UTM's projected AOI boundary may curve relative to geographic edges.
+  // A 5x5 sampled envelope is conservative for bounded local AOIs and avoids
+  // missing tiles if an extremum occurs away from the four corners.
+  const projected: [number,number][]=[];
+  for(let i=0;i<=4;i++)for(let j=0;j<=4;j++)
+    projected.push(lonLatToGridCrs(west+(east-west)*i/4,south+(north-south)*j/4,grid.crs));
   let minC=Infinity,maxC=-Infinity,minR=Infinity,maxR=-Infinity;
   for(const [x,y] of projected){
     const [c,r]=worldToPixel(grid.transform,x,y);

@@ -2,11 +2,25 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.14.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.15.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.14.0 STAC Linked QA is under development; v1.13.0 AOI Pixel Quality is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.15.0 WGS84 UTM GeoTIFF/COG support is under development; v1.14.0 STAC Linked QA is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Native WGS84 UTM GeoTIFF/COG coordinates (v1.15 development)
+
+Raster helpers now understand **EPSG:32601..32660** (WGS84 UTM north) and **EPSG:32701..32760** (WGS84 UTM south), in addition to EPSG:4326 and EPSG:3857. The same projection transformations apply in `decodeGeoTiff()`, `readCogWindowUrl()`, `analyzeAoiPixelQuality()`, `analyzeRemoteAoiPixelQuality()`, and the existing STAC-linked QA workflow. Projection is an ellipsoidal Transverse Mercator conversion, not a generic arbitrary CRS engine.
+
+```ts
+import {lonLatToGridCrs,gridCrsToLonLat} from "@openlaunch/raster";
+const utm=lonLatToGridCrs(14.4208,50.088,"EPSG:32633");
+const geodetic=gridCrsToLonLat(...utm,"EPSG:32633");
+```
+
+UTM zone geometry is validated and outside-zone/invalid-hemisphere inputs are rejected. Byte-range COG cropping now samples geographic edges to bound projected windows. This **does not add JP2, LZW or multiband raster decoding**. Many Sentinel-2 SCL assets are JP2, so UTM alone does not complete all real-scene support. See [v1.15 guide](docs/UTM_COG_V1_15.md).
+
+Fedora smoke: `npm run example:utm-cog`.
 
 ## STAC-linked scene QA analysis (v1.14 development)
 

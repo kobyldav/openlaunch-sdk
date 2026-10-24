@@ -1,6 +1,6 @@
 {
   "name": "@openlaunch/core",
-  "version": "1.14.0",
+  "version": "1.15.0",
   "description": "Shared typed HTTP, cache, query and normalized API primitives without satellite dependencies",
   "license": "MIT",
   "type": "module",
