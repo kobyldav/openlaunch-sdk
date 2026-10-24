@@ -107,7 +107,7 @@ test("v1.11 validates limits, strategies and server trust before any network req
   await assert.rejects(sdk.bestAvailablePreview({...period,...options}),RangeError);
  assert.equal(calls.catalog,0);
  const closed=new SpaceMapClient({previewAllowedHosts:[],fetch:async()=>{throw Error("unexpected");}});
- await assert.rejects(closed.bestAvailablePreview(period),/previewAllowedHosts/);
+ assert.throws(()=>closed.bestAvailablePreview(period),/previewAllowedHosts/);
 });
 test("v1.11 uses deterministic ranking only and never treats metadata preview as verified delivery",async()=>{
  const sample={

@@ -56,7 +56,8 @@ function candidateRequest(candidate:ExploredObservation):ObservationPreviewReque
 function catalogScore(item:ExploredObservation, until:number, strategy:BestPreviewStrategy):number {
   const timestamp=item.acquiredAt===null?NaN:Date.parse(item.acquiredAt);
   const days=Number.isFinite(timestamp)?Math.max(0,(until-timestamp)/86_400_000):3650;
-  const newest=Math.max(0,1-Math.min(1,days/365));
+  // The recent strategy uses a 30-day decay so it really prioritizes timestamp.
+  const newest=Math.max(0,1-Math.min(1,days/(strategy==="recent"?30:365)));
   const cloud=item.cloudCoverPercent;
   // No scene cloud metadata -> neutral, not "perfectly clear".
   const clear=cloud===null?0.35:1-cloud/100;
