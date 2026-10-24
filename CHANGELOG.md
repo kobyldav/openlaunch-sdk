@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.19.0 (development) — JPEG2000 reduced-resolution AOI SCL analysis
+
+- Optional wavelet decomposition levels 0..4 via OpenJPEG WASM `decodeSubResolution()`; level 0 is fully backwards-compatible with v1.18.
+- Exact decoded output dimension checks, pixel-budget enforcement **before network fetch**, source pixel-size budget and properly scaled affine georeferencing on both axes (including skew).
+- SpaceMapClient options `jp2DecompositionLevel` / `jp2MaxSourcePixels` and report provenance fields for actual resolution scale.
+- Real independently encoded lossless 32×32 JP2 fixture decoded with OpenJPEG WASM at level 2 in Node 20/22 CI.
+- No HTTP JP2 range access or large native Sentinel-2 granule support. Entire compressed file must fit existing bounded download budgets.
+
+
 ## 1.18.0 (development) — Real OpenJPEG WASM integration verification
 
 - Dedicated GitHub Actions integration checks actual OpenJPEG/WASM decoded grayscale pixel data for a genuine independently encoded JP2 fixture, not only mock decode outputs.

@@ -81,6 +81,8 @@ export interface SpaceMapOptions {
   jp2Decoder?: Jp2DecoderBackend;
   jp2MaxBytes?: number;
   jp2MaxPixels?: number;
+  jp2MaxSourcePixels?: number;
+  jp2DecompositionLevel?: number;
   jp2TimeoutMs?: number;
   qaMaxPixels?: number;
   qaTimeoutMs?: number;
@@ -127,6 +129,8 @@ export class SpaceMapClient{
       ...(options.jp2Decoder?{decoder:options.jp2Decoder}:{}),
       ...(options.jp2MaxBytes!==undefined?{maxBytes:options.jp2MaxBytes}:{}),
       ...(options.jp2MaxPixels!==undefined?{maxPixels:options.jp2MaxPixels}:{}),
+      ...(options.jp2MaxSourcePixels!==undefined?{maxSourcePixels:options.jp2MaxSourcePixels}:{}),
+      ...(options.jp2DecompositionLevel!==undefined?{decompositionLevel:options.jp2DecompositionLevel}:{}),
       ...(options.jp2TimeoutMs!==undefined?{timeoutMs:options.jp2TimeoutMs}:{}),
       ...(options.fetch?{fetch:options.fetch}:{})
     };

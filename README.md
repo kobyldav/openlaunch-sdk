@@ -2,11 +2,29 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.18.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.19.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## OpenJPEG reduced-resolution JP2 (v1.19 development)
+
+Use `jp2DecompositionLevel:2` in `SpaceMapClient` to decode supported single-band 8-bit JPEG2000 SCL masks at quarter width and height (approximately 1/16 the native pixel count). The real OpenJPEG WASM backend uses `decodeSubResolution()`; the SDK validates decoded dimensions and **scales the georeferencing transform** for the coarser pixel grid. Original dimensions and decoded pixels have separate limits; attempts to decode a very large original image or fetch a JP2 exceeding the byte cap are rejected.
+
+```ts
+const maps = new SpaceMapClient({
+  jp2AllowedHosts:["<reviewed JP2 asset host>"],
+  jp2Decoder:configuredOpenJpegWasmDecoder,
+  jp2DecompositionLevel:2,
+  jp2MaxPixels:1_048_576,
+  jp2MaxSourcePixels:16_777_216
+});
+const report=await maps.analyzeObservationJp2Qa({itemId:stacItemId,area:yourAoi});
+console.log(report.effectivePixelScale,report.decodedWidth,report.quality.usablePercentOfAoi);
+```
+
+**Not a JP2 range or tile reader:** the bounded original file still downloads completely. Native-image decompression can still consume more memory than final decoded pixel count; isolate codec execution server-side. Subresolution changes sampling and cloud classification accuracy. Actual WASM reduction is exercised by independent 32×32 JP2 CI on Node 20/22. Details: [v1.19 guide](docs/JP2_REDUCED_V1_19.md).
 
 ## Real OpenJPEG WASM validation (v1.18 development)
 

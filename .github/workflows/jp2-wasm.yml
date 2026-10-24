@@ -29,3 +29,5 @@ jobs:
         run: npm install --no-save --package-lock=false --ignore-scripts --no-audit --no-fund @cornerstonejs/codec-openjpeg@1.3.6
       - name: Verify actual OpenJPEG WASM SCL pixel values
         run: node scripts/jp2-openjpeg-real-smoke.mjs
+      - name: Verify real JPEG2000 wavelet reduced-resolution decoding
+        run: node scripts/jp2-reduced-real-smoke.mjs
