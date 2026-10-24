@@ -1,3 +1,4 @@
+import { exploreSpaceObservations, type ExploreObservationsOptions, type ExploreObservationsReport } from "./observation-explorer.js";
 import { buildSpaceArchive, type SpaceArchiveRequest, type SpaceArchivePlayback } from "./space-archive.js";
 import { MeteosatImageCache, type MeteosatImageCacheOptions, type MeteosatCachedImage, type MeteosatImageCacheStats } from "../providers/meteosat-cache.js";
 import { checkMeteosatPlayback, type MeteosatPlaybackOptions, type MeteosatPlaybackResult } from "./meteosat-playback.js";
@@ -137,6 +138,10 @@ export class SpaceMapClient{
     return buildSpaceArchive({gibs:this.gibs,meteosat:this.meteosatCache},request);
   }
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
+  /** Find catalog-declared historical satellite scenes by a user-selected location. */
+  exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
+    return exploreSpaceObservations(this.observations,options);
+  }
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
     return this.observations.discover(options);
   }

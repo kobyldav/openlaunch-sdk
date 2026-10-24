@@ -2,11 +2,30 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.8.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.9.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.8.0 Space Archive & Playback is in a development pull request; v1.7.0 is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.9.0 Observation Explorer is under development; v1.8.0 Space Archive & Playback is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Location-first Observation Explorer (v1.9 development)
+
+A web visitor selects a location and date window without first knowing which satellite to use. `SpaceMapClient.exploreObservations()` searches the existing OpenLaunch Copernicus/Planetary Computer STAC adapters for optical Sentinel-2, SAR Sentinel-1, thermal Landsat C2 L2 scenes. Static DEM is opt-in.
+
+```ts
+import { SpaceMapClient } from "@openlaunch/earth";
+const maps = new SpaceMapClient();
+const scenes = await maps.exploreObservations({
+  area: { center: [14.42, 50.08], radiusKm: 10 },
+  from: "2026-09-01", to: "2026-10-01",
+  maxResults: 20, sort: "newest"
+});
+console.log(scenes.status,scenes.observations);
+```
+
+Bounded search, optional scene-level cloud filtering, provider isolation, normalized acquisition dates, declared resolution and unverified previews. **STAC results are catalog records, not actual downloaded images or verified pixel availability.** `status:"partial"` warns of provider failures; thumbnails may require signing. Use this metadata for discovery and route selected products through existing SDK imagery clients.
+
+Test without internet or provider keys after `npm ci`: `npm run example:observation-explorer`. See [Observation Explorer v1.9](docs/OBSERVATION_EXPLORER_V1_9.md).
 
 ## Space Archive & Playback (v1.8 development)
 
