@@ -4,3 +4,4 @@ export * from "./acquisitions.js";
 export * from "./map-layers.js";
 export * from "./layer-health.js";
 export * from "./meteosat-playback.js";
+export * from "./space-archive.js";

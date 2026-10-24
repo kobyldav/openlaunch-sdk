@@ -1,3 +1,4 @@
+import { buildSpaceArchive, type SpaceArchiveRequest, type SpaceArchivePlayback } from "./space-archive.js";
 import { MeteosatImageCache, type MeteosatImageCacheOptions, type MeteosatCachedImage, type MeteosatImageCacheStats } from "../providers/meteosat-cache.js";
 import { checkMeteosatPlayback, type MeteosatPlaybackOptions, type MeteosatPlaybackResult } from "./meteosat-playback.js";
 import { probeSpaceImage, type SpaceImageAvailability, type SpaceImageProbe } from "./layer-health.js";
@@ -131,6 +132,10 @@ export class SpaceMapClient{
   meteosatCacheStats():MeteosatImageCacheStats{return this.meteosatCache.stats();}
   clearMeteosatCache():void{this.meteosatCache.clear();}
   meteosatPlayback(options:MeteosatPlaybackOptions):Promise<MeteosatPlaybackResult>{return checkMeteosatPlayback(this.meteosatCache,this.gibs,options);}
+  /** Unified NASA daily / Meteosat history; optional bounded upstream verification. */
+  archivePlayback(request:SpaceArchiveRequest):Promise<SpaceArchivePlayback>{
+    return buildSpaceArchive({gibs:this.gibs,meteosat:this.meteosatCache},request);
+  }
   meteosatMap(options:MeteosatMapOptions):MeteosatMapDescriptor{return this.meteosat.mapUrl(options);}
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
     return this.observations.discover(options);

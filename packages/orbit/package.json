@@ -1,6 +1,6 @@
 {
   "name": "@openlaunch/orbit",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "SGP4/SDP4 propagation, satellite passes, traffic screening and observation geometry",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.7.0",
+    "@openlaunch/core": "^1.8.0",
     "satellite.js": "6.0.2"
   }
 }

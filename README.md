@@ -2,11 +2,31 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.7.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.8.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
-[Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
+[Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.4.0 Meteosat timeline features are developed in a feature branch; v1.3.0 is merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.8.0 Space Archive & Playback is in a development pull request; v1.7.0 is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Space Archive & Playback (v1.8 development)
+
+`SpaceMapClient.archivePlayback()` exposes one chronological, backend-friendly frame format for **NASA GIBS daily WMTS** and **EUMETView Meteosat WMS**. The SDK never fabricates capture timestamps or presents a checked single NASA tile as a verified entire scene.
+
+```ts
+import { SpaceMapClient } from "@openlaunch/earth";
+const sdk = new SpaceMapClient();
+const archive = await sdk.archivePlayback({
+  source:"nasa-gibs",
+  layer:"MODIS_Terra_CorrectedReflectance_TrueColor",
+  from:"2026-10-01",to:"2026-10-05",maxFrames:5,
+  verifyLast:2,sampleTile:{z:2,x:1,y:1},
+});
+console.log(archive.frames.map(f=>({time:f.time,delivery:f.delivery,url:f.mapUrl})));
+```
+
+For Meteosat, use `{source:"meteosat",layer,bounds3857,width,height,maxFrames,verifyLast}`. Only provider-advertised times are listed; actual WMS image verification is opt-in, bounded to eight most recent frames. This is an SDK data API, not a frontend player or permanent archive.
+
+Offline Fedora test: `npm run example:space-archive`. Details: [Space Archive v1.8](docs/SPACE_ARCHIVE_V1_8.md).
 
 ## Shared Meteosat image cache (v1.7 development)
 
