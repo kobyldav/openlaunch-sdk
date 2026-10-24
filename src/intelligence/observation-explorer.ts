@@ -1,3 +1,4 @@
+import { estimateFootprintCoverage, type FootprintCoverage } from "./footprint-coverage.js";
 import { bbox as makeBbox, circle, type AreaOfInterest, type BBox, type Position } from "../geo/types.js";
 import type { ObservationDiscoveryClient, ObservationDiscoveryReport, ObservationLayer, ObservationProvider, ObservationScene, ObservationQueryStatus } from "./observations.js";
 import { selectEoAssets, type EoLayerKind } from "../eo/products.js";
@@ -17,6 +18,8 @@ export interface ExploreObservationsOptions {
   perSourceLimit?: number;
   maxResults?: number;
   sort?: ExploreSort;
+  /** 0..100; when >0, scenes without usable footprint are excluded. */
+  minFootprintCoveragePercent?: number;
 }
 export interface ExploredAsset {
   key: string;
@@ -39,6 +42,9 @@ export interface ExploredObservation {
   /** A declared preview href is only a pointer, not a verified deliverable. */
   previewUrl: string | null;
   previewVerified: false;
+  footprintCoveragePercent: number | null;
+  footprintCoverageBasis: FootprintCoverage["basis"];
+  pixelCoverageVerified: false;
   catalogOnly: true;
 }
 export interface ExploreObservationsReport {
@@ -90,10 +96,11 @@ function date(value:Date|string,label:string):Date {
 function httpsLink(href:string):string|null {
   try {const url=new URL(href);return url.protocol==="https:"?url.href:null;}catch{return null;}
 }
-function sceneView(scene:ObservationScene):ExploredObservation|null {
+function sceneView(scene:ObservationScene,area:AreaOfInterest):ExploredObservation|null {
   if(!scene.product.assets.length)return null;
   const time=sceneDatetime(scene.item);
   const cloud=scene.product.sceneCloudCoverPercent;
+  const coverage=estimateFootprintCoverage(area,scene.item.geometry);
   const previews=selectEoAssets(scene.product,"preview");
   const previewUrl=previews.map(a=>httpsLink(a.href)).find((x):x is string=>x!==null)??null;
   return {
@@ -107,7 +114,9 @@ function sceneView(scene:ObservationScene):ExploredObservation|null {
     assets:scene.product.assets.map(a=>({
       key:a.key,kind:a.kind,groundSampleDistanceM:a.groundSampleDistanceM??null,
     })),
-    previewUrl,previewVerified:false,catalogOnly:true,
+    previewUrl,previewVerified:false,
+    footprintCoveragePercent:coverage.coveragePercent,
+    footprintCoverageBasis:coverage.basis,pixelCoverageVerified:false,catalogOnly:true,
   };
 }
 /** Reuses OpenLaunch's real multi-provider STAC query. Never fetches or invents pixels. */
@@ -127,6 +136,9 @@ export async function exploreSpaceObservations(
     throw new RangeError("Select between one and four observation layers");
   const allowed=new Set<ObservationLayer>(["optical","radar","thermal","elevation"]);
   for(const layer of layers)if(!allowed.has(layer))throw new RangeError("Unknown observation layer");
+  const minCoverage=options.minFootprintCoveragePercent??0;
+  if(!Number.isFinite(minCoverage)||minCoverage<0||minCoverage>100)
+    throw new RangeError("minFootprintCoveragePercent must be 0..100");
   const cloud=options.maxCloudCoverPercent;
   if(cloud!==undefined&&(!Number.isFinite(cloud)||cloud<0||cloud>100))
     throw new RangeError("maxCloudCoverPercent must be 0..100");
@@ -139,8 +151,10 @@ export async function exploreSpaceObservations(
   const candidates=new Map<string,ExploredObservation>();
   for(const scene of data.scenes) {
     if(!allowed.has(scene.layer)||!layers.includes(scene.layer))continue;
-    const view=sceneView(scene);
+    const view=sceneView(scene,area);
     if(!view)continue;
+    if(minCoverage>0&&(view.footprintCoveragePercent===null||
+      view.footprintCoveragePercent<minCoverage))continue;
     // Include records with no datetime only for static elevation; never label
     // undated optical/radar/thermal records as genuine historical observations.
     const time=view.acquiredAt?Date.parse(view.acquiredAt):NaN;
@@ -175,6 +189,7 @@ export async function exploreSpaceObservations(
       "STAC search results are catalog metadata, not verified pixels or a confirmed downloadable scene.",
       "Preview URLs may require signed access; never interpret a metadata pointer as a playable image.",
       "Cloud coverage is an estimate for the scene, not necessarily the chosen location.",
+      "Footprint overlap is an approximate STAC polygon intersection, not a check that delivered pixels cover the AOI.",
       "Results are bounded by per-provider pagination and may omit other scenes.",
       ...(layers.includes("elevation")?["Static terrain is not a dated observation, even when grouped in search results."]:[]),
       ...(failed?["Some providers failed: this is a partial catalog search, not an empty Earth observation history."]:[]),

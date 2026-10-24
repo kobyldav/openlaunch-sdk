@@ -8,3 +8,4 @@ export * from "./space-archive.js";
 export * from "./observation-explorer.js";
 export * from "./observation-preview.js";
 export * from "./best-preview.js";
+export * from "./footprint-coverage.js";

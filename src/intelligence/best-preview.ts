@@ -66,9 +66,11 @@ function catalogScore(item:ExploredObservation, until:number, strategy:BestPrevi
   // This metadata describes the source product, NOT preview image resolution.
   const detail=best===null?0.25:Math.max(0,Math.min(1,30/best));
   const optical=item.layer==="optical"?1:0;
+  const footprint=item.footprintCoveragePercent===null||item.footprintCoveragePercent===undefined
+    ? 0.30 : Math.max(0,Math.min(1,item.footprintCoveragePercent/100));
   const raw=strategy==="recent"
-    ? newest*70+clear*12+detail*8+optical*10
-    : newest*24+clear*42+detail*14+optical*20;
+    ? newest*60+clear*10+detail*8+optical*7+footprint*15
+    : newest*19+clear*30+detail*10+optical*16+footprint*25;
   return Math.round(raw*100)/100;
 }
 function noLink(item:ExploredObservation):Omit<ExploredObservation,"previewUrl">{
@@ -99,7 +101,7 @@ export async function findBestAvailableObservationPreview(
     .map(item=>({item,score:catalogScore(item,until,strategy)}))
     .sort((a,b)=>b.score-a.score||(b.item.acquiredAt??"").localeCompare(a.item.acquiredAt??"")||a.item.id.localeCompare(b.item.id));
   const warnings=[
-    "Rankings use catalog-level time, scene cloud cover and declared resolution, not inspected image pixels or local clear-sky conditions.",
+    "Rankings use catalog-level time, scene cloud cover, declared resolution and approximate STAC footprint overlap, not inspected image pixels or local clear-sky conditions.",
     "Only a successful HTTPS JPEG/PNG download confirms preview byte delivery; previews are not full-resolution scientific scenes.",
     "The SDK keeps signed asset URLs out of this response; enforce authorization, rate limits and request quotas in the backend.",
     ...catalog.warnings,
