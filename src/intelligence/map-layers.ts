@@ -1,3 +1,4 @@
+import { analyzeLinkedObservationQa, type LinkedQaRequest, type LinkedQaResult, type LinkedQaOptions } from "./linked-qa.js";
 import { analyzeAoiPixelQuality, analyzeRemoteAoiPixelQuality, type AoiPixelQualityInput, type AoiPixelQuality, type RemoteAoiPixelQualityRequest, type RemoteAoiPixelQuality } from "../eo/aoi-quality.js";
 import { findBestAvailableObservationPreview, type BestPreviewOptions, type BestPreviewReport } from "./best-preview.js";
 import { fetchVerifiedObservationPreview, type ObservationPreviewOptions, type ObservationPreviewRequest, type VerifiedObservationPreview } from "./observation-preview.js";
@@ -73,6 +74,10 @@ export interface SpaceMapOptions {
   meteosatCache?:MeteosatImageCacheOptions;
   /** Fail-closed trusted hosts for binary STAC previews; configure server-side. */
   previewAllowedHosts?: readonly string[];
+  qaAllowedHosts?: readonly string[];
+  qaMaxPixels?: number;
+  qaTimeoutMs?: number;
+  qaSignPlanetary?: boolean;
   previewMaxBytes?:number;
   previewTimeoutMs?:number;
   previewSignPlanetary?:boolean;
@@ -96,11 +101,19 @@ export class SpaceMapClient{
   readonly observations:ObservationDiscoveryClient;
   private readonly firms:NasaFirmsClient|null;
   private readonly previewOptions:ObservationPreviewOptions;
+  private readonly linkedQaOptions:LinkedQaOptions;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
     const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
     const pc=options.planetaryComputerClient??new PlanetaryComputerClient({...options.planetaryComputer,...(options.fetch?{fetch:options.fetch}:{})});
     this.observations=new ObservationDiscoveryClient(copernicus,pc);
+    this.linkedQaOptions={
+      allowedHosts:options.qaAllowedHosts??[],
+      ...(options.qaMaxPixels!==undefined?{maxPixels:options.qaMaxPixels}:{}),
+      ...(options.qaTimeoutMs!==undefined?{timeoutMs:options.qaTimeoutMs}:{}),
+      ...(options.qaSignPlanetary?{signPlanetary:true}:{}),
+      ...(options.fetch?{fetch:options.fetch}:{})
+    };
     this.previewOptions={allowedHosts:options.previewAllowedHosts??[],
       ...(options.previewMaxBytes!==undefined?{maxBytes:options.previewMaxBytes}:{}),
       ...(options.previewTimeoutMs!==undefined?{timeoutMs:options.previewTimeoutMs}:{}),
@@ -159,6 +172,14 @@ export class SpaceMapClient{
   /** Fetch bounded remote QA COG data from allowlisted backend URL and classify. */
   analyzeRemoteAoiPixelQuality(request:RemoteAoiPixelQualityRequest):Promise<RemoteAoiPixelQuality>{
     return analyzeRemoteAoiPixelQuality(request);
+  }
+  /** Resolve a STAC scene's own QA/SCL raster, analyze bounded real AOI pixels. */
+  analyzeObservationQa(request:LinkedQaRequest):Promise<LinkedQaResult>{
+    return analyzeLinkedObservationQa({
+      copernicus:this.observations.copernicus.stac,
+      planetaryComputer:this.observations.planetaryComputer.stac,
+      signer:this.observations.planetaryComputer,
+    },request,this.linkedQaOptions);
   }
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
