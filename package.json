@@ -181,7 +181,11 @@
     "example:jp2-reduced-real": "npm run build && node scripts/jp2-reduced-real-smoke.mjs",
     "example:web-map": "npm run build && node scripts/web-map-smoke.mjs",
     "example:web-map-tile": "npm run build && node scripts/web-map-tile-smoke.mjs",
-    "example:web-map-tile-cache": "npm run build && node scripts/web-map-tile-cache-smoke.mjs"
+    "example:web-map-tile-cache": "npm run build && node scripts/web-map-tile-cache-smoke.mjs",
+    "examples:list": "node scripts/verify-cookbook.mjs --mode=list",
+    "examples:offline": "npm run build && node scripts/verify-cookbook.mjs --mode=offline",
+    "examples:live": "npm run build && node scripts/verify-cookbook.mjs --mode=live",
+    "test:fedora": "bash scripts/fedora-full-test.sh"
   },
   "engines": {
     "node": ">=18"

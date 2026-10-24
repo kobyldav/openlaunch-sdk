@@ -22,6 +22,8 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+      - name: Execute all catalogued offline TypeScript examples
+        run: node scripts/verify-cookbook.mjs --mode=offline --output=test-results/ci-cookbook
       - run: npm pack --dry-run
       - run: npm run pack:check:packages
       - run: npm run test:packed

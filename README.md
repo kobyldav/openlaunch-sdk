@@ -8,6 +8,16 @@ OpenLaunch v1.22.0 development builds on seven independent npm workspaces and ke
 
 > **Release status:** v1.21.0 NASA verified tiles is merged into `main`; v1.22.0 adds isolate-local LRU caching and bounded batch processing on a development branch. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. Offline GitHub CI and real provider validation are separate evidence.
 
+## Fedora full SDK verification (v1.22)
+
+Run **one command** to validate source, every published cookbook example type signature, all offline executable examples, unit/regression tests, package consumer installation, and every offline SDK smoke (without calling provider APIs):
+
+```bash
+bash scripts/fedora-full-test.sh
+```
+
+Add `--all` for a small set of live provider smoke probes plus real OpenJPEG/WASM, or `--live-cookbook` only when explicitly willing to exercise all live cookbook scripts and upstream quotas. The script writes individual PASS/FAIL/SKIP logs and JSON/text summaries to `test-results/` (Git ignored). See [Fedora full verification](docs/FEDORA_FULL_SUITE.md).
+
 ## Bounded NASA tile caching & batch maps (v1.22 development)
 
 The **OpenLaunch SDK** (not the web) now offers `SpaceMapClient.webMapDailyTileCached()`, `webMapDailyTilesBatch()`, `webMapTileCacheStats()`, and `clearWebMapTileCache()` on top of the verified NASA GIBS JPEG/PNG downloader introduced in v1.21.
