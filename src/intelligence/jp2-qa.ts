@@ -2,7 +2,7 @@ import type {AreaOfInterest} from "../geo/types.js";
 import type {StacClient,StacAsset,StacItem} from "../providers/stac.js";
 import { inspectEoProduct } from "../eo/products.js";
 import { downloadEoAsset } from "../eo/download.js";
-import { decodeJp2Raster, type Jp2DecoderBackend, type Jp2RasterReference } from "../eo/jp2.js";
+import { decodeJp2Raster, reducedJp2Dimensions, type Jp2DecoderBackend, type Jp2RasterReference } from "../eo/jp2.js";
 import { analyzeAoiPixelQuality, type AoiPixelQuality } from "../eo/aoi-quality.js";
 import { utmZone } from "../eo/utm.js";
 
@@ -13,6 +13,10 @@ export interface Jp2SceneQaOptions {
  fetch?:typeof fetch;
  maxBytes?:number;
  maxPixels?:number;
+ /** Bound on original JP2 pixels; max 16,777,216. */
+ maxSourcePixels?:number;
+ /** Decode at 2^level coarser SCL pixels (0..4); requires codec support. */
+ decompositionLevel?:number;
  timeoutMs?:number;
 }
 export interface Jp2SceneQaResult {
@@ -23,6 +27,10 @@ export interface Jp2SceneQaResult {
  downloadedBytes:number;
  imageFormat:"JP2";
  decodedSamples:number;
+ decompositionLevel:number;
+ effectivePixelScale:number;
+ decodedWidth:number;
+ decodedHeight:number;
  catalogAcquiredAt:string|null;
  quality:AoiPixelQuality;
  linkedFromStacItem:true;
@@ -84,12 +92,19 @@ export async function analyzeStacJp2Qa(
  if(!info)throw new Error("STAC JP2 QA asset absent from product");
  const maxBytes=options.maxBytes??2*1024*1024;
  const maxPixels=options.maxPixels??1_048_576;
+ const maxSourcePixels=options.maxSourcePixels??16_777_216;
+ const level=options.decompositionLevel??0;
+ // Check level and original source footprint before fetching remote bytes.
+ const scaled=reducedJp2Dimensions(ref.shape[1],ref.shape[0],level);
  // Validate budgets before any remote bytes are requested.
  if(!Number.isSafeInteger(maxBytes)||maxBytes<48||maxBytes>8*1024*1024||
-    !Number.isSafeInteger(maxPixels)||maxPixels<1||maxPixels>4_194_304)
+    !Number.isSafeInteger(maxPixels)||maxPixels<1||maxPixels>4_194_304||
+    !Number.isSafeInteger(maxSourcePixels)||maxSourcePixels<1||maxSourcePixels>16_777_216)
    throw new RangeError("Invalid JP2 resource budgets");
- if(ref.shape[0]*ref.shape[1]>maxPixels)
-   throw new RangeError("STAC JP2 scene exceeds memory budget; decode a smaller region instead");
+ if(ref.shape[0]*ref.shape[1]>maxSourcePixels)
+   throw new RangeError("STAC JP2 source exceeds maxSourcePixels budget");
+ if(scaled.width*scaled.height>maxPixels)
+   throw new RangeError("STAC JP2 reduced resolution exceeds output pixel budget");
  let bytes:Uint8Array;
  try {
   const output=await downloadEoAsset(info,{allowedHosts:allowed,maxBytes,
@@ -97,7 +112,7 @@ export async function analyzeStacJp2Qa(
    ...(options.fetch?{fetch:options.fetch}:{})});
   bytes=output.bytes;
  }catch{throw new Error("JP2 QA download failed or exceeded resource budget");}
- const raster=await decodeJp2Raster(bytes,ref,options.decoder,{maxBytes,maxPixels});
+ const raster=await decodeJp2Raster(bytes,ref,options.decoder,{maxBytes,maxPixels,maxSourcePixels,decompositionLevel:level});
  const quality=analyzeAoiPixelQuality({mask:raster,area:request.area,source:"sentinel-2-l2a-scl",
    maxPixels});
  const timestamp=item.properties?.datetime;
@@ -105,13 +120,16 @@ export async function analyzeStacJp2Qa(
  return {
   provider:"copernicus",collection:"sentinel-2-l2a",itemId:item.id,qaAssetKey:key,
   downloadedBytes:bytes.length,imageFormat:"JP2",decodedSamples:raster.values.length,
+  decompositionLevel:level,effectivePixelScale:scaled.scale,
+  decodedWidth:raster.width,decodedHeight:raster.height,
   catalogAcquiredAt:Number.isFinite(parsed.getTime())?parsed.toISOString():null,
   quality,linkedFromStacItem:true,independentlyVerifiedSceneAssociation:false,
   sourceSceneVerified:false,
   warnings:[
     "JP2 SCL pixels were decoded; georeferencing is STAC asset metadata, not independently verified.",
     "STAC link does not cryptographically prove that the image belongs to the satellite scene.",
-    "Full JP2 download is bounded, not an HTTP Range window; large Sentinel-2 assets are intentionally rejected.",
+    "Wavelet resolution reduction changes measured pixel scale; classifications are not native-resolution coverage.",
+    "Full JP2 download is still bounded, not an HTTP Range window; oversized Sentinel-2 assets are rejected.",
   ],
  };
 }

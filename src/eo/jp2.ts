@@ -2,9 +2,29 @@ import { type RasterCrs, type RasterGrid, type RasterTransform, validateRaster }
 
 /** A one-band 8-bit decoded JPEG2000 image; not raw codestream or mock RGB. */
 export interface Jp2Image { width:number; height:number; components:1; values:Uint8Array; }
-export interface Jp2DecoderBackend { decode(bytes:Uint8Array):Promise<Jp2Image>; }
+export interface Jp2DecoderBackend {
+  decode(bytes:Uint8Array, options?:{decompositionLevel?:number}):Promise<Jp2Image>;
+}
 export interface Jp2Header {width:number;height:number;components:number;bitsPerComponent:number;}
-export interface Jp2Limits {maxBytes?:number;maxPixels?:number;}
+export interface Jp2Limits {
+  maxBytes?:number;
+  /** Maximum decoded pixels (after optional reduction). */
+  maxPixels?:number;
+  /** Upper bound on original image pixels even if reduced decode is selected. */
+  maxSourcePixels?:number;
+  /** JPEG2000 wavelet decomposition level, 0=full, 1=half, 2=quarter. */
+  decompositionLevel?:number;
+}
+export function reducedJp2Dimensions(width:number,height:number,level=0):{
+  width:number;height:number;scale:number;
+}{
+  if(!Number.isSafeInteger(level)||level<0||level>4)
+    throw new RangeError("JP2 decompositionLevel must be an integer 0..4");
+  if(!Number.isSafeInteger(width)||width<1||!Number.isSafeInteger(height)||height<1)
+    throw new RangeError("Invalid JP2 dimensions");
+  const scale=2**level;
+  return {width:Math.ceil(width/scale),height:Math.ceil(height/scale),scale};
+}
 export interface Jp2RasterReference {
   crs:RasterCrs;
   transform:RasterTransform;
@@ -54,16 +74,25 @@ export async function decodeJp2Raster(
  options:Jp2Limits={}
 ):Promise<RasterGrid> {
  const maxBytes=options.maxBytes??2*1024*1024,maxPixels=options.maxPixels??1_048_576;
+ const maxSourcePixels=options.maxSourcePixels??16_777_216;
+ const level=options.decompositionLevel??0;
+ const {scale}=reducedJp2Dimensions(1,1,level);
  if(!Number.isSafeInteger(maxBytes)||maxBytes<48||maxBytes>8*1024*1024)
    throw new RangeError("JP2 maxBytes must be 48..8388608");
  if(!Number.isSafeInteger(maxPixels)||maxPixels<1||maxPixels>4_194_304)
    throw new RangeError("JP2 maxPixels must be 1..4194304");
+ if(!Number.isSafeInteger(maxSourcePixels)||maxSourcePixels<1||maxSourcePixels>16_777_216)
+   throw new RangeError("JP2 maxSourcePixels must be 1..16777216");
  if(bytes.length>maxBytes)throw new RangeError("JP2 bytes exceed configured download/decode budget");
  const header=readJp2Header(bytes);
  if(header.components!==1||header.bitsPerComponent!==8)
    throw new RangeError("Only 8-bit single-band JP2 classification masks supported");
- if(header.width*header.height>maxPixels||!Number.isSafeInteger(header.width*header.height))
-   throw new RangeError("JP2 pixel dimensions exceed maxPixels");
+ const sourcePixels=header.width*header.height;
+ if(!Number.isSafeInteger(sourcePixels)||sourcePixels>maxSourcePixels)
+   throw new RangeError("JP2 source dimensions exceed maxSourcePixels");
+ const target=reducedJp2Dimensions(header.width,header.height,level);
+ if(target.width*target.height>maxPixels)
+   throw new RangeError("Reduced JP2 output dimensions exceed maxPixels");
  if(!Array.isArray(reference.shape)||reference.shape[0]!==header.height||reference.shape[1]!==header.width)
    throw new RangeError("Exact JP2 asset proj:shape does not match image");
  if(!Array.isArray(reference.transform)||reference.transform.length!==6||reference.transform.some(v=>!Number.isFinite(v)))
@@ -71,14 +100,20 @@ export async function decodeJp2Raster(
  if(!backend||typeof backend.decode!=="function")
    throw new TypeError("A configured JP2 decoder backend is required");
  let result:Jp2Image;
- try{result=await backend.decode(bytes);}
+ try{result=await backend.decode(bytes,{decompositionLevel:level});}
  catch{throw new Error("JP2 codec rejected the image");}
- if(result.width!==header.width||result.height!==header.height||
+ if(result.width!==target.width||result.height!==target.height||
     result.components!==1||!(result.values instanceof Uint8Array)||
-    result.values.length!==header.width*header.height)
+    result.values.length!==target.width*target.height)
    throw new RangeError("JP2 decoder dimensions or sample representation do not match source");
- const out:RasterGrid={width:header.width,height:header.height,crs:reference.crs,
-  transform:reference.transform,values:Float64Array.from(result.values),source:"decoded-jp2-scl",unit:"SCL-class"};
+ // A reduced pixel represents the original pixel block. Preserve the
+ // origin, and scale both affine basis vectors; never reuse 20 m spacing
+ // as if it were native 10 m data.
+ const [a,b,c,d,e,f]=reference.transform;
+ const transform:RasterTransform=[a,b*scale,c*scale,d,e*scale,f*scale];
+ const out:RasterGrid={width:target.width,height:target.height,crs:reference.crs,
+  transform,values:Float64Array.from(result.values),
+  source:level?"decoded-jp2-scl-reduced":"decoded-jp2-scl",unit:"SCL-class"};
  validateRaster(out);
  return out;
 }
@@ -94,13 +129,16 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
   getEncodedBuffer(n:number):Uint8Array;
   readHeader?():unknown;
   decode():void;
+  decodeSubResolution?(level:number,layer:number):void;
   getDecodedBuffer():Uint8Array|ArrayBuffer;
   getFrameInfo():{width:number;height:number;componentCount?:number;bitsPerSample?:number;isSigned?:boolean};
   delete?():void;
  };
 }>):Jp2DecoderBackend {
  if(typeof factory!=="function")throw new TypeError("OpenJPEG factory required");
- return {async decode(bytes) {
+ return {async decode(bytes,options={}) {
+  const level=options.decompositionLevel??0;
+  reducedJp2Dimensions(1,1,level);
   let codec:Awaited<ReturnType<typeof factory>>;
   try{codec=await factory();}catch{throw new Error("OpenJPEG WASM unavailable");}
   const instance=new codec.J2KDecoder();
@@ -111,7 +149,11 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
     encoded.set(bytes);
     // OpenJPEG decode() parses the header itself. Calling readHeader()
     // first may consume the input stream and break a second decode pass.
-    instance.decode();
+    if(level>0){
+      if(typeof instance.decodeSubResolution!=="function")
+        throw new RangeError("OpenJPEG backend does not support reduced resolution");
+      instance.decodeSubResolution(level,0);
+    }else instance.decode();
     const info=instance.getFrameInfo();
     if(!info||!Number.isSafeInteger(info.width)||!Number.isSafeInteger(info.height)||
        info.width<1||info.height<1||
@@ -119,6 +161,7 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
        (info.bitsPerSample!==undefined&&info.bitsPerSample!==8)||
        (info.isSigned!==undefined&&info.isSigned!==false))
       throw new RangeError("OpenJPEG decoded format is not one unsigned 8-bit component");
+    const reduced=reducedJp2Dimensions(info.width,info.height,level);
     const buffer=instance.getDecodedBuffer();
     // Emscripten may return a typed_memory_view from a separate JS realm.
     // ArrayBuffer.isView() works cross-realm whereas instanceof Uint8Array
@@ -126,19 +169,19 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
     let values:Uint8Array;
     if(ArrayBuffer.isView(buffer)){
       const view=buffer as ArrayBufferView & {BYTES_PER_ELEMENT?:number};
-      if(view.BYTES_PER_ELEMENT!==1||view.byteLength!==info.width*info.height)
+      if(view.BYTES_PER_ELEMENT!==1||view.byteLength!==reduced.width*reduced.height)
         throw new RangeError("OpenJPEG decoded buffer has unsupported sample width or dimensions");
       values=new Uint8Array(view.buffer,view.byteOffset,view.byteLength);
     }else if(Object.prototype.toString.call(buffer)==="[object ArrayBuffer]"){
       const raw=buffer as ArrayBuffer;
-      if(raw.byteLength!==info.width*info.height)
+      if(raw.byteLength!==reduced.width*reduced.height)
         throw new RangeError("OpenJPEG decoded ArrayBuffer length differs from frame");
       values=new Uint8Array(raw);
     }else{
       throw new TypeError("OpenJPEG returned an unsupported pixel buffer");
     }
     // Copy from WASM memory BEFORE destructor (typed_memory_view becomes dangling).
-    return {width:info.width,height:info.height,components:1,
+    return {width:reduced.width,height:reduced.height,components:1,
       values:Uint8Array.from(values)};
   }finally{instance.delete?.();}
  }};
