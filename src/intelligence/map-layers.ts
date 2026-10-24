@@ -1,3 +1,4 @@
+import { WebMapTileCache,type CachedWebMapDailyTileResult,type WebMapDailyTileBatchRequest,type WebMapDailyTileBatchResult,type WebMapTileCacheOptions,type WebMapTileCacheStats } from "./web-map-tile-cache.js";
 import { fetchWebMapDailyTile,type WebMapDailyTileRequest,type WebMapDailyTileOptions,type WebMapDailyTileResult } from "./web-map-tile.js";
 import {buildWebMapSearch,buildWebMapDaily,type WebMapSearchRequest,type WebMapSearchResult,type WebMapDailyRequest,type WebMapDailyResult} from "./web-map.js";
 import {analyzeStacJp2Qa,type Jp2SceneQaRequest,type Jp2SceneQaOptions,type Jp2SceneQaResult} from "./jp2-qa.js";
@@ -95,6 +96,8 @@ export interface SpaceMapOptions {
   /** Bounded official NASA GIBS tile image verification for web backends. */
   webMapTileMaxBytes?:number;
   webMapTileTimeoutMs?:number;
+  /** Per-SpaceMapClient bounded memory cache for verified NASA GIBS images. */
+  webMapTileCache?:WebMapTileCacheOptions;
 }
 export interface SceneFreshness {
   observationTime:string|null;
@@ -118,6 +121,7 @@ export class SpaceMapClient{
   private readonly linkedQaOptions:LinkedQaOptions;
   private readonly jp2Options:Jp2SceneQaOptions;
   private readonly webMapTileOptions:WebMapDailyTileOptions;
+  private readonly webMapCache:WebMapTileCache;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
     const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
@@ -150,6 +154,7 @@ export class SpaceMapClient{
       ...(options.webMapTileMaxBytes!==undefined?{maxBytes:options.webMapTileMaxBytes}:{}),
       ...(options.webMapTileTimeoutMs!==undefined?{timeoutMs:options.webMapTileTimeoutMs}:{})
     };
+    this.webMapCache=new WebMapTileCache(this,this.webMapTileOptions,options.webMapTileCache);
     this.gibs=new NasaGibsClient(http);
     this.meteosat=new MeteosatClient(http);
     this.meteosatCache=new MeteosatImageCache(this.meteosat,options.meteosatCache);
@@ -228,6 +233,16 @@ export class SpaceMapClient{
   webMapDailyTile(request:WebMapDailyTileRequest):Promise<WebMapDailyTileResult>{
     return fetchWebMapDailyTile(this,request,this.webMapTileOptions);
   }
+  /** A verified NASA tile from bounded isolate memory or validated upstream. */
+  webMapDailyTileCached(request:WebMapDailyTileRequest):Promise<CachedWebMapDailyTileResult>{
+    return this.webMapCache.get(request);
+  }
+  /** Fetch 1..16 NASA tiles, at most 4 at once, preserving input order. */
+  webMapDailyTilesBatch(request:WebMapDailyTileBatchRequest):Promise<WebMapDailyTileBatchResult>{
+    return this.webMapCache.batch(request);
+  }
+  webMapTileCacheStats():WebMapTileCacheStats{return this.webMapCache.stats();}
+  clearWebMapTileCache():void{this.webMapCache.clear();}
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
     return exploreSpaceObservations(this.observations,options);
