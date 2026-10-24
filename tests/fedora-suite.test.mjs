@@ -29,8 +29,12 @@ test("Fedora one-command suite can list all planned offline coverage without ins
 test("Fedora suite --all plans optional real OpenJPEG and bounded live checks",()=>{
  const result=run(["--list","--all","--skip-install"]);
  assert.equal(result.status,0,result.stderr);
- assert.match(result.stdout,/REAL OpenJPEG original/);
- assert.match(result.stdout,/REAL OpenJPEG reduced/);
+ if(Number(process.versions.node.split(".")[0])>=20){
+  assert.match(result.stdout,/REAL OpenJPEG original/);
+  assert.match(result.stdout,/REAL OpenJPEG reduced/);
+ }else{
+  assert.match(result.stdout,/SKIP real OpenJPEG\/WASM: Node 20\+ required/);
+ }
  assert.match(result.stdout,/Live Copernicus/);
  assert.doesNotMatch(result.stdout,/npm ci: deterministic dependency install/);
 });
