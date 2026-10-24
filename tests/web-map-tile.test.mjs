@@ -147,6 +147,6 @@ test("v1.21 a deliberately forged descriptor never becomes an internet fetch pro
   requestedDate:"2026-10-17",maxZoom:9,attribution:"unsafe"
  })};
  await assert.rejects(fetchWebMapDailyTile(fake,req,{fetch:async()=>{sent++;return new Response(jpg)}}),
-  /Unexpected NASA GIBS tile URL/);
+  /Unexpected NASA (?:GIBS tile URL|map descriptor)/);
  assert.equal(sent,0);
 });
