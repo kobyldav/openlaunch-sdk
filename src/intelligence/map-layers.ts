@@ -1,3 +1,4 @@
+import { findBestAvailableObservationPreview, type BestPreviewOptions, type BestPreviewReport } from "./best-preview.js";
 import { fetchVerifiedObservationPreview, type ObservationPreviewOptions, type ObservationPreviewRequest, type VerifiedObservationPreview } from "./observation-preview.js";
 import { exploreSpaceObservations, type ExploreObservationsOptions, type ExploreObservationsReport } from "./observation-explorer.js";
 import { buildSpaceArchive, type SpaceArchiveRequest, type SpaceArchivePlayback } from "./space-archive.js";
@@ -155,6 +156,12 @@ export class SpaceMapClient{
     return exploreSpaceObservations(this.observations,options);
   }
   /** Download and validate a declared preview by provider/collection/item ID. */
+  /** Find the most suitable *deliverable* catalog preview; bounded sequential fallback. */
+  bestAvailablePreview(options:BestPreviewOptions):Promise<BestPreviewReport>{
+    if(!this.previewOptions.allowedHosts.length)
+      throw new TypeError("previewAllowedHosts must be explicitly configured on the server");
+    return findBestAvailableObservationPreview(this,options);
+  }
   fetchObservationPreview(request:ObservationPreviewRequest):Promise<VerifiedObservationPreview>{
     return fetchVerifiedObservationPreview({
       copernicus:this.observations.copernicus.stac,
