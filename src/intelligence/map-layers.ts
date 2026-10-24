@@ -1,3 +1,4 @@
+import {buildWebMapSearch,buildWebMapDaily,type WebMapSearchRequest,type WebMapSearchResult,type WebMapDailyRequest,type WebMapDailyResult} from "./web-map.js";
 import {analyzeStacJp2Qa,type Jp2SceneQaRequest,type Jp2SceneQaOptions,type Jp2SceneQaResult} from "./jp2-qa.js";
 import type {Jp2DecoderBackend} from "../eo/jp2.js";
 import { analyzeLinkedObservationQa, type LinkedQaRequest, type LinkedQaResult, type LinkedQaOptions } from "./linked-qa.js";
@@ -204,6 +205,14 @@ export class SpaceMapClient{
       planetaryComputer:this.observations.planetaryComputer.stac,
       signer:this.observations.planetaryComputer,
     },request,this.linkedQaOptions);
+  }
+  /** JSON-safe scene cards for web maps; no STAC asset URLs are returned. */
+  webMapSearch(request:WebMapSearchRequest):Promise<WebMapSearchResult>{
+    return buildWebMapSearch(this,request);
+  }
+  /** MapLibre/Leaflet NASA daily XYZ layer descriptor (availability unchecked). */
+  webMapDaily(request:WebMapDailyRequest):WebMapDailyResult{
+    return buildWebMapDaily(this,request);
   }
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{

@@ -11,3 +11,4 @@ export * from "./best-preview.js";
 export * from "./footprint-coverage.js";
 export * from "./linked-qa.js";
 export * from "./jp2-qa.js";
+export * from "./web-map.js";
