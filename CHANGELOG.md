@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.16.0 (development) — TIFF LZW GeoTIFF/COG
+
+- Bounded TIFF 6.0 LZW decompression (MSB-first, 9–12 bits, clear/EOI, early-change=1) without new runtime packages.
+- Local GeoTIFF and remote HTTP 206 COG readers accept Compression=5 for supported single-band TIFF tiles or strips.
+- Independent Pillow/libtiff-compressed actual TIFF fixtures, including 32×32 dynamic-width dictionary regression and 3×2 QA classification.
+- Secure allowlist restrictions, bounded output and sanitized scene-linked QA remain unchanged.
+- No JPEG2000/JP2 support or claim of current real satellite-provider accessibility.
+- Fedora smoke, docs and seven scoped workspace versions updated to 1.16.0.
+
+
 ## 1.15.0 (development) — WGS84 UTM GeoTIFF/COG Support
 
 - Support all 60 WGS84 northern EPSG:326xx and 60 southern EPSG:327xx UTM zones in raster geometry and coordinate conversion, with inverse WGS84 geodetic formulas.
