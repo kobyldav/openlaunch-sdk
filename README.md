@@ -2,11 +2,30 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.9.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.10.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.9.0 Observation Explorer is under development; v1.8.0 Space Archive & Playback is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.10.0 Verified Satellite Preview Delivery is under development; v1.9.0 Observation Explorer is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Verified Satellite Previews (v1.10 development)
+
+A user can now choose a **specific historical STAC observation** and obtain actual binary PNG/JPEG preview data from OpenLaunch. The provider STAC item is queried by ID; the image is streamed with strict size/time limits and checked for MIME and PNG/JPEG signatures. No raw catalog URL is accepted from a user request, and returned metadata does not include provider tokens or SAS signatures.
+
+```ts
+const maps = new SpaceMapClient({
+  // Backend-only, static and reviewed. Check actual preview storage domains first.
+  previewAllowedHosts: ["images.example.org"],
+});
+const preview = await maps.fetchObservationPreview({
+  provider:"copernicus", collection:"sentinel-2-l2a", itemId:"real-provider-item-id",
+});
+// Send preview.image bytes with preview.contentType from a throttled backend endpoint.
+```
+
+The example uses placeholder storage host and item ID; configure actual verified provider hosts in your deployment. **Empty trusted hosts means no download.** Planetary Computer preview signing can be enabled with `previewSignPlanetary:true` and a trusted host for the resulting URL. This is only verified *image byte delivery*, not full-resolution pixels or independently verified satellite acquisition.
+
+Offline test: `npm run example:observation-preview`. See [Preview Delivery v1.10](docs/OBSERVATION_PREVIEW_V1_10.md).
 
 ## Location-first Observation Explorer (v1.9 development)
 
