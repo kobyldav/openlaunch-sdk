@@ -1,5 +1,5 @@
 import { nasaGibsTileTemplate, type GibsLayerId, type NasaGibsClient } from "../providers/gibs.js";
-import type { MeteosatFrameTimeline, MeteosatMapOptions } from "../providers/meteosat.js";
+import type { MeteosatClient, MeteosatFrameTimeline } from "../providers/meteosat.js";
 import type { BBox } from "../geo/types.js";
 import { probeSpaceImage, type SpaceImageAvailability } from "./layer-health.js";
 
@@ -63,11 +63,7 @@ export interface SpaceArchivePlayback {
 }
 export interface SpaceArchiveClients {
   gibs: Pick<NasaGibsClient,"fetchTile">;
-  meteosat: {
-    timeline(options: { layer:string; bounds3857:BBox; width:number; height:number;
-      maxFrames?:number; format?:"image/png"|"image/jpeg" }):Promise<MeteosatFrameTimeline>;
-    fetchMap(options:MeteosatMapOptions):Promise<{image:Uint8Array;contentType:string}>;
-  };
+  meteosat: Pick<MeteosatClient,"timeline"|"fetchMap">;
 }
 function count(value:number|undefined, fallback:number, max:number, label:string):number {
   const result=value??fallback;
