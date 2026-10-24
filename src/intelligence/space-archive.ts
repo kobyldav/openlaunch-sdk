@@ -128,7 +128,7 @@ export async function buildSpaceArchive(
         delivery:"unchecked",checkedAt:null,verifiedScope:"none",fullImageReady:false,
       };
     });
-    for(const frame of frames.slice(-verifyLast)){
+    for(const frame of (verifyLast>0 ? frames.slice(-verifyLast) : [])){
       const tile=request.sampleTile!;
       checked(frame,await probeSpaceImage(clients,{
         source:"nasa-gibs",layer:request.layer,date:frame.time,z:tile.z,x:tile.x,y:tile.y,
@@ -153,7 +153,7 @@ export async function buildSpaceArchive(
     mapUrl:frame.request.url,mapKind:"wms-image",attribution:"EUMETSAT EUMETView",
     delivery:"unchecked",checkedAt:null,verifiedScope:"none",fullImageReady:false,
   }));
-  for(const frame of frames.slice(-verifyLast)){
+  for(const frame of (verifyLast>0 ? frames.slice(-verifyLast) : [])){
     checked(frame,await probeSpaceImage(clients,{
       source:"meteosat",map:{layer:request.layer,bounds3857:request.bounds3857,
         width:request.width,height:request.height,time:frame.time,
