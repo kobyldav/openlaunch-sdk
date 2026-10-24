@@ -1,3 +1,4 @@
+import { decodeTiffLzw } from "./tiff-lzw.js";
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import { validateRaster } from "./raster.js";
 import { utmZone } from "./utm.js";
@@ -16,9 +17,9 @@ const BYTE_SIZE:Readonly<Record<number,number>>={
 
 /**
  * Decode one-band georeferenced TIFF/COG bytes (classic TIFF or BigTIFF).
- * Supports uncompressed or zlib Deflate tiles/strips, horizontal predictor,
+ * Supports uncompressed, TIFF LZW or zlib Deflate tiles/strips, horizontal predictor,
  * 8/16/32-bit integer and 32/64-bit IEEE float samples, EPSG:4326/3857/UTM WGS84.
- * Not a general TIFF library: JP2, JPEG, LZW, multi-band pixel-interleaving,
+ * Not a general TIFF library: JP2, JPEG, multi-band pixel-interleaving,
  * predictor 3 and arbitrary CRSs fail explicitly.
  *
  * Operates on bounded supplied bytes, not remote COG HTTP range requests.
@@ -46,7 +47,7 @@ export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
   if(![8,16,32,64].includes(bps))throw new RangeError("Unsupported BitsPerSample");
   if(!([1,2].includes(sampleFormat)&&[8,16,32].includes(bps) || sampleFormat===3&&[32,64].includes(bps)))
     throw new RangeError("Unsupported SampleFormat / BitsPerSample");
-  if(![1,8,32946].includes(compression))throw new RangeError("Unsupported TIFF compression (expected none/Deflate)");
+  if(![1,5,8,32946].includes(compression))throw new RangeError("Unsupported TIFF compression (expected none/LZW/Deflate)");
   if(predictor!==1 && predictor!==2)throw new RangeError("Unsupported TIFF predictor (only 1/2)");
   if(predictor===2&&sampleFormat===3)throw new RangeError("Float predictor 2 unsupported: use a compatible integer GeoTIFF");
 
@@ -84,7 +85,7 @@ export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
       throw new RangeError("TIFF block exceeds safety limit");
     const offset=offsets[block]!,length=lengths[block]!;
     const compressed=checkedSlice(bytes,offset,length);
-    const raw=compression===1?compressed:await inflateDeflate(compressed,expected);
+    const raw=compression===1?compressed:compression===5?decodeTiffLzw(compressed,expected):await inflateDeflate(compressed,expected);
     if(raw.byteLength<expected)throw new RangeError("Truncated decoded TIFF tile/strip");
     if(raw.byteLength>expected)throw new RangeError("Decoded TIFF block size exceeds expected allocation");
     const buf=new Uint8Array(raw); // clone before applying predictor

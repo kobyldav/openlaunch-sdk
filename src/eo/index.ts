@@ -9,4 +9,5 @@ export * from "./calibration.js";
 export * from "./cog.js";
 export * from "./aoi-quality.js";
 export * from "./utm.js";
+export * from "./tiff-lzw.js";
 export * from "./jp2.js";

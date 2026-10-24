@@ -1,3 +1,4 @@
+import { decodeTiffLzw } from "./tiff-lzw.js";
 import type { AreaOfInterest } from "../geo/types.js";
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import {
@@ -38,8 +39,8 @@ export interface CogReadResult {
  *
  * WGS84 UTM 326xx/327xx conversion is supported; no arbitrary projection.
  * Supports single-band classic/BigTIFF,
- * uncompressed/Deflate TIFF strips or tiles, EPSG:4326 / EPSG:3857 only.
- * No multi-band JPEG, LZW, JP2, cloud-native GeoTIFF overviews, or full
+ * uncompressed/LZW/Deflate TIFF strips or tiles, EPSG:4326 / EPSG:3857 / WGS84 UTM.
+ * No multi-band JPEG, JP2, cloud-native GeoTIFF overviews, or full
  * arbitrary CRS pipeline. Requests a bounded TIFF IFD header then blocks.
  */
 export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:CogReadOptions):Promise<CogReadResult>{
@@ -121,7 +122,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
     if(![8,16,32,64].includes(bps)||
       !([1,2].includes(format)&&[8,16,32].includes(bps)||format===3&&[32,64].includes(bps)))
       throw new RangeError("Unsupported COG sample format");
-    if(![1,8,32946].includes(compression)||![1,2].includes(predictor)||
+    if(![1,5,8,32946].includes(compression)||![1,2].includes(predictor)||
       (format===3&&predictor===2))throw new RangeError("Unsupported COG compression/predictor");
     const crs=readCrs(tiff),transform=readTransform(tiff);
     const blockWidth=tiff.scalar(322,width),blockHeight=tiff.scalar(323,tiff.scalar(278,height));
@@ -163,7 +164,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
           throw new RangeError("Invalid COG block byte range");
         const part=await fetchRange(offset,length);
         tileBytesRead+=part.length;
-        const inflated=compression===1?part:await inflateDeflate(part,expected);
+        const inflated=compression===1?part:compression===5?decodeTiffLzw(part,expected):await inflateDeflate(part,expected);
         if(inflated.length!==expected)throw new RangeError("COG tile decompressed size mismatch");
         const raw=new Uint8Array(inflated);
         if(predictor===2)undoHorizontalPredictor(raw,blockWidth,decodedHeight,bps,tiff!.littleEndian);
@@ -194,7 +195,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       warnings:[
         "Returned raster is a bounded window from a provider TIFF, not a resampled cloud-free product.",
         "Native sample values need scale/offset calibration and quality masks before spectral/temperature analysis.",
-        "Range reader only supports one band and explicitly supported TIFF encoding/CRS; no JP2/LZW/JPEG.",
+        "Range reader only supports one band and explicitly supported TIFF encoding/CRS; no JP2/JPEG.",
       ],
     };
   }finally{clearTimeout(timer);}

@@ -6,7 +6,7 @@ OpenLaunch v1.17.0 development builds on seven independent npm workspaces and ke
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.17.0 optional JP2 Sentinel-2 SCL analysis is under development; v1.16.0 LZW GeoTIFF/COG is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
 
 ## Optional JPEG2000 / Sentinel-2 SCL JP2 (v1.17 development)
 
@@ -27,6 +27,20 @@ const result=await maps.analyzeObservationJp2Qa({itemId:"<exact STAC ID>",area})
 ```
 
 **Important:** test fixtures include a real independently OpenJPEG-encoded 8-bit JP2 but mock the codec implementation; production OpenJPEG WASM decoding has **not** been proven by CI. Only single-band 8-bit images, bounded full downloads and exact asset-level georeference are supported. Full-size Sentinel-2 JP2 exceeds these conservative defaults; windowed/reduced-resolution JP2 decoding and production validation remain future work. See [JP2 v1.17](docs/JP2_QA_V1_17.md). Fedora smoke: `npm run example:jp2-qa`.
+
+## LZW GeoTIFF/COG decoding (v1.16 development)
+
+TIFF Compression=5 (LZW) now works through `decodeGeoTiff()` and `readCogWindowUrl()`, on top of existing WGS84 UTM support. This uses a bounded TIFF-specific 9–12-bit MSB-first LZW decoder, including dictionary reset, TIFF early-change and strict exact block-size checks. It works for supported single-band GeoTIFF and COG data and can feed existing QA/SCL analysis.
+
+```ts
+import {readCogWindowUrl,bbox} from "@openlaunch/raster";
+const window = await readCogWindowUrl("https://reviewed-provider.example/QA.tif",bbox(14,50.9,14.1,51),{
+  allowedHosts:["reviewed-provider.example"]
+});
+console.log(window.raster.values);
+```
+
+**JP2/JPEG2000 has not been implemented**: it requires a separate decoder and many native Sentinel-2 products are JP2. Multi-band/JPEG TIFF, generic projections and real-provider authorization quirks remain separate work. Offline smoke: `npm run example:lzw-geotiff`. See [v1.16 guide](docs/TIFF_LZW_V1_16.md).
 
 ## Native WGS84 UTM GeoTIFF/COG coordinates (v1.15 development)
 
