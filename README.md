@@ -2,11 +2,36 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.19.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.20.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Web map integration API (v1.20 development)
+
+`SpaceMapClient.webMapSearch()` transforms the existing STAC discovery into compact, **JSON-safe** scene cards for a web map. Clients select a curated layer and AOI/date window; the SDK returns scene ID, source, actual STAC acquisition metadata, scene-wide cloud estimate, approximate footprint overlap and a **provider/collection/itemId selector** for a declared preview. All raw STAC asset URLs (potentially signed) and provider error strings stay out of the result. A declared preview is `declared-unverified`, **never** a guarantee that imagery can be delivered.
+
+```ts
+const maps=new SpaceMapClient({previewAllowedHosts:["<reviewed actual HTTPS storage hostname>"]});
+const result=await maps.webMapSearch({
+ layer:"sentinel2-optical",
+ area:{center:[14.42,50.08],radiusKm:10},
+ from:"2026-10-01",to:"2026-10-20",maxResults:20
+});
+// JSON metadata for your map, no signed STAC links:
+const card=result.scenes[0];
+if(card?.preview.request){
+ const binary=await maps.fetchObservationPreview(card.preview.request);
+ // Your authenticated/rate-limited backend serves binary.image with binary.contentType.
+}
+```
+
+`SpaceMapClient.webMapDaily({layer:"nasa-modis-terra",date:"2026-10-17"})` returns the official NASA GIBS MapLibre/Leaflet WMTS-compatible XYZ template with `delivery:"unchecked"`. Also supports `nasa-viirs-noaa20`. This is a metadata descriptor, not evidence that all XYZ tiles exist or were captured on the requested day.
+
+Use these two SDK APIs to implement the first production-friendly UI path: **location → satellite layer → date → scene list → verified preview**. Configure all provider secrets and reviewed storage hosts exclusively on the backend. Add authentication, throttling, attribution and caching in Cloudflare; never expose provider credentials in Next.js client bundles.
+
+[Full integration guide](docs/WEB_MAP_V1_20.md). Offline Fedora smoke: `npm run example:web-map`.
 
 ## OpenJPEG reduced-resolution JP2 (v1.19 development)
 
