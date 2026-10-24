@@ -2,11 +2,28 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.11.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.12.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.11.0 Best Available Satellite Preview is under development; v1.10.0 Verified Satellite Preview Delivery is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.12.0 Footprint Coverage is under development; v1.11.0 Best Available Satellite Preview is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Satellite Footprint Coverage (v1.12 development)
+
+`SpaceMapClient.exploreObservations()` now returns `footprintCoveragePercent` for **approximate geometric overlap** of a satellite STAC footprint and the selected AOI polygon (including bbox, circle, Polygon and MultiPolygon with holes). Bad or missing footprint means `null`, never fabricated coverage. The backend can require `minFootprintCoveragePercent` to avoid selecting partial/unknown catalog footprint scenes.
+
+```ts
+const result = await maps.bestAvailablePreview({
+  area:{center:[14.42,50.08],radiusKm:10},
+  from:"2026-10-01",to:"2026-10-15",
+  layers:["optical"],strategy:"balanced",
+  minFootprintCoveragePercent:80,
+  maxAttempts:3
+});
+console.log(result.selected?.observation.footprintCoveragePercent);
+```
+
+The score considers estimated STAC footprint overlap in addition to cloud/age/source resolution. **This does NOT verify that any actual delivered pixel covers the chosen AOI or that the AOI itself is cloud free.** It is not a geodesic-certified area calculation; complex geometries / dateline crossing may return `null`. The existing secure preview byte-delivery API remains unchanged. Fedora smoke: `npm run example:footprint-coverage`. See [v1.12 guide](docs/FOOTPRINT_COVERAGE_V1_12.md).
 
 ## Best Available Satellite Preview (v1.11 development)
 

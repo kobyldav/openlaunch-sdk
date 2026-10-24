@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.12.0 (development) — Satellite Footprint Coverage
+
+- New `estimateFootprintCoverage()` calculates bounded approximate STAC Polygon/MultiPolygon vs convex AOI polygon overlap, subtracting polygon holes where present.
+- `exploreObservations()` returns nullable `footprintCoveragePercent`, explicit basis and `pixelCoverageVerified:false` rather than inventing 100% for missing footprints.
+- Optional `minFootprintCoveragePercent` filter to exclude low-coverage or unknown scenes.
+- `bestAvailablePreview()` now includes catalog coverage estimate in candidate ranking while still verifying real preview bytes separately.
+- Offline regression tests, standalone Fedora smoke and seven-workspace v1.12 alignment.
+
+
 ## 1.11.0 (development) — Best Available Satellite Preview
 
 - New `SpaceMapClient.bestAvailablePreview()` combines location-first multi-provider discovery with verified JPEG/PNG image delivery.
