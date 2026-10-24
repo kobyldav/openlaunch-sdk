@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.7.0 (development) — Shared Meteosat Image Cache
+
+- Optional, backend-neutral `MeteosatSharedImageStore` with cross-instance read/write support.
+- Cloudflare Workers KV adapter with hashed official WMS keys, binary envelope and explicit expiry.
+- `MeteosatImageCache` revalidates remote image data and permits shared hits across SDK instances; KV read/write errors fall back to upstream.
+- Offline integration tests and standalone Fedora smoke; seven workspaces aligned to v1.7.0.
+
+
 ## 1.6.0 (development) — Meteosat Validated Image Cache
 
 - Added `MeteosatImageCache`: 5-minute TTL, bounded LRU byte budget, single-flight identical requests and defensive copies.

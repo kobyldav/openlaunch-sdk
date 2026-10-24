@@ -1,3 +1,4 @@
+import type { MeteosatSharedImageStore } from "./meteosat-cache-store.js";
 import { meteosatWmsMapUrl, type MeteosatClient, type MeteosatMapOptions, type MeteosatMapDescriptor, type MeteosatFrameTimeline, type MeteosatTimelineOptions } from "./meteosat.js";
 import { isVerifiedImageBytes } from "./image-validation.js";
 
@@ -6,8 +7,10 @@ export interface MeteosatImageCacheOptions {
   ttlMs?: number;
   maxEntries?: number;
   maxBytes?: number;
+  /** Optional shared backend cache; memory-only remains the default. */
+  sharedStore?: MeteosatSharedImageStore;
 }
-export type MeteosatImageCacheState = "hit" | "miss" | "coalesced" | "bypass";
+export type MeteosatImageCacheState = "hit" | "miss" | "coalesced" | "bypass" | "shared-hit";
 export interface MeteosatCachedImage {
   image: Uint8Array;
   contentType: string;
@@ -22,6 +25,10 @@ export interface MeteosatImageCacheStats {
   misses: number;
   coalesced: number;
   evictions: number;
+  sharedHits: number;
+  sharedMisses: number;
+  sharedErrors: number;
+  sharedWrites: number;
 }
 type RawImage = Awaited<ReturnType<MeteosatClient["fetchMap"]>>;
 interface Entry {
@@ -41,7 +48,7 @@ function copyDescriptor(source: MeteosatMapDescriptor): MeteosatMapDescriptor {
 }
 
 /**
- * Cache is per SDK client / warm server process. Not shared or persistent.
+ * Local LRU is per instance. Optional sharedStore supplies cross-instance persistence.
  * Only explicit TIME URLs are retained; default/latest WMS images are never cached.
  * Concurrent identical requests share one upstream call. Never caches errors.
  */
@@ -50,13 +57,18 @@ export class MeteosatImageCache {
   private readonly maxEntries: number;
   private readonly maxBytes: number;
   private readonly entries = new Map<string, Entry>();
-  private readonly inflight = new Map<string, Promise<Entry>>();
+  private readonly inflight = new Map<string, Promise<{entry:Entry;state:"miss"|"shared-hit"}>>();
   private totalBytes = 0;
   private hits = 0;
   private misses = 0;
   private coalesced = 0;
   private evictions = 0;
   private generation = 0;
+  private sharedHits = 0;
+  private sharedMisses = 0;
+  private sharedErrors = 0;
+  private sharedWrites = 0;
+  private readonly sharedStore: MeteosatSharedImageStore | undefined;
 
   constructor(
     private readonly upstream: Pick<MeteosatClient, "fetchMap" | "timeline">,
@@ -64,6 +76,7 @@ export class MeteosatImageCache {
     private readonly now: () => number = () => Date.now(),
   ) {
     this.ttlMs = checkedInteger(options.ttlMs ?? 300_000, "ttlMs", 86_400_000);
+    this.sharedStore = options.sharedStore;
     this.maxEntries = checkedInteger(options.maxEntries ?? 24, "maxEntries", 256);
     this.maxBytes = checkedInteger(options.maxBytes ?? 32 * 1024 * 1024, "maxBytes", 128 * 1024 * 1024);
   }
@@ -102,42 +115,76 @@ export class MeteosatImageCache {
     const pending = this.inflight.get(key);
     if (pending) {
       this.coalesced++;
-      return this.result(await pending, "coalesced");
+      return this.result((await pending).entry, "coalesced");
     }
     this.misses++;
     const generation = this.generation;
     const promise = this.download(copiedOptions, descriptor, key, generation);
     this.inflight.set(key, promise);
     try {
-      return this.result(await promise, "miss");
+      const downloaded = await promise;
+      return this.result(downloaded.entry,downloaded.state);
     } finally {
       if (this.inflight.get(key) === promise) this.inflight.delete(key);
     }
   }
 
-  private async download(
-    options: MeteosatMapOptions, descriptor: MeteosatMapDescriptor, key: string, generation: number,
-  ): Promise<Entry> {
-    const response: RawImage = await this.upstream.fetchMap(options);
-    if (!isVerifiedImageBytes(response.image, response.contentType))
-      throw new Error("EUMETView returned invalid image bytes");
-    const image = response.image.slice();
-    const entry: Entry = {
-      image, contentType: response.contentType,
-      descriptor: copyDescriptor(descriptor), expiresAt: this.now() + this.ttlMs,
-    };
-    // Oversized images are delivered to the requester without cache retention.
-    if (this.generation === generation && image.byteLength <= this.maxBytes) {
-      while (this.entries.size >= this.maxEntries || this.totalBytes + image.byteLength > this.maxBytes) {
-        const first = this.entries.keys().next().value;
-        if (first === undefined) break;
-        this.remove(first);
-        this.evictions++;
-      }
-      this.entries.set(key, entry);
-      this.totalBytes += image.byteLength;
+  private retain(key:string, entry:Entry, generation:number):void {
+    if (this.generation!==generation || entry.image.byteLength>this.maxBytes || this.now()>=entry.expiresAt) return;
+    while (this.entries.size>=this.maxEntries || this.totalBytes+entry.image.byteLength>this.maxBytes) {
+      const first=this.entries.keys().next().value;
+      if(first===undefined)break;
+      this.remove(first);
+      this.evictions++;
     }
-    return entry;
+    this.entries.set(key,entry);
+    this.totalBytes+=entry.image.byteLength;
+  }
+
+  private async download(
+    options:MeteosatMapOptions, descriptor:MeteosatMapDescriptor, key:string, generation:number,
+  ):Promise<{entry:Entry;state:"miss"|"shared-hit"}> {
+    const store=this.sharedStore;
+    if(store) {
+      try {
+        const saved=await store.get(key);
+        if(saved && Number.isSafeInteger(saved.expiresAt) && saved.expiresAt>this.now() &&
+          saved.image.byteLength<=this.maxBytes &&
+          isVerifiedImageBytes(saved.image,saved.contentType)) {
+          const entry:Entry={
+            image:saved.image.slice(),contentType:saved.contentType,
+            descriptor:copyDescriptor(descriptor),
+            expiresAt:Math.min(saved.expiresAt,this.now()+this.ttlMs),
+          };
+          this.sharedHits++;
+          this.retain(key,entry,generation);
+          return {entry,state:"shared-hit"};
+        }
+        this.sharedMisses++;
+      } catch {
+        // A shared store outage must never make valid satellite data unavailable.
+        this.sharedErrors++;
+      }
+    }
+    const response:RawImage=await this.upstream.fetchMap(options);
+    if(!isVerifiedImageBytes(response.image,response.contentType))
+      throw new Error("EUMETView returned invalid image bytes");
+    const entry:Entry={
+      image:response.image.slice(),contentType:response.contentType,
+      descriptor:copyDescriptor(descriptor),expiresAt:this.now()+this.ttlMs,
+    };
+    this.retain(key,entry,generation);
+    if(store && this.generation===generation && entry.image.byteLength<=this.maxBytes) {
+      try {
+        await store.put(key,{image:entry.image.slice(),
+          contentType:entry.contentType,expiresAt:entry.expiresAt});
+        this.sharedWrites++;
+      } catch {
+        // A shared store write failure is observable but not fatal to callers.
+        this.sharedErrors++;
+      }
+    }
+    return {entry,state:"miss"};
   }
 
   private result(entry: Entry, cacheState: MeteosatImageCacheState): MeteosatCachedImage {
@@ -159,6 +206,8 @@ export class MeteosatImageCache {
     return {
       entries: this.entries.size, bytes: this.totalBytes, pending: this.inflight.size,
       hits: this.hits, misses: this.misses, coalesced: this.coalesced, evictions: this.evictions,
+      sharedHits:this.sharedHits,sharedMisses:this.sharedMisses,
+      sharedErrors:this.sharedErrors,sharedWrites:this.sharedWrites,
     };
   }
 }

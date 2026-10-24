@@ -2,11 +2,29 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.6.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.7.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
 > **Release status:** v1.4.0 Meteosat timeline features are developed in a feature branch; v1.3.0 is merged into main. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+
+## Shared Meteosat image cache (v1.7 development)
+
+New optional shared cache contract `MeteosatSharedImageStore` and `MeteosatCloudflareKvStore` enable validated binary WMS images to survive separate backend SDK instances. Default behavior remains purely in-memory.
+
+```ts
+import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunch/earth";
+// Cloudflare Worker: env.SPACE_IMAGES is a KV namespace binding.
+const store = new MeteosatCloudflareKvStore(env.SPACE_IMAGES);
+const maps = new SpaceMapClient({meteosatCache:{sharedStore:store}});
+const result = await maps.meteosatImage({
+ layer:"provider:real-layer",bounds3857:[1300000,6200000,1900000,6900000],
+ width:256,height:256,time:"2026-10-19T10:00:00Z"
+});
+console.log(result.cacheState); // miss / hit / shared-hit / coalesced / bypass
+```
+
+Requires explicit TIME, validated JPEG/PNG bytes and an expiration envelope. The adapter uses SHA-256 keys via Web Crypto and binary KV values, no extra npm dependency. KV is eventually consistent: it does **not** guarantee atomic cross-region deduplication. If KV is down, satellite downloads still work. See [Shared Cache v1.7](docs/METEOSAT_SHARED_CACHE_V1_7.md).
 
 ## Meteosat image cache (v1.6 development)
 

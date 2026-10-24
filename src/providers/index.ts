@@ -11,3 +11,6 @@ export * from "./meteosat.js";
 export * from "./firms.js";
 export * from "./sentinel5p.js";
 export * from "./space-video.js";
+export * from "./meteosat-cache.js";
+export * from "./meteosat-cache-store.js";
+export * from "./meteosat-kv.js";
