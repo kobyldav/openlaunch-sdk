@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.15.0 (development) — WGS84 UTM GeoTIFF/COG Support
+
+- Support all 60 WGS84 northern EPSG:326xx and 60 southern EPSG:327xx UTM zones in raster geometry and coordinate conversion, with inverse WGS84 geodetic formulas.
+- GeoTIFF reader recognizes WGS84 UTM ProjectedCSType GeoKeys, not only EPSG:4326/3857.
+- Bounded HTTP Range COG AOI clipping uses UTM transforms and sampled geographic edge envelopes for reliable window selection.
+- Existing STAC-linked Sentinel-2 SCL / Landsat 8/9 QA_PIXEL pipeline automatically benefits for supported TIFF/COG assets. This release does NOT include JPEG2000 support.
+- New UTM inverse, north/south GeoTIFF and COG range/pixel-quality regressions, Fedora smoke and version sync across 7 workspaces.
+
+
 ## 1.14.0 (development) — STAC-linked QA analysis
 
 - Add `SpaceMapClient.analyzeObservationQa()`: provider+collection+item ID resolves a matching Sentinel-2 SCL or Landsat 8/9 QA_PIXEL COG from the official STAC item.
