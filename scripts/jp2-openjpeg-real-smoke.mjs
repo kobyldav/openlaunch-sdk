@@ -23,6 +23,10 @@ assert.equal(typeof module.J2KDecoder,"function");
 const backend=createOpenJpegWasmBackend(async()=>module);
 assert.deepEqual(readJp2Header(jpg),{width:3,height:2,components:1,bitsPerComponent:8});
 const reference={crs:"EPSG:4326",shape:[2,3],transform:[14,0.01,0,51,0,-0.01]};
+// Also expose a controlled-codec failure in CI rather than hiding it behind
+// SDK's sanitized error message. This fixture contains no credentials.
+try{await backend.decode(jpg);}
+catch(error){console.error("Controlled OpenJPEG fixture decode failed:",error?.message);throw error;}
 const raster=await decodeJp2Raster(jpg,reference,backend);
 assert.deepEqual([...raster.values],expected,"OpenJPEG's ACTUAL decoded pixel values do not match the independent Pillow/OpenJPEG fixture");
 

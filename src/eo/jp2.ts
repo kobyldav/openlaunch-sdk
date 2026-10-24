@@ -109,7 +109,8 @@ export function createOpenJpegWasmBackend(factory:()=>Promise<{
     if(!(encoded instanceof Uint8Array)||encoded.byteLength<bytes.length)
       throw new RangeError("OpenJPEG encoded buffer unavailable");
     encoded.set(bytes);
-    instance.readHeader?.();
+    // OpenJPEG decode() parses the header itself. Calling readHeader()
+    // first may consume the input stream and break a second decode pass.
     instance.decode();
     const info=instance.getFrameInfo();
     if(!info||!Number.isSafeInteger(info.width)||!Number.isSafeInteger(info.height)||
