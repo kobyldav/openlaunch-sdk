@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.14.0 (development) — STAC-linked QA analysis
+
+- Add `SpaceMapClient.analyzeObservationQa()`: provider+collection+item ID resolves a matching Sentinel-2 SCL or Landsat 8/9 QA_PIXEL COG from the official STAC item.
+- Explicit host allowlist for asset URLs, identity checks, strict TIFF-only selection, optional Planetary Computer signing and rejection of unsafe/ambiguous scene mask links.
+- Actual GeoTIFF HTTP byte-range windows reused from OpenLaunch raster engine; no token or provider URL in outputs.
+- Source provenance makes clear STAC linkage is not independent image-to-scene authentication.
+- Offline real TIFF fixture, security regressions, Fedora smoke and seven-workspace versions updated.
+
+
 ## 1.13.0 (development) — AOI Pixel Quality from real raster masks
 
 - Sensor-specific Sentinel-2 L2A SCL and Landsat 8/9 Collection 2 QA_PIXEL classification of real georeferenced pixels in Polygon/MultiPolygon AOIs.
