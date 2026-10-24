@@ -1,3 +1,4 @@
+import { fetchVerifiedObservationPreview, type ObservationPreviewOptions, type ObservationPreviewRequest, type VerifiedObservationPreview } from "./observation-preview.js";
 import { exploreSpaceObservations, type ExploreObservationsOptions, type ExploreObservationsReport } from "./observation-explorer.js";
 import { buildSpaceArchive, type SpaceArchiveRequest, type SpaceArchivePlayback } from "./space-archive.js";
 import { MeteosatImageCache, type MeteosatImageCacheOptions, type MeteosatCachedImage, type MeteosatImageCacheStats } from "../providers/meteosat-cache.js";
@@ -68,6 +69,11 @@ export interface SpaceMapOptions {
   copernicusClient?:CopernicusClient;
   planetaryComputerClient?:PlanetaryComputerClient;
   meteosatCache?:MeteosatImageCacheOptions;
+  /** Fail-closed trusted hosts for binary STAC previews; configure server-side. */
+  previewAllowedHosts?: readonly string[];
+  previewMaxBytes?:number;
+  previewTimeoutMs?:number;
+  previewSignPlanetary?:boolean;
 }
 export interface SceneFreshness {
   observationTime:string|null;
@@ -87,11 +93,17 @@ export class SpaceMapClient{
   readonly videos:SpaceVideoClient;
   readonly observations:ObservationDiscoveryClient;
   private readonly firms:NasaFirmsClient|null;
+  private readonly previewOptions:ObservationPreviewOptions;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
     const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
     const pc=options.planetaryComputerClient??new PlanetaryComputerClient({...options.planetaryComputer,...(options.fetch?{fetch:options.fetch}:{})});
     this.observations=new ObservationDiscoveryClient(copernicus,pc);
+    this.previewOptions={allowedHosts:options.previewAllowedHosts??[],
+      ...(options.previewMaxBytes!==undefined?{maxBytes:options.previewMaxBytes}:{}),
+      ...(options.previewTimeoutMs!==undefined?{timeoutMs:options.previewTimeoutMs}:{}),
+      ...(options.previewSignPlanetary?{signPlanetary:true}:{}),
+      ...(options.fetch?{fetch:options.fetch}:{})};
     this.gibs=new NasaGibsClient(http);
     this.meteosat=new MeteosatClient(http);
     this.meteosatCache=new MeteosatImageCache(this.meteosat,options.meteosatCache);
@@ -141,6 +153,14 @@ export class SpaceMapClient{
   /** Find catalog-declared historical satellite scenes by a user-selected location. */
   exploreObservations(options:ExploreObservationsOptions):Promise<ExploreObservationsReport>{
     return exploreSpaceObservations(this.observations,options);
+  }
+  /** Download and validate a declared preview by provider/collection/item ID. */
+  fetchObservationPreview(request:ObservationPreviewRequest):Promise<VerifiedObservationPreview>{
+    return fetchVerifiedObservationPreview({
+      copernicus:this.observations.copernicus.stac,
+      planetaryComputer:this.observations.planetaryComputer.stac,
+      signer:this.observations.planetaryComputer,
+    },request,this.previewOptions);
   }
   discoverObservations(options:ObservationDiscoveryOptions):Promise<ObservationDiscoveryReport>{
     return this.observations.discover(options);
