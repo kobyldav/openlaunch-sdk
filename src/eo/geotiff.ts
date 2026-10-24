@@ -1,5 +1,6 @@
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import { validateRaster } from "./raster.js";
+import { utmZone } from "./utm.js";
 
 export interface GeoTiffDecodeOptions {
   maxPixels?: number;
@@ -16,7 +17,7 @@ const BYTE_SIZE:Readonly<Record<number,number>>={
 /**
  * Decode one-band georeferenced TIFF/COG bytes (classic TIFF or BigTIFF).
  * Supports uncompressed or zlib Deflate tiles/strips, horizontal predictor,
- * 8/16/32-bit integer and 32/64-bit IEEE float samples, EPSG:4326/3857.
+ * 8/16/32-bit integer and 32/64-bit IEEE float samples, EPSG:4326/3857/UTM WGS84.
  * Not a general TIFF library: JP2, JPEG, LZW, multi-band pixel-interleaving,
  * predictor 3 and arbitrary CRSs fail explicitly.
  *
@@ -164,8 +165,8 @@ export function readCrs(tiff:TiffDirectory):RasterCrs{
     const start=4+i*4,key=keys[start]!,tagLocation=keys[start+1]!,count=keys[start+2]!,value=keys[start+3]!;
     if((key===2048||key===3072)&&tagLocation===0&&count===1)epsg=value;
   }
-  if(epsg!==4326&&epsg!==3857)
-    throw new RangeError("GeoTIFF CRS is missing or unsupported: only EPSG:4326 / EPSG:3857 are supported");
+  if(epsg!==4326&&epsg!==3857&&!(epsg!==undefined&&utmZone(`EPSG:${epsg}`)))
+    throw new RangeError("GeoTIFF CRS unsupported: expected EPSG:4326/3857 or WGS84 UTM EPSG:32601..32660 / 32701..32760");
   return `EPSG:${epsg}` as RasterCrs;
 }
 /** @internal */
