@@ -1,3 +1,5 @@
+import {analyzeStacJp2Qa,type Jp2SceneQaRequest,type Jp2SceneQaOptions,type Jp2SceneQaResult} from "./jp2-qa.js";
+import type {Jp2DecoderBackend} from "../eo/jp2.js";
 import { analyzeLinkedObservationQa, type LinkedQaRequest, type LinkedQaResult, type LinkedQaOptions } from "./linked-qa.js";
 import { analyzeAoiPixelQuality, analyzeRemoteAoiPixelQuality, type AoiPixelQualityInput, type AoiPixelQuality, type RemoteAoiPixelQualityRequest, type RemoteAoiPixelQuality } from "../eo/aoi-quality.js";
 import { findBestAvailableObservationPreview, type BestPreviewOptions, type BestPreviewReport } from "./best-preview.js";
@@ -75,6 +77,11 @@ export interface SpaceMapOptions {
   /** Fail-closed trusted hosts for binary STAC previews; configure server-side. */
   previewAllowedHosts?: readonly string[];
   qaAllowedHosts?: readonly string[];
+  jp2AllowedHosts?: readonly string[];
+  jp2Decoder?: Jp2DecoderBackend;
+  jp2MaxBytes?: number;
+  jp2MaxPixels?: number;
+  jp2TimeoutMs?: number;
   qaMaxPixels?: number;
   qaTimeoutMs?: number;
   qaSignPlanetary?: boolean;
@@ -102,6 +109,7 @@ export class SpaceMapClient{
   private readonly firms:NasaFirmsClient|null;
   private readonly previewOptions:ObservationPreviewOptions;
   private readonly linkedQaOptions:LinkedQaOptions;
+  private readonly jp2Options:Jp2SceneQaOptions;
   constructor(options:SpaceMapOptions={}){
     const http:BoundedHttpOptions=options.fetch?{fetch:options.fetch}:{};
     const copernicus=options.copernicusClient??new CopernicusClient({...options.copernicus,...(options.fetch?{fetch:options.fetch}:{})});
@@ -112,6 +120,14 @@ export class SpaceMapClient{
       ...(options.qaMaxPixels!==undefined?{maxPixels:options.qaMaxPixels}:{}),
       ...(options.qaTimeoutMs!==undefined?{timeoutMs:options.qaTimeoutMs}:{}),
       ...(options.qaSignPlanetary?{signPlanetary:true}:{}),
+      ...(options.fetch?{fetch:options.fetch}:{})
+    };
+    this.jp2Options={
+      allowedHosts:options.jp2AllowedHosts??[],
+      ...(options.jp2Decoder?{decoder:options.jp2Decoder}:{}),
+      ...(options.jp2MaxBytes!==undefined?{maxBytes:options.jp2MaxBytes}:{}),
+      ...(options.jp2MaxPixels!==undefined?{maxPixels:options.jp2MaxPixels}:{}),
+      ...(options.jp2TimeoutMs!==undefined?{timeoutMs:options.jp2TimeoutMs}:{}),
       ...(options.fetch?{fetch:options.fetch}:{})
     };
     this.previewOptions={allowedHosts:options.previewAllowedHosts??[],
@@ -172,6 +188,10 @@ export class SpaceMapClient{
   /** Fetch bounded remote QA COG data from allowlisted backend URL and classify. */
   analyzeRemoteAoiPixelQuality(request:RemoteAoiPixelQualityRequest):Promise<RemoteAoiPixelQuality>{
     return analyzeRemoteAoiPixelQuality(request);
+  }
+  /** Decode explicitly georeferenced 8-bit Sentinel-2 JP2 SCL pixels (optional codec). */
+  analyzeObservationJp2Qa(request:Jp2SceneQaRequest):Promise<Jp2SceneQaResult>{
+    return analyzeStacJp2Qa(this.observations.copernicus.stac,request,this.jp2Options);
   }
   /** Resolve a STAC scene's own QA/SCL raster, analyze bounded real AOI pixels. */
   analyzeObservationQa(request:LinkedQaRequest):Promise<LinkedQaResult>{

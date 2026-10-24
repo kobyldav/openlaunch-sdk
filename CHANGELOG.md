@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.17.0 (development) — Optional JP2 QA adapter and scene-linked Sentinel-2 SCL
+
+- New `readJp2Header()` validates JP2 signature/box header and 8-bit one-band dimensions before decoding.
+- New `decodeJp2Raster()` converts output of an explicitly injected JP2 codec into validated georeferenced RasterGrid with strict byte/pixel bounds and exact STAC asset-level shape.
+- `createOpenJpegWasmBackend()` adapter targets separately installed OpenJPEG JS/WASM; SDK does not bundle unreviewed codec binaries.
+- `SpaceMapClient.analyzeObservationJp2Qa()` identifies matching official Sentinel-2 SCL JP2 asset by scene ID, securely downloads from backend allowlist and performs actual QA raster pixel classification.
+- Security tests for unsafe host, asset-level projection mismatches, corrupt output, missing decoder, signed-URL secrecy, and offline real JP2 encoded fixture.
+- Tests use mocked backend output, NOT real OpenJPEG WASM execution. Large native JP2 products are not yet supported by bounded full-download decoding.
+
+
+
 ## 1.16.0 (development) — TIFF LZW GeoTIFF/COG
 
 - Bounded TIFF 6.0 LZW decompression (MSB-first, 9–12 bits, clear/EOI, early-change=1) without new runtime packages.
