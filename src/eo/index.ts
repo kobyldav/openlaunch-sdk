@@ -8,3 +8,4 @@ export * from "./geotiff.js";
 export * from "./calibration.js";
 export * from "./cog.js";
 export * from "./aoi-quality.js";
+export * from "./utm.js";
