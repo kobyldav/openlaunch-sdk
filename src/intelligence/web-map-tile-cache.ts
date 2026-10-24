@@ -78,6 +78,7 @@ export class WebMapTileCache {
   private readonly store=new Map<string,CacheEntry>();
   private readonly inflight=new Map<string,Promise<WebMapDailyTileResult>>();
   private totalBytes=0;
+  private generation=0;
   private hits=0;
   private fetches=0;
   private joined=0;
@@ -97,6 +98,7 @@ export class WebMapTileCache {
   }
   /** Invalidate all stored images. Existing in-flight requests remain bounded and still resolve. */
   clear():void{
+    this.generation++;
     this.store.clear();this.totalBytes=0;
   }
   stats():WebMapTileCacheStats{
@@ -148,12 +150,13 @@ export class WebMapTileCache {
       return {...copyTile(result),cacheStatus:"shared"};
     }
     this.fetches++;
+    const generation=this.generation;
     // Avoid async ordering issues: insert promise before any subsequent get().
     const operation=fetchWebMapDailyTile(this.clients,request,this.fetchOptions);
     this.inflight.set(key,operation);
     try{
       const result=await operation;
-      this.remember(key,result);
+      if(generation===this.generation)this.remember(key,result);
       return {...copyTile(result),cacheStatus:"fetched"};
     }finally{
       if(this.inflight.get(key)===operation)this.inflight.delete(key);

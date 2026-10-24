@@ -108,8 +108,9 @@ test("v1.22 batch has bounded unique fetch concurrency, input order and duplicat
  assert.equal(batch.available,6);
  assert.equal(batch.verifiedAcquisition,false);
  assert.equal(batch.missing,0);
- assert.equal(batch.shared,1);
- assert.equal(batch.cacheHits,0);
+ // The duplicate may join a still-running request or hit its completed cache:
+ // worker scheduling must not change the number of external requests.
+ assert.equal(batch.shared+batch.cacheHits,1);
  assert.ok(peak<=2);
  assert.equal(started,5);
  assert.deepEqual(batch.results.map(x=>x.x),[1,2,3,2,4,5]);
@@ -193,4 +194,19 @@ test("v1.22 rejected unexpected provider URL cannot become an arbitrary URL cach
  const cache=new WebMapTileCache(unsafe,{fetch:async()=>{count++;return jpeg()}});
  await assert.rejects(cache.get(base),/Unexpected NASA map descriptor/);
  assert.equal(count,0);
+});
+test("v1.22 clearing during an in-flight fetch does not repopulate the cache",async()=>{
+ let release;
+ const gate=new Promise(resolve=>release=resolve);
+ const {sdk,count}=sdkWithFetch(async()=>{await gate;return jpeg()});
+ const fetching=sdk.webMapDailyTileCached(base);
+ await Promise.resolve();
+ sdk.clearWebMapTileCache();
+ release();
+ const first=await fetching;
+ assert.equal(first.cacheStatus,"fetched");
+ assert.equal(sdk.webMapTileCacheStats().entries,0);
+ const second=await sdk.webMapDailyTileCached(base);
+ assert.equal(second.cacheStatus,"fetched");
+ assert.equal(count(),2);
 });
