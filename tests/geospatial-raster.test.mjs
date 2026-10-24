@@ -98,7 +98,7 @@ test("Decode nodata as NaN without pretending 0 is valid reflectance",async()=>{
 });
 
 test("Decode guards reject arbitrary unsupported CRS and unsafe sizes",async()=>{
-  const bytes=fixture({epsg:32633});
+  const bytes=fixture({epsg:25833});
   await assert.rejects(decodeGeoTiff(bytes),/GeoTIFF CRS.*unsupported/);
   await assert.rejects(decodeGeoTiff(fixture(),{maxPixels:5}),/maxPixels/);
   await assert.rejects(decodeGeoTiff(fixture(),{maxInputBytes:50}),/maxInputBytes/);

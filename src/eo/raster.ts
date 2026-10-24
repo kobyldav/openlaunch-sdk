@@ -67,6 +67,7 @@ export function lonLatToGridCrs(lon:number,lat:number,crs:RasterCrs): [number,nu
 }
 export function gridCrsToLonLat(x:number,y:number,crs:RasterCrs): [number,number] {
   if(crs==="EPSG:4326")return [x,y];
+  if(crs!=="EPSG:3857")return utmToLonLat(x,y,crs);
   return [x*180/(MERCATOR_R*Math.PI),(2*Math.atan(Math.exp(y/MERCATOR_R))-Math.PI/2)*180/Math.PI];
 }
 export function rasterStatistics(grid:RasterGrid): RasterStats {
