@@ -210,3 +210,29 @@ test("FIRMS backend key is redacted from network error messages",async()=>{
     return true;
   });
 });
+
+test("Sentinel-5P can render map-aligned Web Mercator output without mislabelling acquisition",async()=>{
+  let body;
+  const cp=new CopernicusClient({accessToken:"TEST",fetch:async(url,init)=>{
+    assert.equal(String(url),"https://sh.dataspace.copernicus.eu/process/v1");
+    body=JSON.parse(init.body);
+    return new Response(new Uint8Array([137,80,78,71]),{headers:{"content-type":"image/png"}});
+  }});
+  const mercator=[1280000,6140000,2150000,6630000];
+  const report=await new Sentinel5pClient(cp).render({
+    area:bbox(11.5,48.2,19.3,51.3),webMercatorBounds:mercator,
+    from:"2026-10-15T00:00:00Z",to:"2026-10-22T00:00:00Z",
+    species:"SO2",width:512,height:512,
+  });
+  assert.deepEqual(body.input.bounds.bbox,mercator);
+  assert.equal(body.input.bounds.properties.crs,"http://www.opengis.net/def/crs/EPSG/0/3857");
+  assert.equal(report.species,"SO2");
+  assert.equal(report.observedAt,null);
+});
+test("SpaceVideoClient uses an official NASA ISS livestream, not the retired private ID",()=>{
+  const station=new SpaceVideoClient().get("iss-earth-live");
+  assert.equal(station.provider,"NASA");
+  assert.ok(station.embedUrl.includes("jKHvbJe9c_Y"));
+  assert.ok(!station.embedUrl.includes("aB1yRz0HhdY"));
+  assert.equal(station.availability,"not-checked");
+});
