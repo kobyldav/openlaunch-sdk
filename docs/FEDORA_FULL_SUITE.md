@@ -29,7 +29,7 @@ bash scripts/fedora-full-test.sh --wasm
 # Offline + live provider smoke probes + actual OpenJPEG/WASM.
 bash scripts/fedora-full-test.sh --all
 
-# Explicitly run *all* online-labelled cookbook recipes; 60 separate scripts,
+# Explicitly run *all* online-labelled cookbook recipes; 65 separate scripts,
 # 3-second spacing and individual timeouts. Many independent API calls, quotas,
 # credentials and longer execution; do not run casually.
 bash scripts/fedora-full-test.sh --live-cookbook
@@ -49,7 +49,7 @@ bash scripts/fedora-full-test.sh --live-cookbook
 | Packages | `test:packages`, `pack:check:packages`, `test:packed`, root pack | No |
 | Live providers | LL2, CelesTrak, Copernicus, Planetary Computer, weather, orbit | Opt in `--live` |
 | Real WASM codec | Pinned `@cornerstonejs/codec-openjpeg@1.3.6`, original/reduced JP2 | Opt in `--wasm` |
-| All online cookbook | 60 `network:true` examples, spaced by 3 s | Explicit `--live-cookbook` |
+| All online cookbook | 65 `network:true` examples, spaced by 3 s | Explicit `--live-cookbook` |
 
 Some online examples need provider keys; a live failure means the real provider or credentials may be unavailable, not necessarily that the SDK is broken. All offline STAC image responses and other provider fixtures are **simulated**. Successful CI does not prove every public provider currently delivers usable data.
 

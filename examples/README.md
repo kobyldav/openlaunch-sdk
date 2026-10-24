@@ -8,7 +8,7 @@ This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It
 
 `npm run examples:check` type-checks the **entire** example catalogue, including network-backed recipes, without contacting providers. After `npm run build`, execute `node scripts/verify-cookbook.mjs --mode=offline` to transpile and execute every `network:false` recipe under a fixed timeout. The verified scene/preview, NASA daily tile, LRU cache and bounded batch recipes are in [19-web-integration](./19-web-integration).
 
-`node scripts/verify-cookbook.mjs --mode=list` reports current totals by category. `--mode=live` deliberately runs all network-labelled recipes and may require credentials and consume many requests; use it only when explicitly needed. A comprehensive Fedora launcher with all SDK tests, package install and optional real WASM tests is in [FEDORA_FULL_SUITE](../docs/FEDORA_FULL_SUITE.md).
+`node scripts/verify-cookbook.mjs --mode=list` reports current totals by category. `--mode=live` deliberately runs all 65 network-labelled recipes and may require credentials and consume many requests; use it only when explicitly needed. A comprehensive Fedora launcher with all SDK tests, package install and optional real WASM tests is in [FEDORA_FULL_SUITE](../docs/FEDORA_FULL_SUITE.md).
 
 ## v1.2 Satellite maps and Live Earth
 

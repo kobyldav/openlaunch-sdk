@@ -76,7 +76,8 @@ function mappedImport(spec,original){
  if(target.startsWith(sourcePrefix)){
   // SDK examples import ../../src/*.js: tested against the actual compiled SDK.
   const out=join(root,"dist",relative(join(root,"src"),target));
-  return pathToFileURL(out).href;
+  const js=out.endsWith(".js")?out:out+".js";
+  return pathToFileURL(js).href;
  }
  if(target.startsWith(examplesPrefix)){
   const inside=relative(examples,target).replace(/\.(?:js|ts)$/,".mjs");

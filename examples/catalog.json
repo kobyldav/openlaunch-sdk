@@ -1642,6 +1642,61 @@
       ],
       "network": false,
       "description": "Offline SDK web integration exercise for webMapSearch, fetchObservationPreview."
+    },
+    {
+      "path": "celestrak.ts",
+      "title": "Legacy CelesTrak ISS",
+      "description": "CelesTrak catalog orbit lookup",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak"
+      ],
+      "network": true
+    },
+    {
+      "path": "mars-mission.ts",
+      "title": "Legacy Mars mission with live launch",
+      "description": "Combined Mars engineering and live LL2 launch data",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "marsMissionReference"
+      ],
+      "network": true
+    },
+    {
+      "path": "next-launch.ts",
+      "title": "Legacy next launch",
+      "description": "Live upcoming launch from LL2",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "launches.next"
+      ],
+      "network": true
+    },
+    {
+      "path": "query-builder.ts",
+      "title": "Legacy launch query",
+      "description": "Live raw LL2 endpoint with query builder",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "query"
+      ],
+      "network": true
+    },
+    {
+      "path": "search.ts",
+      "title": "Legacy search",
+      "description": "LL2 development search endpoint",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "launches.search"
+      ],
+      "network": true
     }
   ]
 }
