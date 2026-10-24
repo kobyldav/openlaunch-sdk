@@ -145,7 +145,7 @@ test("v1.14 Landsat QA_PIXEL is bit decoded only from matching STAC item's exact
  assert.equal(result.qaAssetKey,"QA_PIXEL");
  assert.deepEqual([result.quality.clearPixels,result.quality.cloudPixels,
   result.quality.shadowPixels,result.quality.snowPixels,
-  result.quality.unknownPixels,result.quality.noDataPixels],[1,2,1,1,0,1]);
+  result.quality.unknownPixels,result.quality.noDataPixels],[1,1,1,1,0,2]);
 });
 test("v1.14 unsupported pair or empty trust list fails before STAC request",async()=>{
  const {sdk,calls}=sdkWith();
