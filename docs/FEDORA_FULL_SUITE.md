@@ -1,14 +1,14 @@
 # Fedora SDK full functional test suite
 
-**Target:** OpenLaunch SDK `feature/gibs-tile-cache-batch-v1.22.0` (PR #33). The suite tests the SDK, not the separate MyWeb frontend. An API export parity audit and gap inventory are included. **No single test suite can certify every behavior or live upstream provider.** All operations are local except npm package installation and any live checks you explicitly enable.
+**Target:** OpenLaunch SDK `main` (v1.22+). The suite tests the SDK, not the separate MyWeb frontend. An API export parity audit and gap inventory are included. **No single test suite can certify every behavior or live upstream provider.** All operations are local except npm package installation and any live checks you explicitly enable.
 
 ## Copy/paste: recommended complete offline verification
 
 ```bash
-cd ~/Desktop/Openspace/openlaunch-sdk
+cd ~/Desktop/Openspace/openlaunch-sdk-validation
 git fetch origin
-git switch feature/gibs-tile-cache-batch-v1.22.0
-git pull --ff-only origin feature/gibs-tile-cache-batch-v1.22.0
+git switch main
+git pull --ff-only origin main
 bash scripts/fedora-full-test.sh
 ```
 
@@ -30,7 +30,7 @@ bash scripts/fedora-full-test.sh --wasm
 bash scripts/fedora-full-test.sh --all
 
 # Explicitly run *all* online-labelled cookbook recipes; 65 separate scripts,
-# 3-second spacing and individual timeouts. Many independent API calls, quotas,
+# 3-second spacing and individual 30-second timeouts. Many independent API calls, quotas,
 # credentials and longer execution; do not run casually.
 bash scripts/fedora-full-test.sh --live-cookbook
 ```
@@ -69,7 +69,7 @@ test-results/fedora-YYYY-MM-DDTHH-MM-SS/
     summary-offline.json
 ```
 
-The runner uses bounded execution per test, reports failures individually, avoids embedding secret values in log output and returns a nonzero shell exit code if anything fails. You can send `summary.txt` and the specific failed `.log` to diagnose quickly. `test-results/` is ignored by Git.
+The runner uses bounded execution per test, reports failures individually, avoids embedding secret values in log output and returns a nonzero shell exit code if anything fails. The live cookbook runs with a 45-minute overall cap to accommodate up to 65 individual 30-second request limits and 3-second gaps. It prints allowlisted `RUN/PASS/FAIL` lines as each recipe executes; a live provider may still block an individual recipe until its own timeout. Every completed recipe is persisted immediately in `cookbook-live/progress-live.json`, even if the suite is interrupted before the final `summary-live.json` is produced. Do not run two suites writing the same output directory. You can send `summary.txt` and the specific failed `.log` to diagnose quickly. `test-results/` is ignored by Git.
 
 ## Manual requirements
 
@@ -87,6 +87,6 @@ The runner uses bounded execution per test, reports failures individually, avoid
 - All recorded offline examples are executed. Online examples are **not executed** unless `--live-cookbook` is provided. `--all` alone runs only bounded live smoke probes plus optional OpenJPEG.
 - Live provider tests, authentication, actual satellite acquisition dates, and downstream browser/Cloudflare behavior remain separate integration risks.
 
-**GitHub branch vs main:** The examples belong in `main` only after reviewed PR merge; otherwise users viewing the default branch see an older catalogue.
+**Versioned examples:** The catalogue and Fedora runner are tracked in `main`. Always verify the checked-out Git commit in the Fedora report.
 
 **Measured initial API gaps (2026-10-28):** 486 distinct public runtime symbols, 300 not referenced in cookbook examples; 637 exported class-method records (across entrypoints), 270 not referenced in examples. These are reference-audit counts, not executed statement coverage. The Fedora runner includes these values in its summary as **incomplete API coverage** even when all executed tests pass.

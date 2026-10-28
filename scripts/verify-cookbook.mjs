@@ -11,7 +11,7 @@
  *      node scripts/verify-cookbook.mjs --mode=live [--output=...]
  *      node scripts/verify-cookbook.mjs --mode=list
  */
-import {readFile,readdir,mkdir,mkdtemp,writeFile,rm} from "node:fs/promises";
+import {readFile,readdir,mkdir,mkdtemp,writeFile,rename,rm} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join,dirname,resolve,relative,sep} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
@@ -120,6 +120,18 @@ try{
  }
  const wrapper=join(temp,"entry.mjs");
  const summaries=[];
+ const progressFile=join(reportDir,"progress-"+mode+".json");
+ let current=null;
+ async function saveProgress(status){
+  const snapshot={mode,status,updatedAt:new Date().toISOString(),
+   total:selected.length,completed:summaries.length,
+   passed:summaries.filter(x=>x.status==="PASS").length,
+   failed:summaries.filter(x=>x.status==="FAIL").length,
+   current,results:summaries};
+  await writeFile(progressFile+".tmp",JSON.stringify(snapshot,null,2)+"\n");
+  await rename(progressFile+".tmp",progressFile);
+ }
+ await saveProgress("running");
  const env={...process.env,OPENLAUNCH_EXAMPLE_RUN_MODE:mode};
  for(let i=0;i<selected.length;i++){
   const example=selected[i];
@@ -127,6 +139,9 @@ try{
   await writeFile(wrapper,
     (mode==="offline"?`globalThis.fetch=()=>{throw new Error("Offline example attempted network access");};\n`:"")+
     `await import(${JSON.stringify(entry)});\n`);
+  current=example.path;
+  await saveProgress("running");
+  console.log("["+String(i+1).padStart(3)+"/"+selected.length+"] RUN "+example.path);
   const start=Date.now();
   const run=await new Promise((done)=>{
    const child=spawn(process.execPath,[wrapper],{cwd:root,env,stdio:["ignore","pipe","pipe"]});
@@ -143,6 +158,8 @@ try{
   summaries.push({path:example.path,category:example.category,network:example.network,
     status:ok?"PASS":"FAIL",durationMs:Date.now()-start,log:logName,
     exitCode:run.exitCode,timedOut:run.timedOut});
+  current=null;
+  await saveProgress("running");
   console.log("["+String(i+1).padStart(3)+"/"+selected.length+"] "+
     (ok?"PASS":"FAIL")+" "+example.path);
   if(mode==="live"&&pauseMs&&i+1<selected.length)
@@ -153,6 +170,7 @@ try{
   liveTotal:live.length,run:total,passed,failed:total-passed,
   results:summaries};
  await writeFile(join(reportDir,"summary-"+mode+".json"),JSON.stringify(report,null,2)+"\n");
+ await saveProgress("finished");
  console.log("COOKBOOK: "+passed+"/"+total+" PASS; "+(total-passed)+" FAIL. Logs: "+reportDir);
  if(passed!==total)process.exitCode=1;
 }finally{
