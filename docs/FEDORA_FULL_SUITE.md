@@ -123,3 +123,27 @@ node scripts/verify-cookbook.mjs --mode=live \
 ```
 
 Use the same `--only=` syntax for e.g. `02-nasa/02-neows-browse.ts` or `17-raster/01-real-cog-window.ts`. Multiple exact `--only=` arguments are accepted, but choose a few representatives at most. The original 30-second deadline remains the default for the full live suite to bound calls; a longer deadline is **explicit opt-in** for individual root-cause analysis. Inspect `summary-live.json`, `diagnosis-live.json` and the relevant `.log` file before touching SDK provider code. Redact provider credentials and signed asset URLs before sharing logs.
+
+## 2026-10-28 LL2 timeout follow-up: prove transport before changing SDK
+
+The user-measured cookbook reported 33/65 PASS, with **31 examples killed by the 30-second cookbook deadline** and 1 independent raster exception. An additional single LL2 example run with a 120-second deadline also failed, but its console output did not expose `timedOut` versus an SDK-raised `TimeoutError`.
+
+To inspect the existing **120-second** result without any requests:
+
+```bash
+node -e 'const r=require("./test-results/live-ll2-one/summary-live.json").results[0]; console.log(JSON.stringify({path:r.path,timedOut:r.timedOut,durationMs:r.durationMs,exitCode:r.exitCode,diagnosis:r.diagnosis},null,2))'
+```
+
+Then, **only if a fresh LL2 request is justified** (it uses the production unauthenticated quota), check one SDK HTTP request with no automatic retry and a 10-second deadline:
+
+```bash
+node scripts/ll2-transport-probe.mjs
+```
+
+An alternative uses stale, rate-limit-free development data:
+
+```bash
+node scripts/ll2-transport-probe.mjs --dev
+```
+
+Both outputs are deliberately small and never include request URLs, query strings, API tokens, or provider response bodies. The probe reports the HTTP status (including 429, 401, 403, or 5xx), an SDK timeout, or a transport error, but still cannot prove its underlying infrastructure cause. `retries:0` prevents 429 `Retry-After` from making this diagnosis wait for an hour. A normal SDK instance defaults to **two retries** and **30 seconds per HTTP attempt**, so naive cookbook execution is not a strong live integration test. Never weaken the production client's rate-limit protection just to make cookbook examples pass. Inspect the COG log separately; it is not part of the LL2 transport investigation.

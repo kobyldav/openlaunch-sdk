@@ -47,6 +47,7 @@ const output={
  timeoutByHarness,
  notes:[
  "A signature is not proof of the upstream root cause.",
+ "harness_deadline_exceeded confirms only the cookbook process was killed, not the upstream reason for stalling.",
  "403 may be an expired quota, missing key, or permissions: review the individual log.",
  "No keys, request URLs, or provider response bodies are included."
  ]
