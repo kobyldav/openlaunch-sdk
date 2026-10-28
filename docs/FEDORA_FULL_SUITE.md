@@ -43,7 +43,7 @@ bash scripts/fedora-full-test.sh --live-cookbook
 |---|---|---|
 | Build | TypeScript ESM+CJS + 7 modular workspaces | No |
 | TypeScript API examples | All catalogued cookbook TS examples typechecked | No |
-| Runnable offline examples | All catalogued `network:false` TS examples (currently 82) | No |
+| Runnable offline examples | All catalogued `network:false` TS examples (currently 87) | No |
 | Regression tests | All `tests/*.test.mjs`, including security/telemetry/parsing | No |
 | SDK smoke scripts | Every offline executable entry in `package.json` `test` | No |
 | Packages | `test:packages`, `pack:check:packages`, `test:packed`, root pack | No |
@@ -88,3 +88,5 @@ The runner uses bounded execution per test, reports failures individually, avoid
 - Live provider tests, authentication, actual satellite acquisition dates, and downstream browser/Cloudflare behavior remain separate integration risks.
 
 **GitHub branch vs main:** The examples belong in `main` only after reviewed PR merge; otherwise users viewing the default branch see an older catalogue.
+
+**Measured initial API gaps (2026-10-28):** 486 distinct public runtime symbols, 300 not referenced in cookbook examples; 637 exported class-method records (across entrypoints), 270 not referenced in examples. These are reference-audit counts, not executed statement coverage. The Fedora runner includes these values in its summary as **incomplete API coverage** even when all executed tests pass.

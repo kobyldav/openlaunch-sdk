@@ -79,7 +79,7 @@ if(!skipInstall)add("setup","npm ci: deterministic dependency install",npm,
 npmRun("TypeScript source typecheck","typecheck","static",90000);
 npmRun("All TypeScript cookbook examples typecheck","examples:check","static",90000);
 npmRun("Build ESM/CJS + seven workspaces","build","build",180000);
-add("audit","Public API export/parity and example gap inventory",process.execPath,
+add("audit","Public API export parity + explicit coverage gaps",process.execPath,
  ["scripts/api-surface-audit.mjs","--output="+join(logDir,"api-surface")],120000);
 add("unit","All SDK regression tests",process.execPath,
  [...(nodeMajor>=20?["--experimental-test-coverage"]:[]),"--test",...allTests],240000);
@@ -177,9 +177,19 @@ if(wasm&&nodeMajor<20){
 if(!live)results.push({status:"SKIP",group:"live",label:"Live provider probes",reason:"Use --live or --all"});
 if(!wasm)results.push({status:"SKIP",group:"wasm",label:"Real OpenJPEG/WASM",reason:"Use --wasm or --all"});
 if(!liveCookbook)results.push({status:"SKIP",group:"live",label:"All online TypeScript examples",
- reason:"Use --live-cookbook; up to 60 live examples may be rate limited"});
+ reason:"Use --live-cookbook; up to 65 live examples may be rate limited"});
+let apiCoverage=null;
+try{
+ const audit=JSON.parse(await readFile(join(logDir,"api-surface","public-api.json"),"utf8"));
+ apiCoverage={
+  distinctRuntimeSymbols:audit.stats.distinctRuntimeSymbols,
+  symbolsWithoutExampleReference:audit.stats.unreferencedExportNames,
+  classMethodsWithoutExampleReference:audit.stats.unreferencedClassMethods,
+  note:"Text references do not prove functional execution; no claim of 100% coverage"
+ };
+}catch{}
 const summary={sdkVersion:pkg.version,node:process.version,gitBranch,gitCommit,
- startMode:{live,wasm,liveCookbook,skipInstall},
+ startMode:{live,wasm,liveCookbook,skipInstall},apiCoverage,
  totals:{pass:results.filter(x=>x.status==="PASS").length,
  fail:results.filter(x=>x.status==="FAIL").length,
  skip:results.filter(x=>x.status==="SKIP").length},
@@ -195,4 +205,11 @@ console.log("PASS:",summary.totals.pass,"FAIL:",summary.totals.fail,"SKIP:",summ
 console.log("Logs:",logDir);
 console.log("Summary:",join(logDir,"summary.txt"));
 console.log("Full JSON:",join(logDir,"summary.json"));
+if(apiCoverage){
+ console.log("API COVERAGE IS INCOMPLETE:");
+ console.log("  distinct public runtime symbols:",apiCoverage.distinctRuntimeSymbols);
+ console.log("  symbols not referenced by examples:",apiCoverage.symbolsWithoutExampleReference);
+ console.log("  class methods not referenced by examples:",apiCoverage.classMethodsWithoutExampleReference);
+ console.log("  Reference counts are NOT proof of behavioral coverage.");
+}
 if(summary.totals.fail)process.exitCode=1;
