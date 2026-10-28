@@ -103,3 +103,23 @@ node scripts/diagnose-live-results.mjs --dir=test-results/live-manual
 ```
 
 Or pass the existing `test-results/fedora-.../cookbook-live` directory. This tool reads only existing logs and uses **zero** provider requests. Do not share unredacted API tokens or signed asset URLs. The resulting `diagnosis-live.json` includes only classifications and filenames. To reproduce provider behavior safely, avoid hammering unauthenticated LL2 production: LL2 free production allows about 15 calls/hour, and the rate-unlimited `lldev` endpoint contains stale/limited data. NASA `DEMO_KEY` has much lower per-IP quotas (30/hour, 50/day); configure a personal NASA key if repeated API calls are needed. These limits do not justify marking failed tests as passed.
+
+## Why 31 online examples timed out, and how to reproduce safely
+
+The 2026-10-28 Fedora logs had **33 PASS, 31 timeout-classified failures and 1 COG/raster exception**. These do **not** demonstrate 31 defective SDK functions. The live cookbook process had a 30-second per-example deadline, while HTTP clients can themselves wait up to 30 seconds **per request** and may retry. A process killed at the harness deadline never emits the true HTTP error. Timeout signatures also do not rule out provider throttling, DNS issues, or retries.
+
+**Do not immediately repeat all 65 online examples**. First inspect the existing `diagnosis-live.json` and a specific failed example's local (redacted) log.
+
+The diagnosis CLI now reports a **numeric** `failed`, `failedExamples[]`, and `timeoutByHarness` to separate process termination from merely mentioning "TimeoutError" in a log.
+
+To investigate a *single* failing LL2 example with a longer budget (this makes real network requests and can consume quotas):
+
+```bash
+cd ~/Desktop/Openspace/openlaunch-sdk-validation
+node scripts/verify-cookbook.mjs --mode=live \
+  --only=00-getting-started/01-next-launch.ts \
+  --timeout-ms=120000 \
+  --output=test-results/live-ll2-one
+```
+
+Use the same `--only=` syntax for e.g. `02-nasa/02-neows-browse.ts` or `17-raster/01-real-cog-window.ts`. Multiple exact `--only=` arguments are accepted, but choose a few representatives at most. The original 30-second deadline remains the default for the full live suite to bound calls; a longer deadline is **explicit opt-in** for individual root-cause analysis. Inspect `summary-live.json`, `diagnosis-live.json` and the relevant `.log` file before touching SDK provider code. Redact provider credentials and signed asset URLs before sharing logs.
