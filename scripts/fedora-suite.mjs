@@ -79,7 +79,10 @@ if(!skipInstall)add("setup","npm ci: deterministic dependency install",npm,
 npmRun("TypeScript source typecheck","typecheck","static",90000);
 npmRun("All TypeScript cookbook examples typecheck","examples:check","static",90000);
 npmRun("Build ESM/CJS + seven workspaces","build","build",180000);
-add("unit","All SDK regression tests",process.execPath,["--test",...allTests],180000);
+add("audit","Public API export/parity and example gap inventory",process.execPath,
+ ["scripts/api-surface-audit.mjs","--output="+join(logDir,"api-surface")],120000);
+add("unit","All SDK regression tests",process.execPath,
+ [...(nodeMajor>=20?["--experimental-test-coverage"]:[]),"--test",...allTests],240000);
 add("cookbook","Execute ALL catalogue-labelled offline TypeScript examples",process.execPath,
  ["scripts/verify-cookbook.mjs","--mode=offline","--output="+join(logDir,"cookbook")],180000);
 for(const path of demoScripts)nodeRun(path,path,"offline-demos",90000);
@@ -158,7 +161,7 @@ for(let i=0;i<planned.length;i++){
   continue;
  }
  // Build can fail yet static checks are useful. Binary tests cannot run without it.
- const requiresBuild=["unit","cookbook","offline-demos","packaging","wasm","live"].includes(step.group);
+ const requiresBuild=["audit","unit","cookbook","offline-demos","packaging","wasm","live"].includes(step.group);
  if(requiresBuild&&!buildOk){
   results.push({status:"SKIP",group:step.group,label:step.label,reason:"SDK build failed"});
   console.log("SKIP "+step.label+" (SDK build failed)");

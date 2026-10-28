@@ -1697,6 +1697,68 @@
         "launches.search"
       ],
       "network": true
+    },
+    {
+      "path": "20-provider-replay/01-nasa-provider-fixture.ts",
+      "title": "Offline fixture: nasa provider fixture",
+      "category": "provider-replay",
+      "symbols": [
+        "NasaClient",
+        "neoFeed",
+        "neoLookup",
+        "donki",
+        "epicEnhanced",
+        "techTransfer"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/02-celestrak-provider-fixture.ts",
+      "title": "Offline fixture: celestrak provider fixture",
+      "category": "provider-replay",
+      "symbols": [
+        "CelesTrakClient",
+        "byCatalogNumber",
+        "byName",
+        "byGroup"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/03-gibs-failure-matrix.ts",
+      "title": "Offline fixture: gibs failure matrix",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTile"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/04-mixed-batch-isolation.ts",
+      "title": "Offline fixture: mixed batch isolation",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTilesBatch"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/05-layer-registry-contract.ts",
+      "title": "Offline fixture: layer registry contract",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "layers",
+        "webMapDaily"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
     }
   ]
 }

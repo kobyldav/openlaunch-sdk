@@ -1,5 +1,18 @@
 # OpenLaunch SDK examples
 
+## Strict public API inventory and provider replay fixtures
+
+New `examples/20-provider-replay` includes five **offline** assertions for NASA,
+CelesTrak, GIBS failure classifications, batch isolation and 18 layer registry entries.
+These fixtures do **not** authenticate actual satellite observations.
+
+Run `npm run examples:offline` to execute all network-free examples.
+Run `node scripts/api-surface-audit.mjs` after building to inventory every
+runtime entrypoint, ESM/CommonJS parity, exported classes/methods, and symbols
+that are not even mentioned in cookbook examples. This is a **gap report**,
+not a statement of total functional coverage. See `docs/FEDORA_FULL_SUITE.md`.
+
+
 This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It is intentionally organized for both humans and code/AI indexers: examples use descriptive filenames, self-contained imports, explicit units, short comments, and stable public symbols.
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.

@@ -22,6 +22,14 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
+      - name: Audit all public runtime exports and examples
+        run: node scripts/api-surface-audit.mjs --output=test-results/ci-api
+      - name: Preserve API coverage inventory
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-inventory-node-${{ matrix.node }}
+          path: test-results/ci-api
       - name: Execute all catalogued offline TypeScript examples
         run: node scripts/verify-cookbook.mjs --mode=offline --output=test-results/ci-cookbook
       - run: npm pack --dry-run

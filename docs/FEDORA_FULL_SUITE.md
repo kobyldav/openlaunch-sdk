@@ -1,6 +1,6 @@
 # Fedora SDK full functional test suite
 
-**Target:** OpenLaunch SDK `feature/gibs-tile-cache-batch-v1.22.0` (PR #33). The suite tests the SDK, not the separate MyWeb frontend. All operations are local except npm package installation and any live checks you explicitly enable.
+**Target:** OpenLaunch SDK `feature/gibs-tile-cache-batch-v1.22.0` (PR #33). The suite tests the SDK, not the separate MyWeb frontend. An API export parity audit and gap inventory are included. **No single test suite can certify every behavior or live upstream provider.** All operations are local except npm package installation and any live checks you explicitly enable.
 
 ## Copy/paste: recommended complete offline verification
 
@@ -78,3 +78,13 @@ The runner uses bounded execution per test, reports failures individually, avoid
 - `npm ci` may require internet; the *SDK* offline test stages never need actual NASA/SpaceX/Copernicus credentials.
 - Optional live API testing has real network, latency, quotas and potential upstream rate limits. Never enter API credentials directly in the shell commands.
 - The suite does not run or deploy MyWeb, Cloudflare Workers or browser UI. Those require a separate environment/integration test.
+
+## Scope and coverage evidence
+
+- `api-surface/public-api.json` inventories root subpath exports and seven independent workspace entrypoints, checks ESM/CJS parity, and lists symbols/methods not referenced in tests/examples. **A reference is not a functional test.**
+- `tests/public-api-parity.test.mjs` requires every public ESM/CJS export name and value type to agree and all `examples/**/*.ts` entries to exist in the versioned catalog.
+- On Node.js 20+, the Fedora runner enables Node's built-in V8 test coverage output during the regression-test stage. Coverage of those tests must not be confused with full integration coverage.
+- All recorded offline examples are executed. Online examples are **not executed** unless `--live-cookbook` is provided. `--all` alone runs only bounded live smoke probes plus optional OpenJPEG.
+- Live provider tests, authentication, actual satellite acquisition dates, and downstream browser/Cloudflare behavior remain separate integration risks.
+
+**GitHub branch vs main:** The examples belong in `main` only after reviewed PR merge; otherwise users viewing the default branch see an older catalogue.

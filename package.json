@@ -185,7 +185,8 @@
     "examples:list": "node scripts/verify-cookbook.mjs --mode=list",
     "examples:offline": "npm run build && node scripts/verify-cookbook.mjs --mode=offline",
     "examples:live": "npm run build && node scripts/verify-cookbook.mjs --mode=live",
-    "test:fedora": "bash scripts/fedora-full-test.sh"
+    "test:fedora": "bash scripts/fedora-full-test.sh",
+    "api:audit": "npm run build && node scripts/api-surface-audit.mjs"
   },
   "engines": {
     "node": ">=18"
