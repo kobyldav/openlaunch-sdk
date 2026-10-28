@@ -1,6 +1,6 @@
 {
   "name": "@openlaunch/raster",
-  "version": "1.21.0",
+  "version": "1.22.0",
   "description": "Georeferenced GeoTIFF/COG pixel decoding, NDVI, calibration, cloud masks and terrain meshes",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.21.0"
+    "@openlaunch/core": "^1.22.0"
   }
 }

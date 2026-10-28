@@ -13,3 +13,4 @@ export * from "./linked-qa.js";
 export * from "./jp2-qa.js";
 export * from "./web-map.js";
 export * from "./web-map-tile.js";
+export * from "./web-map-tile-cache.js";

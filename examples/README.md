@@ -1,8 +1,27 @@
 # OpenLaunch SDK examples
 
+## Strict public API inventory and provider replay fixtures
+
+New `examples/20-provider-replay` includes five **offline** assertions for NASA,
+CelesTrak, GIBS failure classifications, batch isolation and 18 layer registry entries.
+These fixtures do **not** authenticate actual satellite observations.
+
+Run `npm run examples:offline` to execute all network-free examples.
+Run `node scripts/api-surface-audit.mjs` after building to inventory every
+runtime entrypoint, ESM/CommonJS parity, exported classes/methods, and symbols
+that are not even mentioned in cookbook examples. This is a **gap report**,
+not a statement of total functional coverage. See `docs/FEDORA_FULL_SUITE.md`.
+
+
 This directory is a **searchable, type-checked cookbook** for OpenLaunch SDK. It is intentionally organized for both humans and code/AI indexers: examples use descriptive filenames, self-contained imports, explicit units, short comments, and stable public symbols.
 
 > These examples improve discoverability but do not guarantee that any particular AI system will crawl or index the repository.
+
+## v1.22 Runnable full cookbook verification
+
+`npm run examples:check` type-checks the **entire** example catalogue, including network-backed recipes, without contacting providers. After `npm run build`, execute `node scripts/verify-cookbook.mjs --mode=offline` to transpile and execute every `network:false` recipe under a fixed timeout. The verified scene/preview, NASA daily tile, LRU cache and bounded batch recipes are in [19-web-integration](./19-web-integration).
+
+`node scripts/verify-cookbook.mjs --mode=list` reports current totals by category. `--mode=live` deliberately runs all 65 network-labelled recipes and may require credentials and consume many requests; use it only when explicitly needed. A comprehensive Fedora launcher with all SDK tests, package install and optional real WASM tests is in [FEDORA_FULL_SUITE](../docs/FEDORA_FULL_SUITE.md).
 
 ## v1.2 Satellite maps and Live Earth
 

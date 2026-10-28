@@ -1584,6 +1584,181 @@
       ],
       "network": true,
       "description": "v1.2 source-driven Earth observations, official video and honest time provenance."
+    },
+    {
+      "path": "19-web-integration/01-live-earth-layers.ts",
+      "title": "01 live earth layers.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "layers",
+        "webMapDaily"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for layers, webMapDaily."
+    },
+    {
+      "path": "19-web-integration/02-verified-daily-tile.ts",
+      "title": "02 verified daily tile.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTile"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTile."
+    },
+    {
+      "path": "19-web-integration/03-lru-image-cache.ts",
+      "title": "03 lru image cache.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTileCached",
+        "webMapTileCacheStats"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTileCached, webMapTileCacheStats."
+    },
+    {
+      "path": "19-web-integration/04-bounded-tile-batch.ts",
+      "title": "04 bounded tile batch.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTilesBatch"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapDailyTilesBatch."
+    },
+    {
+      "path": "19-web-integration/05-stac-scene-and-preview.ts",
+      "title": "05 stac scene and preview.ts",
+      "category": "web-integration",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapSearch",
+        "fetchObservationPreview"
+      ],
+      "network": false,
+      "description": "Offline SDK web integration exercise for webMapSearch, fetchObservationPreview."
+    },
+    {
+      "path": "celestrak.ts",
+      "title": "Legacy CelesTrak ISS",
+      "description": "CelesTrak catalog orbit lookup",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "celestrak"
+      ],
+      "network": true
+    },
+    {
+      "path": "mars-mission.ts",
+      "title": "Legacy Mars mission with live launch",
+      "description": "Combined Mars engineering and live LL2 launch data",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "marsMissionReference"
+      ],
+      "network": true
+    },
+    {
+      "path": "next-launch.ts",
+      "title": "Legacy next launch",
+      "description": "Live upcoming launch from LL2",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "launches.next"
+      ],
+      "network": true
+    },
+    {
+      "path": "query-builder.ts",
+      "title": "Legacy launch query",
+      "description": "Live raw LL2 endpoint with query builder",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "query"
+      ],
+      "network": true
+    },
+    {
+      "path": "search.ts",
+      "title": "Legacy search",
+      "description": "LL2 development search endpoint",
+      "category": "legacy-live",
+      "symbols": [
+        "OpenLaunch",
+        "launches.search"
+      ],
+      "network": true
+    },
+    {
+      "path": "20-provider-replay/01-nasa-provider-fixture.ts",
+      "title": "Offline fixture: nasa provider fixture",
+      "category": "provider-replay",
+      "symbols": [
+        "NasaClient",
+        "neoFeed",
+        "neoLookup",
+        "donki",
+        "epicEnhanced",
+        "techTransfer"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/02-celestrak-provider-fixture.ts",
+      "title": "Offline fixture: celestrak provider fixture",
+      "category": "provider-replay",
+      "symbols": [
+        "CelesTrakClient",
+        "byCatalogNumber",
+        "byName",
+        "byGroup"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/03-gibs-failure-matrix.ts",
+      "title": "Offline fixture: gibs failure matrix",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTile"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/04-mixed-batch-isolation.ts",
+      "title": "Offline fixture: mixed batch isolation",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "webMapDailyTilesBatch"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "20-provider-replay/05-layer-registry-contract.ts",
+      "title": "Offline fixture: layer registry contract",
+      "category": "provider-replay",
+      "symbols": [
+        "SpaceMapClient",
+        "layers",
+        "webMapDaily"
+      ],
+      "network": false,
+      "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
     }
   ]
 }

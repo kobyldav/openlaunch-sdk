@@ -2,11 +2,45 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.21.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch v1.22.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.17.0 optional JPEG2000 JP2 SCL support is under development; v1.16.0 LZW support is merged into `main`. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. The GitHub integration and offline tests passed on Node 18, 20 and 22. A successful SDK test does not certify satellite acquisitions, collision probability or flight safety.
+> **Release status:** v1.21.0 NASA verified tiles is merged into `main`; v1.22.0 adds isolate-local LRU caching and bounded batch processing on a development branch. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. Offline GitHub CI and real provider validation are separate evidence.
+
+## Fedora full SDK verification (v1.22)
+
+Run **one command** to validate source, every published cookbook example type signature, all offline executable examples, unit/regression tests, package consumer installation, and every offline SDK smoke (without calling provider APIs):
+
+```bash
+bash scripts/fedora-full-test.sh
+```
+
+Add `--all` for a small set of live provider smoke probes plus real OpenJPEG/WASM, or `--live-cookbook` only when explicitly willing to exercise all live cookbook scripts and upstream quotas. The script writes individual PASS/FAIL/SKIP logs and JSON/text summaries to `test-results/` (Git ignored). See [Fedora full verification](docs/FEDORA_FULL_SUITE.md).
+
+## Bounded NASA tile caching & batch maps (v1.22 development)
+
+The **OpenLaunch SDK** (not the web) now offers `SpaceMapClient.webMapDailyTileCached()`, `webMapDailyTilesBatch()`, `webMapTileCacheStats()`, and `clearWebMapTileCache()` on top of the verified NASA GIBS JPEG/PNG downloader introduced in v1.21.
+
+```ts
+import {SpaceMapClient} from "@openlaunch/earth";
+const maps=new SpaceMapClient({
+  webMapTileCache:{ttlMs:300000,maxEntries:32,maxTotalBytes:8*1024*1024},
+  webMapTileMaxBytes:512*1024,webMapTileTimeoutMs:8000,
+});
+const tiles=[{layer:"nasa-modis-terra",date:"2026-10-17",z:5,x:17,y:11}];
+const batch=await maps.webMapDailyTilesBatch({tiles,concurrency:3});
+for(const result of batch.results){
+  if(result.status==="available")console.log(result.cacheStatus,result.image);
+}
+console.log(maps.webMapTileCacheStats());
+```
+
+Only **verified delivered image bytes** enter the cache; missing/error/invalid responses are never cached. Identical concurrent requests use one in-flight download. The LRU stores exact canonical layer/day/XYZ keys; external consumers receive their own copies of bytes. Hard bounds: 16 tiles/batch, up to 4 unique concurrent network requests per batch, 128 cache entries, 32 MiB cache, 1-hour TTL, and existing max 2 MiB per image. Defaults are intentionally lower. Validation happens for the **entire batch before first network request**.
+
+**Cloudflare Workers note:** the cache is local to a single long-lived `SpaceMapClient` instance within one worker isolate. It is not distributed storage and cannot eliminate requests between independent isolates. The website must still enforce authentication/rate limits, attribution and durable caching if needed. This SDK change does not deploy or modify MyWeb.
+
+[Cache and batch v1.22 guide](docs/WEB_GIBS_CACHE_V1_22.md). Fedora smoke: `npm run example:web-map-tile-cache`.
 
 ## Verified NASA GIBS daily map tiles (v1.21 development)
 

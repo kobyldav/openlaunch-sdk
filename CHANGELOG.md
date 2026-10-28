@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.22.0 (development) — NASA GIBS Tile Cache and Bounded Batch
+
+- New `WebMapTileCache` with per-instance bounded in-memory LRU, TTL, total-byte and entry caps. Only verified binary images are cached, never HTTP failures, missing or spoofed images.
+- Concurrent duplicate requests share a single in-flight tile fetch; results and cache hits copy Uint8Array bytes to prevent mutation of cached payloads.
+- `SpaceMapClient.webMapDailyTileCached()` and `webMapDailyTilesBatch()` with a 16-tile batch limit, maximum concurrency of four, input order preservation, canonical day/XYZ keys and upfront validation before any egress.
+- Cache observability via `webMapTileCacheStats()`, explicit invalidation via `clearWebMapTileCache()`; cache is isolate-local, **not** Cloudflare KV or a durable cross-region CDN.
+- Existing verified one-tile API, MIME/signature restrictions, HTTPS hardening and clear `verifiedAcquisition:false` evidence boundaries preserved.
+- Deterministic unit/integration regressions, offline Fedora smoke, documentation, seven scoped workspace versions aligned to 1.22.0.
+- Provider availability and live production Cloudflare caching are not verified by these tests.
+
+
 ## 1.21.0 (development) — Bounded Verified NASA GIBS Web Tiles
 
 - New `SpaceMapClient.webMapDailyTile()` retrieves exactly one daily NASA GIBS XYZ tile from a fixed official HTTPS origin, with no untrusted href parameter.
