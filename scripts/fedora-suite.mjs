@@ -24,7 +24,7 @@ if(help){
  bash scripts/fedora-full-test.sh --all              Offline + limited provider live probes + REAL OpenJPEG/WASM
  bash scripts/fedora-full-test.sh --live             Offline + controlled live API probes
  bash scripts/fedora-full-test.sh --wasm             Offline + optional real OpenJPEG/WASM tests
- bash scripts/fedora-full-test.sh --live-cookbook    Offline + all 60 network cookbook examples (rate-limit risk)
+ bash scripts/fedora-full-test.sh --live-cookbook    Offline + all 65 network cookbook examples (rate-limit risk)
  bash scripts/fedora-full-test.sh --skip-install    Reuse current node_modules
  bash scripts/fedora-full-test.sh --list             List planned checks only
 

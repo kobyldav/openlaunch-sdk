@@ -35,7 +35,7 @@ bash scripts/fedora-full-test.sh --all
 bash scripts/fedora-full-test.sh --live-cookbook
 ```
 
-`--skip-install` reuses existing `node_modules`, useful for repeat runs after a successful `npm ci`. `--all` intentionally **does not** run 60 network-labelled cookbook entries because doing so can trigger multiple upstream quotas. Only `--live-cookbook` explicitly authorizes those extra requests.
+`--skip-install` reuses existing `node_modules`, useful for repeat runs after a successful `npm ci`. `--all` intentionally **does not** run 65 network-labelled cookbook entries because doing so can trigger multiple upstream quotas. Only `--live-cookbook` explicitly authorizes those extra requests.
 
 ## Included validation coverage
 

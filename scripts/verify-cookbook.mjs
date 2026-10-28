@@ -30,6 +30,17 @@ if(!["offline","live","list"].includes(mode)||!Number.isSafeInteger(timeoutMs)||
  console.error("Usage: --mode=offline|live|list [--timeout-ms=15000] [--pause-ms=3000] [--output=directory]");
  process.exit(2);
 }
+// Log output may be shared for debugging. Redact provider secrets before saving.
+function redactLog(value){
+ let result=String(value??"");
+ for(const [key,secret] of Object.entries(process.env)){
+  if(/(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL|AUTH)/i.test(key) &&
+     typeof secret==="string" && secret.length>=8)
+    result=result.split(secret).join("[REDACTED]");
+ }
+ return result.replace(/([?&](?:api_key|token|sig|signature|key|client_secret|access_token)=)[^\\s&#]+/gi,
+   "$1[REDACTED]").replace(/(Authorization:\\s*Bearer\\s+)[^\\s]+/gi,"$1[REDACTED]");
+}
 const catalog=JSON.parse(await readFile(join(root,"examples/catalog.json"),"utf8"));
 if(!Array.isArray(catalog.examples))throw new Error("Invalid examples/catalog.json");
 const paths=new Set(),seen=new Set();
@@ -128,7 +139,7 @@ try{
   });
   const ok=run.exitCode===0&&!run.timedOut;
   const logName=example.path.replace(/[^a-zA-Z0-9._/-]/g,"_").replace(/\//g,"__").replace(/\.ts$/,".log");
-  await writeFile(join(reportDir,logName),run.log);
+  await writeFile(join(reportDir,logName),redactLog(run.log));
   summaries.push({path:example.path,category:example.category,network:example.network,
     status:ok?"PASS":"FAIL",durationMs:Date.now()-start,log:logName,
     exitCode:run.exitCode,timedOut:run.timedOut});
