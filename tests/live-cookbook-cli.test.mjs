@@ -31,7 +31,7 @@ test("Old Fedora diagnosis emits numeric failed count, not list of failed exampl
   assert.equal(output.failedCount,2);
   assert.equal(output.timeoutByHarness,1);
   assert.equal(output.failedExamples.length,2);
-  assert.equal(output.causes.timeout,1);
+  assert.equal(output.causes.harness_deadline_exceeded,1);
   assert.equal(output.causes.sdk_or_example_exception,1);
   assert.ok(!("results" in output));
  }finally{await rm(dir,{recursive:true,force:true});}

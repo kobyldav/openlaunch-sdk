@@ -19,7 +19,8 @@ test("classifies untrusted upstream signatures without copying secrets",()=>{
   assert.equal(classifyFailure({path:"02-nasa/01-neows-feed.ts",log}).category,expected,log);
  const secret="my-secret-ABCD12345";
  assert.equal(JSON.stringify(classifyFailure({path:"02-nasa/01-neows-feed.ts",log:"HTTP 403 "+secret})).includes(secret),false);
- assert.equal(classifyFailure({path:"foo",timedOut:true}).category,"timeout");
+ assert.equal(classifyFailure({path:"foo",timedOut:true}).category,"harness_deadline_exceeded");
+ assert.equal(classifyFailure({path:"foo",log:"TimeoutError: request deadline"}).category,"timeout");
 });
 test("aggregated diagnosis does not make one API failure look like multiple SDK bugs",()=>{
  const items=[

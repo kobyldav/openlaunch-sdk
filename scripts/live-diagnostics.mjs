@@ -26,7 +26,7 @@ export function providerForExample(path){
  return "unknown_or_combined";
 }
 export function classifyFailure({path="",log="",timedOut=false}={}){
- if(timedOut)return {category:"timeout",provider:providerForExample(path),confidence:"signature_only"};
+ if(timedOut)return {category:"harness_deadline_exceeded",provider:providerForExample(path),confidence:"confirmed_runner_termination"};
  // Avoid mistaking a harmless count in console output for a response status.
  const tail=String(log).slice(-100_000);
  for(const {name,test} of rules){
