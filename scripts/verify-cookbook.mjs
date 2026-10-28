@@ -17,6 +17,7 @@ import {join,dirname,resolve,relative,sep} from "node:path";
 import {fileURLToPath,pathToFileURL} from "node:url";
 import {spawn} from "node:child_process";
 import ts from "typescript";
+import {aggregateDiagnosis,classifyFailure} from "./live-diagnostics.mjs";
 
 const root=fileURLToPath(new URL("../",import.meta.url));
 const args=process.argv.slice(2);
@@ -155,13 +156,15 @@ try{
   const ok=run.exitCode===0&&!run.timedOut;
   const logName=example.path.replace(/[^a-zA-Z0-9._/-]/g,"_").replace(/\//g,"__").replace(/\.ts$/,".log");
   await writeFile(join(reportDir,logName),redactLog(run.log));
+  const diagnosis=!ok&&mode==="live"?classifyFailure({path:example.path,log:run.log,timedOut:run.timedOut}):null;
   summaries.push({path:example.path,category:example.category,network:example.network,
     status:ok?"PASS":"FAIL",durationMs:Date.now()-start,log:logName,
-    exitCode:run.exitCode,timedOut:run.timedOut});
+    exitCode:run.exitCode,timedOut:run.timedOut,...(diagnosis?{diagnosis}:{})});
   current=null;
   await saveProgress("running");
   console.log("["+String(i+1).padStart(3)+"/"+selected.length+"] "+
     (ok?"PASS":"FAIL")+" "+example.path);
+  if(diagnosis)console.log("DIAG "+diagnosis.provider+" "+diagnosis.category+" (signature only)");
   if(mode==="live"&&pauseMs&&i+1<selected.length)
    await new Promise(r=>setTimeout(r,pauseMs));
  }
@@ -171,6 +174,11 @@ try{
   results:summaries};
  await writeFile(join(reportDir,"summary-"+mode+".json"),JSON.stringify(report,null,2)+"\n");
  await saveProgress("finished");
+ if(mode==="live"){
+  const diagnosis=aggregateDiagnosis(summaries);
+  await writeFile(join(reportDir,"diagnosis-live.json"),JSON.stringify(diagnosis,null,2)+"\n");
+  console.log("ONLINE FAILURE CATEGORIES (heuristic):",JSON.stringify(diagnosis.causes));
+ }
  console.log("COOKBOOK: "+passed+"/"+total+" PASS; "+(total-passed)+" FAIL. Logs: "+reportDir);
  if(passed!==total)process.exitCode=1;
 }finally{
