@@ -38,8 +38,8 @@ function redactLog(value){
      typeof secret==="string" && secret.length>=8)
     result=result.split(secret).join("[REDACTED]");
  }
- return result.replace(/([?&](?:api_key|token|sig|signature|key|client_secret|access_token)=)[^\\s&#]+/gi,
-   "$1[REDACTED]").replace(/(Authorization:\\s*Bearer\\s+)[^\\s]+/gi,"$1[REDACTED]");
+ return result.replace(/([?&](?:api_key|token|sig|signature|key|client_secret|access_token)=)[^\s&#]+/gi,
+   "$1[REDACTED]").replace(/(Authorization:\s*Bearer\s+)[^\s]+/gi,"$1[REDACTED]");
 }
 const catalog=JSON.parse(await readFile(join(root,"examples/catalog.json"),"utf8"));
 if(!Array.isArray(catalog.examples))throw new Error("Invalid examples/catalog.json");
