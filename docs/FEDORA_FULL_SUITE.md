@@ -90,3 +90,16 @@ The runner uses bounded execution per test, reports failures individually, avoid
 **Versioned examples:** The catalogue and Fedora runner are tracked in `main`. Always verify the checked-out Git commit in the Fedora report.
 
 **Measured initial API gaps (2026-10-28):** 486 distinct public runtime symbols, 300 not referenced in cookbook examples; 637 exported class-method records (across entrypoints), 270 not referenced in examples. These are reference-audit counts, not executed statement coverage. The Fedora runner includes these values in its summary as **incomplete API coverage** even when all executed tests pass.
+
+## Diagnose live failures using existing logs (no new API requests)
+
+The `--mode=live` runner now stores `diagnosis-live.json` with **signature-only** categories. A 403 or timeout alone does not prove an SDK defect or a provider quota. Preserve complete redacted logs for inspection.
+
+After testing on Fedora, run:
+
+```bash
+cd ~/Desktop/Openspace/openlaunch-sdk-validation
+node scripts/diagnose-live-results.mjs --dir=test-results/live-manual
+```
+
+Or pass the existing `test-results/fedora-.../cookbook-live` directory. This tool reads only existing logs and uses **zero** provider requests. Do not share unredacted API tokens or signed asset URLs. The resulting `diagnosis-live.json` includes only classifications and filenames. To reproduce provider behavior safely, avoid hammering unauthenticated LL2 production: LL2 free production allows about 15 calls/hour, and the rate-unlimited `lldev` endpoint contains stale/limited data. NASA `DEMO_KEY` has much lower per-IP quotas (30/hour, 50/day); configure a personal NASA key if repeated API calls are needed. These limits do not justify marking failed tests as passed.
