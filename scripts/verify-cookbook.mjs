@@ -9,6 +9,7 @@
  *
  * CLI: node scripts/verify-cookbook.mjs --mode=offline [--output=...]
  *      node scripts/verify-cookbook.mjs --mode=live [--output=...]
+ *      node scripts/verify-cookbook.mjs --mode=live --only=00-getting-started/01-next-launch.ts --timeout-ms=120000
  *      node scripts/verify-cookbook.mjs --mode=list
  */
 import {readFile,readdir,mkdir,mkdtemp,writeFile,rename,rm} from "node:fs/promises";
@@ -22,13 +23,16 @@ import {aggregateDiagnosis,classifyFailure} from "./live-diagnostics.mjs";
 const root=fileURLToPath(new URL("../",import.meta.url));
 const args=process.argv.slice(2);
 const getOpt=(prefix)=>args.find(a=>a.startsWith(prefix))?.slice(prefix.length);
+const only=args.filter(a=>a.startsWith("--only=")).map(a=>a.slice("--only=".length));
+const unknown=args.filter(a=>!["--mode=","--output=","--timeout-ms=","--pause-ms=","--only="].some(p=>a.startsWith(p)));
 const mode=getOpt("--mode=")??"offline";
 const output=getOpt("--output=");
 const timeoutMs=Number(getOpt("--timeout-ms=")??(mode==="live"?"30000":"15000"));
 const pauseMs=Number(getOpt("--pause-ms=")??(mode==="live"?"3000":"0"));
 if(!["offline","live","list"].includes(mode)||!Number.isSafeInteger(timeoutMs)||timeoutMs<100||
- timeoutMs>120000||!Number.isSafeInteger(pauseMs)||pauseMs<0||pauseMs>30000){
- console.error("Usage: --mode=offline|live|list [--timeout-ms=15000] [--pause-ms=3000] [--output=directory]");
+ timeoutMs>120000||!Number.isSafeInteger(pauseMs)||pauseMs<0||pauseMs>30000||
+ unknown.length>0||only.some(p=>!p)||((mode==="list")&&only.length>0)){
+ console.error("Usage: --mode=offline|live|list [--timeout-ms=15000] [--pause-ms=3000] [--only=EXACT_CATALOG_PATH.ts] [--output=directory]");
  process.exit(2);
 }
 // Log output may be shared for debugging. Redact provider secrets before saving.
@@ -75,7 +79,14 @@ if(mode==="list"){
  console.table(counts);
  process.exit(0);
 }
-const selected=mode==="offline"?offline:live;
+const eligible=mode==="offline"?offline:live;
+const selected=only.length?eligible.filter(item=>only.includes(item.path)):eligible;
+if(only.length&&selected.length!==new Set(only).size){
+ const missing=[...new Set(only)].filter(p=>!selected.some(x=>x.path===p));
+ console.error("Unknown or incompatible --only path(s): "+missing.join(", "));
+ console.error("Check exact paths with --mode=list; live examples require --mode=live.");
+ process.exit(2);
+}
 const temp=await mkdtemp(join(tmpdir(),"openlaunch-cookbook-"));
 const examples=join(root,"examples"),tempExamples=join(temp,"examples");
 const reportDir=output?resolve(output):join(root,"test-results","cookbook");

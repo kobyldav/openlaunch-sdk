@@ -34,13 +34,17 @@ for(const item of report.results){
   diagnosis:item.status==="FAIL"?classifyFailure({path,log,timedOut:item.timedOut===true}):null});
 }
 const summary=aggregateDiagnosis(entries);
+const {failed:failedExamples,...aggregates}=summary;
+const timeoutByHarness=entries.filter(x=>x.status==="FAIL"&&x.timedOut===true).length;
 const output={
  source:kind,
  status:report.status??"finished_or_legacy",
  completed:entries.length,
  passed:entries.filter(x=>x.status==="PASS").length,
+ ...aggregates,
  failed:summary.failedCount,
- ...summary,
+ failedExamples,
+ timeoutByHarness,
  notes:[
  "A signature is not proof of the upstream root cause.",
  "403 may be an expired quota, missing key, or permissions: review the individual log.",
@@ -50,6 +54,7 @@ const output={
 await writeFile(join(dir,"diagnosis-live.json"),JSON.stringify(output,null,2)+"\n");
 console.log("LIVE DIAGNOSIS, no network requests");
 console.log("Analyzed:",output.completed,"PASS:",output.passed,"FAIL:",output.failed);
+console.log("Terminated by cookbook deadline:",output.timeoutByHarness);
 for(const [category,total] of Object.entries(summary.causes))
  console.log("  "+category+": "+total);
 console.log("Providers:",JSON.stringify(Object.fromEntries(Object.entries(summary.providers).map(([k,v])=>[k,v.failed]))));
