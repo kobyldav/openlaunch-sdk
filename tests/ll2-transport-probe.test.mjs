@@ -8,7 +8,7 @@ const json=(body,status=200,headers={})=>new Response(
 );
 const launch={
  id:"test-1",name:"Test launch",net:"2035-01-01T00:00:00Z",
- status:{id:1,name:"Go"},vid_urls:[],rocket:{configuration:{name:"Mock rocket"}}
+ status:{id:1,name:"Go"},vid_urls:[],rocket:{configuration:{id:1,name:"Mock rocket"}}
 };
 test("one LL2 request succeeds with normalized data, without leaking URL or response",async()=>{
  let calls=0;

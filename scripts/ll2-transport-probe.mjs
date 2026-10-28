@@ -56,7 +56,7 @@ export async function probeLl2({
    provider:"launch_library_2",endpoint:isDev?"development":"production",
    outcome:category,elapsedMs:Date.now()-started,requests,
    status,
-   errorType:error instanceof Error?error.name:"UnknownError",
+   errorType:rateLimit?"RateLimitError":timeout?"TimeoutError":http?"HttpError":error instanceof TypeError?"TypeError":"OtherError",
    ...(rateLimit&&Number.isFinite(error.retryAfterSeconds)?
     {retryAfterSeconds:error.retryAfterSeconds}:{}),
    observations,
