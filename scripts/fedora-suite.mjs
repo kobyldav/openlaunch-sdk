@@ -8,6 +8,7 @@ import {spawn,spawnSync} from "node:child_process";
 import {readFile,readdir,mkdir,writeFile} from "node:fs/promises";
 import {dirname,join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
+import {createCookbookProgress} from "./fedora-progress.mjs";
 
 const root=fileURLToPath(new URL("../",import.meta.url));
 process.chdir(root);
@@ -97,9 +98,10 @@ if(live){
  nodeRun("Live orbit/ISS traffic sample","scripts/orbit-traffic-demo.mjs","live",120000);
 }
 if(liveCookbook){
- add("live","Run all 60 network-labelled cookbook examples (may be rate limited)",
+ const liveCount=JSON.parse(await readFile(join(root,"examples","catalog.json"),"utf8")).examples.filter(x=>x.network).length;
+ add("live",`Run all ${liveCount} network-labelled cookbook examples (may be rate limited)`,
   process.execPath,["scripts/verify-cookbook.mjs","--mode=live",
-  "--pause-ms=3000","--output="+join(logDir,"cookbook-live")],900000);
+  "--pause-ms=3000","--output="+join(logDir,"cookbook-live")],2_700_000);
 }
 if(wasm&&nodeMajor>=20){
  // The WASM codec is never installed as a default runtime dependency.
@@ -122,6 +124,8 @@ async function execute(step,index){
  const safe=step.label.replace(/[^a-zA-Z0-9_-]+/g,"-").slice(0,80);
  const logfile=String(index+1).padStart(2,"0")+"-"+safe+".log";
  console.log("\n["+String(index+1)+"/"+planned.length+"] "+step.label);
+ const showProgress=step.params.some(p=>p==="--mode=live");
+ const progress=showProgress?createCookbookProgress(line=>console.log("  "+line)):null;
  const run=await new Promise(done=>{
   const chunks=[];let bytes=0,timedOut=false,settled=false;
   const child=spawn(step.command,step.params,{
@@ -130,11 +134,13 @@ async function execute(step,index){
   const save=(d)=>{
    if(bytes<10*1024*1024){bytes+=d.length;chunks.push(d);}
   };
-  child.stdout.on("data",save);child.stderr.on("data",save);
+  child.stdout.on("data",chunk=>{save(chunk);progress?.push(chunk);});
+  child.stderr.on("data",save);
   const timer=setTimeout(()=>{timedOut=true;child.kill("SIGKILL");},step.timeoutMs);
   function end(exitCode){
    if(settled)return;
    settled=true;clearTimeout(timer);
+   progress?.flush();
    done({exitCode,timedOut,content:redact(Buffer.concat(chunks).toString("utf8"))});
   }
   child.on("error",e=>{save(Buffer.from(String(e)));end(-1);});

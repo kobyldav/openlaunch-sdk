@@ -54,3 +54,9 @@ test("Fedora launcher is a Bash script with no forced installs or global destruc
   assert.equal(result.status,0,result.stderr);
  }
 });
+
+test("Fedora live cookbook plan names all catalogued network recipes",()=>{
+ const result=run(["--list","--live-cookbook","--skip-install"]);
+ assert.equal(result.status,0,result.stderr);
+ assert.match(result.stdout,/Run all 65 network-labelled cookbook examples/);
+});
