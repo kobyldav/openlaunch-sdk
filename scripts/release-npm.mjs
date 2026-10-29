@@ -86,7 +86,7 @@ function verify() {
 }
 
 if (mode === "--plan") {
-  console.log("\nNo publishing performed. Verify ownership of npm @openlaunch first.");
+  console.log("\nNo publishing performed. Verify npm organization @openlaunchsdk ownership and 2FA first.");
   console.log("Next: npm login; git switch main; git pull --ff-only origin main; node scripts/release-npm.mjs --publish");
 } else if (mode === "--publish") {
   ensureMain(); ensureRegistry(); ensureLogin();
