@@ -7,8 +7,8 @@ import {join} from "node:path";
 import {fileURLToPath} from "node:url";
 
 const root=fileURLToPath(new URL("../",import.meta.url));
-function run(script,args){
- return spawnSync(process.execPath,["scripts/"+script,...args],{cwd:root,encoding:"utf8",timeout:25000,maxBuffer:2*1024*1024});
+function run(script,args,env=process.env){
+ return spawnSync(process.execPath,["scripts/"+script,...args],{cwd:root,encoding:"utf8",timeout:25000,maxBuffer:2*1024*1024,env});
 }
 test("Old Fedora diagnosis emits numeric failed count, not list of failed examples",async()=>{
  const dir=await mkdtemp(join(tmpdir(),"openlaunch-live-diagnosis-"));
@@ -22,9 +22,10 @@ test("Old Fedora diagnosis emits numeric failed count, not list of failed exampl
   }));
   await writeFile(join(dir,"ll2.log"),"");
   await writeFile(join(dir,"raster.log"),"AssertionError: invalid pixels");
-  const result=run("diagnose-live-results.mjs",["--dir="+dir]);
+  const result=run("diagnose-live-results.mjs",["--dir="+dir],{...process.env,FORCE_COLOR:"1",NO_COLOR:undefined,NODE_DISABLE_COLORS:undefined});
   assert.equal(result.status,1,result.stderr);
   assert.match(result.stdout,/FAIL: 2(?:\n|$)/);
+  assert.doesNotMatch(result.stdout,/\x1b\[[0-9;]*m/,"diagnostics must emit plain machine-readable counts even with FORCE_COLOR=1");
   assert.doesNotMatch(result.stdout,/FAIL: \[/);
   const output=JSON.parse(await readFile(join(dir,"diagnosis-live.json"),"utf8"));
   assert.equal(output.failed,2);
