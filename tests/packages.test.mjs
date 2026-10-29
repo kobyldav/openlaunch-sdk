@@ -109,7 +109,7 @@ test("Engineering re-exports math without bundling math implementations",async()
  const e=JSON.parse(await readFile(path.join(root,"packages/engineering/package.json"),"utf8"));
  assert.equal(e.dependencies["@openlaunchsdk/math"],"^1.22.0");
  const index=await readFile(path.join(root,"packages/engineering/dist/esm/science/index.js"),"utf8");
- assert.match(index,/@openlaunch\/math\/internal\/science\/matrix/);
+ assert.match(index,/@openlaunchsdk\/math\/internal\/science\/matrix/);
  const m=await import("@openlaunchsdk/math");
  assert.equal(m.matrixMul([[2]],[[3]])[0][0],6);
 });
