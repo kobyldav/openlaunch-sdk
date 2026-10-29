@@ -1,5 +1,5 @@
 {
-  "name": "@openlaunch/core",
+  "name": "@openlaunchsdk/core",
   "version": "1.22.0",
   "description": "Shared typed HTTP, cache, query and normalized API primitives without satellite dependencies",
   "license": "MIT",

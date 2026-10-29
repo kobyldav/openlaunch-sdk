@@ -3,7 +3,7 @@
 Backend service example:
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const client = new SpaceMapClient();
 const result = await client.meteosatPlayback({
   layer:"<layer advertised by Meteosat capabilities>",

@@ -11,7 +11,7 @@ import { SpaceMapClient } from "../intelligence/map-layers.js";
  * Lean entrypoint for STAC and Earth Observation discovery.
  * Does not import raster decoders or satellite.js.
  *
- * For georeferenced TIFF/COG pixels, install @openlaunch/raster separately.
+ * For georeferenced TIFF/COG pixels, install @openlaunchsdk/raster separately.
  */
 export interface EarthCatalogOptions {
   copernicus?: CopernicusOptions;

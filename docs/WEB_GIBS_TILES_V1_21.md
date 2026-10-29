@@ -7,7 +7,7 @@
 `webMapDaily()` (v1.20) returns an official XYZ URL template for MapLibre/Leaflet, but does not verify any actual tile. `webMapDailyTile()` now makes one real bounded HTTPS request against the official NASA GIBS endpoint and checks that bytes match the claimed image type. This lets a web backend distinguish a valid tile, missing day/tile, provider failure and an invalid XML/HTML error page.
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
  webMapTileMaxBytes:512*1024,
  webMapTileTimeoutMs:8000,

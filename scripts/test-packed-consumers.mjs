@@ -8,10 +8,10 @@ const repo=fileURLToPath(new URL("../",import.meta.url));
 const tmp=await mkdtemp(join(tmpdir(),"openlaunch-packed-"));
 const names=["core","earth","raster","launches","orbit","math","engineering"];
 const tests={
- earth:{symbol:"EarthCatalogClient",absent:["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]},
- raster:{symbol:"readCogWindowUrl",absent:["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]},
- launches:{symbol:"LaunchDataClient",absent:["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]},
- orbit:{symbol:"Sgp4Satellite",absent:["@openlaunch/engineering"]},
+ earth:{symbol:"EarthCatalogClient",absent:["satellite.js","@openlaunchsdk/orbit","@openlaunchsdk/engineering"]},
+ raster:{symbol:"readCogWindowUrl",absent:["satellite.js","@openlaunchsdk/orbit","@openlaunchsdk/engineering"]},
+ launches:{symbol:"LaunchDataClient",absent:["satellite.js","@openlaunchsdk/orbit","@openlaunchsdk/engineering"]},
+ orbit:{symbol:"Sgp4Satellite",absent:["@openlaunchsdk/engineering"]},
  engineering:{symbol:"simulateLaunch",absent:[]},
 };
 function npm(args,cwd){
@@ -25,7 +25,7 @@ function npm(args,cwd){
 try{
   const archives={};
   for(const name of names){
-    const result=JSON.parse(npm(["pack","--json","--ignore-scripts","--workspace","@openlaunch/"+name,"--pack-destination",tmp],repo));
+    const result=JSON.parse(npm(["pack","--json","--ignore-scripts","--workspace","@openlaunchsdk/"+name,"--pack-destination",tmp],repo));
     archives[name]=join(tmp,result[0].filename);
   }
   // Pack the already-installed upstream library locally for fully offline
@@ -42,10 +42,10 @@ try{
     if(name==="engineering")installs.push(archives.math);
     if(name!=="orbit")installs.push(archives[name]);
     npm(["install","--offline","--ignore-scripts","--no-audit","--no-fund","--package-lock=false",...installs],consumer);
-    const code=`import { ${test.symbol} } from "@openlaunch/${name}"; if(typeof ${test.symbol}!=="function")throw new Error("Missing export");`;
+    const code=`import { ${test.symbol} } from "@openlaunchsdk/${name}"; if(typeof ${test.symbol}!=="function")throw new Error("Missing export");`;
     const run=spawnSync(process.execPath,["--input-type=module","-e",code],{cwd:consumer,encoding:"utf8"});
     if(run.status!==0)throw new Error("Independent ESM install failed for "+name+": "+run.stderr);
-    const cjs=`if(typeof require("@openlaunch/${name}").${test.symbol}!=="function")throw new Error("Missing CJS export");`;
+    const cjs=`if(typeof require("@openlaunchsdk/${name}").${test.symbol}!=="function")throw new Error("Missing CJS export");`;
     const runCjs=spawnSync(process.execPath,["-e",cjs],{cwd:consumer,encoding:"utf8"});
     if(runCjs.status!==0)throw new Error("Independent CJS install failed for "+name+": "+runCjs.stderr);
     const ls=JSON.parse(npm(["ls","--all","--json","--omit=dev"],consumer));
@@ -54,7 +54,7 @@ try{
     if(namesInstalled.includes("openlaunch-sdk"))throw new Error(name+" consumer requires monolithic openlaunch-sdk");
     if((name==="orbit"||name==="engineering") && !namesInstalled.includes("satellite.js"))
       throw new Error(name+" consumer missing required orbit dependency satellite.js");
-    console.log(`PASS isolated npm install @openlaunch/${name}: ESM/CJS loaded; installed=${namesInstalled.join(",")}`);
+    console.log(`PASS isolated npm install @openlaunchsdk/${name}: ESM/CJS loaded; installed=${namesInstalled.join(",")}`);
   }
 }finally{
   await rm(tmp,{recursive:true,force:true});

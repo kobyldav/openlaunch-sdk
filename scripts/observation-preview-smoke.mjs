@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const image=new Uint8Array([137,80,78,71,13,10,26,10,0]);
 const item={
  type:"Feature",id:"S2-CZ",collection:"sentinel-2-l2a",geometry:null,

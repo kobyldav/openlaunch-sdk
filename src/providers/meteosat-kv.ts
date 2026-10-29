@@ -1,7 +1,7 @@
 import { EUMETVIEW_WMS } from "./meteosat.js";
 import type { MeteosatSharedImageStore, MeteosatSharedImageRecord } from "./meteosat-cache-store.js";
 
-/** Minimal structural KV interface: no Cloudflare-specific dependency in @openlaunch/earth. */
+/** Minimal structural KV interface: no Cloudflare-specific dependency in @openlaunchsdk/earth. */
 export interface MeteosatKvNamespace {
   get(key: string, type: "arrayBuffer"): Promise<ArrayBuffer | null>;
   put(key: string, value: ArrayBuffer, options: { expirationTtl: number }): Promise<void>;

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const records={
  "sentinel-2-l2a":[{type:"Feature",id:"S2-CZ",collection:"sentinel-2-l2a",
   geometry:null,properties:{datetime:"2026-10-10T10:00:00Z","eo:cloud_cover":9},

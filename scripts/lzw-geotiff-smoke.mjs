@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {decodeGeoTiff,readCogWindowUrl,bbox} from "@openlaunch/raster";
+import {decodeGeoTiff,readCogWindowUrl,bbox} from "@openlaunchsdk/raster";
 const bytes=Uint8Array.from(Buffer.from("SUkqABIAAACAAQEAkBgsDQEADAAAAQMAAQAAAAMAAAABAQMAAQAAAAIAAAACAQMAAQAAAAgAAAADAQMAAQAAAAUAAAAGAQMAAQAAAAEAAAARAQQAAQAAAAgAAAAWAQMAAQAAAAIAAAAXAQQAAQAAAAkAAAAcAQMAAQAAAAEAAAAOgwwAAwAAAKgAAACChAwABgAAAMAAAACvhwMACAAAAPAAAAAAAAAAexSuR+F6hD97FK5H4XqEPwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAALEAAAAAAAIBJQAAAAAAAAAAAAQABAAAAAQAACAAAAQDmEA==","base64"));
 const raster=await decodeGeoTiff(bytes);
 assert.deepEqual([...raster.values],[4,8,9,3,11,6]);

@@ -2,7 +2,7 @@
 
 ## v1.2 live satellite data: sources, stream and verification
 
-- `SpaceMapClient` from `@openlaunch/earth` exposes `layers()` and web-safe descriptors for 18 sources in four groups.
+- `SpaceMapClient` from `@openlaunchsdk/earth` exposes `layers()` and web-safe descriptors for 18 sources in four groups.
 - NASA GIBS WMTS daily imagery: `maps.nasaDailyTimeline`, `maps.gibs.fetchTile`.
 - Meteosat weather WMS: `maps.meteosatCapabilities`, `maps.meteosat.fetchMap`.
 - FIRMS real wildfire hotspot candidates: `maps.activeFires` using backend MAP_KEY.

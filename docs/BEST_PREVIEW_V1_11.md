@@ -7,7 +7,7 @@
 Given only a geographic area and historical time interval, the SDK discovers official satellite catalog scenes and fetches the best *actually delivered image preview* under a bounded request budget. The host website uses the OpenLaunch SDK exclusively; it does not implement direct provider integrations.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
   previewAllowedHosts:["<your explicitly reviewed HTTPS image storage host>"],
   previewMaxBytes:3*1024*1024,

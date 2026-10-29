@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {lonLatToGridCrs,gridCrsToLonLat,utmZone} from "@openlaunch/raster";
+import {lonLatToGridCrs,gridCrsToLonLat,utmZone} from "@openlaunchsdk/raster";
 const cases=[
   {place:"Prague",coords:[14.4208,50.088],crs:"EPSG:32633"},
   {place:"Cape Town",coords:[18.4241,-33.9249],crs:"EPSG:32734"},

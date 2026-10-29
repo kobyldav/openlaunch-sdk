@@ -5,7 +5,7 @@
 ## Use in a Cloudflare Worker
 
 ```ts
-import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunch/earth";
+import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunchsdk/earth";
 
 // Configure a KV namespace binding called SPACE_IMAGES in Wrangler.
 const sharedStore = new MeteosatCloudflareKvStore(env.SPACE_IMAGES, {

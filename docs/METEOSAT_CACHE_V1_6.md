@@ -7,7 +7,7 @@
 Previous v1.5 `meteosatPlayback()` verifies individual WMS images, but repeats upstream downloads when a user replays the same timestamps. This release adds an SDK-owned in-memory cache for **validated binary image bytes**, not a browser-only response metadata cache.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const maps = new SpaceMapClient({meteosatCache:{
   ttlMs:300_000, maxEntries:24, maxBytes:32*1024*1024
 }});

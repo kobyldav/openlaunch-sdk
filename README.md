@@ -6,7 +6,7 @@ OpenLaunch v1.22.0 development builds on seven independent npm workspaces and ke
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.21.0 NASA verified tiles is merged into `main`; v1.22.0 adds isolate-local LRU caching and bounded batch processing on a development branch. No npm publication is implied. The `@openlaunch/*` scoped packages are **not yet published to the npm registry**. Offline GitHub CI and real provider validation are separate evidence.
+> **Release status:** v1.21.0 NASA verified tiles is merged into `main`; v1.22.0 adds isolate-local LRU caching and bounded batch processing on a development branch. No npm publication is implied. The `@openlaunchsdk/*` scoped packages are **not yet published to the npm registry**. Offline GitHub CI and real provider validation are separate evidence.
 
 ## Fedora full SDK verification (v1.22)
 
@@ -23,7 +23,7 @@ Add `--all` for a small set of live provider smoke probes plus real OpenJPEG/WAS
 The **OpenLaunch SDK** (not the web) now offers `SpaceMapClient.webMapDailyTileCached()`, `webMapDailyTilesBatch()`, `webMapTileCacheStats()`, and `clearWebMapTileCache()` on top of the verified NASA GIBS JPEG/PNG downloader introduced in v1.21.
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
   webMapTileCache:{ttlMs:300000,maxEntries:32,maxTotalBytes:8*1024*1024},
   webMapTileMaxBytes:512*1024,webMapTileTimeoutMs:8000,
@@ -122,8 +122,8 @@ The external codec remains **optional**, not added to the default SDK dependenci
 `SpaceMapClient.analyzeObservationJp2Qa()` can resolve a Sentinel-2 SCL JP2 from the matching official STAC item, require exact asset `proj:epsg`, `proj:shape`, `proj:transform`, securely fetch bounded JP2 bytes and classify decoded grayscale mask pixels within the AOI. Codec integration is **optional and explicitly injected**, so no WASM bundle is automatically downloaded.
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
-import {createOpenJpegWasmBackend} from "@openlaunch/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {createOpenJpegWasmBackend} from "@openlaunchsdk/raster";
 // Install @cornerstonejs/codec-openjpeg separately in your secure backend.
 import {OpenJPEGWASM} from "@cornerstonejs/codec-openjpeg";
 const maps=new SpaceMapClient({
@@ -142,7 +142,7 @@ const result=await maps.analyzeObservationJp2Qa({itemId:"<exact STAC ID>",area})
 TIFF Compression=5 (LZW) now works through `decodeGeoTiff()` and `readCogWindowUrl()`, on top of existing WGS84 UTM support. This uses a bounded TIFF-specific 9–12-bit MSB-first LZW decoder, including dictionary reset, TIFF early-change and strict exact block-size checks. It works for supported single-band GeoTIFF and COG data and can feed existing QA/SCL analysis.
 
 ```ts
-import {readCogWindowUrl,bbox} from "@openlaunch/raster";
+import {readCogWindowUrl,bbox} from "@openlaunchsdk/raster";
 const window = await readCogWindowUrl("https://reviewed-provider.example/QA.tif",bbox(14,50.9,14.1,51),{
   allowedHosts:["reviewed-provider.example"]
 });
@@ -156,7 +156,7 @@ console.log(window.raster.values);
 Raster helpers now understand **EPSG:32601..32660** (WGS84 UTM north) and **EPSG:32701..32760** (WGS84 UTM south), in addition to EPSG:4326 and EPSG:3857. The same projection transformations apply in `decodeGeoTiff()`, `readCogWindowUrl()`, `analyzeAoiPixelQuality()`, `analyzeRemoteAoiPixelQuality()`, and the existing STAC-linked QA workflow. Projection is an ellipsoidal Transverse Mercator conversion, not a generic arbitrary CRS engine.
 
 ```ts
-import {lonLatToGridCrs,gridCrsToLonLat} from "@openlaunch/raster";
+import {lonLatToGridCrs,gridCrsToLonLat} from "@openlaunchsdk/raster";
 const utm=lonLatToGridCrs(14.4208,50.088,"EPSG:32633");
 const geodetic=gridCrsToLonLat(...utm,"EPSG:32633");
 ```
@@ -214,7 +214,7 @@ The score considers estimated STAC footprint overlap in addition to cloud/age/so
 Find a real STAC observation by location and obtain the highest-ranked *deliverable* preview without manually choosing a specific satellite. Uses existing `exploreObservations()` and `fetchObservationPreview()` SDK functions. Tries candidates **sequentially**, defaults to three attempts, hard maximum five.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const maps = new SpaceMapClient({
   previewAllowedHosts:["<real reviewed preview storage hostname>"],
 });
@@ -252,7 +252,7 @@ Offline test: `npm run example:observation-preview`. See [Preview Delivery v1.10
 A web visitor selects a location and date window without first knowing which satellite to use. `SpaceMapClient.exploreObservations()` searches the existing OpenLaunch Copernicus/Planetary Computer STAC adapters for optical Sentinel-2, SAR Sentinel-1, thermal Landsat C2 L2 scenes. Static DEM is opt-in.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const maps = new SpaceMapClient();
 const scenes = await maps.exploreObservations({
   area: { center: [14.42, 50.08], radiusKm: 10 },
@@ -271,7 +271,7 @@ Test without internet or provider keys after `npm ci`: `npm run example:observat
 `SpaceMapClient.archivePlayback()` exposes one chronological, backend-friendly frame format for **NASA GIBS daily WMTS** and **EUMETView Meteosat WMS**. The SDK never fabricates capture timestamps or presents a checked single NASA tile as a verified entire scene.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const sdk = new SpaceMapClient();
 const archive = await sdk.archivePlayback({
   source:"nasa-gibs",
@@ -291,7 +291,7 @@ Offline Fedora test: `npm run example:space-archive`. Details: [Space Archive v1
 New optional shared cache contract `MeteosatSharedImageStore` and `MeteosatCloudflareKvStore` enable validated binary WMS images to survive separate backend SDK instances. Default behavior remains purely in-memory.
 
 ```ts
-import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunch/earth";
+import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunchsdk/earth";
 // Cloudflare Worker: env.SPACE_IMAGES is a KV namespace binding.
 const store = new MeteosatCloudflareKvStore(env.SPACE_IMAGES);
 const maps = new SpaceMapClient({meteosatCache:{sharedStore:store}});
@@ -353,7 +353,7 @@ Offline local Fedora smoke: `npm run example:meteosat-timeline`. Opt-in live pro
 | True metadata for scene detail cards | `maps.sceneMetadata()`, `maps.sceneFreshness()` | STAC pixel size, UTC time, cloud %, freshness |
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 
 const maps = new SpaceMapClient();
 // All four of the planned selector categories are filled by the SDK:
@@ -370,7 +370,7 @@ Or with the backward-compatible umbrella API: `new OpenLaunch().earth.maps.layer
 
 **Important:** `LIVE VIDEO` is an external provider stream, never a geo-aligned map raster. Meteosat near-real-time frames have provider delay; NOAA/NASA daily tiles are not continuous. The SDK reports `observedAt:null` and `liveVerified:false` until source-specific evidence exists — no fabricated live status. NASA FIRMS MAP_KEY and Copernicus OAuth credentials must stay on your **backend**, not in public web code.
 
-**Source release:** v1.2.0 is on `feature/live-earth-layers-v1.2.0`, with a draft PR. The `main` release remains v1.1.0 until explicit merge. The six scoped `@openlaunch/*` npm packages are still not published to the registry.
+**Source release:** v1.2.0 is on `feature/live-earth-layers-v1.2.0`, with a draft PR. The `main` release remains v1.1.0 until explicit merge. The six scoped `@openlaunchsdk/*` npm packages are still not published to the registry.
 
 Details and security/integration examples: [Live Earth v1.2 architecture](docs/LIVE_EARTH_V1_2.md). Try offline: `npm run example:live-earth`.
 
@@ -388,13 +388,13 @@ OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. I
 
 | Package | Purpose | Runtime dependencies |
 | --- | --- | --- |
-| `@openlaunch/core` | Typed HTTP requests, caching, rate limits, retries, telemetry, normalized models | None |
-| `@openlaunch/earth` | STAC search, Copernicus, Planetary Computer, weather, AOI discovery | `@openlaunch/core` |
-| `@openlaunch/raster` | GeoTIFF/COG reads, spatial clips, NDVI / NDWI / NDMI / NBR, quality masks, change analysis, DEM mesh | `@openlaunch/core` |
-| `@openlaunch/launches` | Launch Library 2, NASA, launch resources and normalization | `@openlaunch/core` |
-| `@openlaunch/orbit` | TLE/OMM, SGP4/SDP4, ground passes, space-traffic checks, swath/CZML | `@openlaunch/core`, `satellite.js` |
-| `@openlaunch/math` | Independent vector/matrix/quaternion algebra, numerics, statistics and control | `@openlaunch/core` |
-| `@openlaunch/engineering` | Optional rocket and mission engineering and trajectory simulations | `@openlaunch/core`, `@openlaunch/orbit`, `@openlaunch/math` |
+| `@openlaunchsdk/core` | Typed HTTP requests, caching, rate limits, retries, telemetry, normalized models | None |
+| `@openlaunchsdk/earth` | STAC search, Copernicus, Planetary Computer, weather, AOI discovery | `@openlaunchsdk/core` |
+| `@openlaunchsdk/raster` | GeoTIFF/COG reads, spatial clips, NDVI / NDWI / NDMI / NBR, quality masks, change analysis, DEM mesh | `@openlaunchsdk/core` |
+| `@openlaunchsdk/launches` | Launch Library 2, NASA, launch resources and normalization | `@openlaunchsdk/core` |
+| `@openlaunchsdk/orbit` | TLE/OMM, SGP4/SDP4, ground passes, space-traffic checks, swath/CZML | `@openlaunchsdk/core`, `satellite.js` |
+| `@openlaunchsdk/math` | Independent vector/matrix/quaternion algebra, numerics, statistics and control | `@openlaunchsdk/core` |
+| `@openlaunchsdk/engineering` | Optional rocket and mission engineering and trajectory simulations | `@openlaunchsdk/core`, `@openlaunchsdk/orbit`, `@openlaunchsdk/math` |
 | `openlaunch-sdk` | Backward-compatible **umbrella** API with all functions | `satellite.js` |
 
 Every scoped package has separate **ESM, CommonJS and TypeScript declaration** entrypoints. The monorepo uses npm workspaces and a build step that copies only the reachable, compiled modules into each package. The original TypeScript source remains under `src/` for now; it has **not** yet been physically moved to `packages/*/src`.
@@ -406,11 +406,11 @@ Measured with `npm pack --dry-run` in GitHub Actions (Node 22):
 | What you install | Compressed OpenLaunch archive total |
 | --- | ---: |
 | Entire umbrella `openlaunch-sdk` | **361.5 kB** |
-| `@openlaunch/earth` + `@openlaunch/core` | **35.7 kB** |
-| `@openlaunch/raster` + `@openlaunch/core` | **46.0 kB** |
-| `@openlaunch/launches` + `@openlaunch/core` | **22.8 kB** |
-| `@openlaunch/orbit` + `@openlaunch/core` | **52.9 kB** excluding `satellite.js` |
-| `@openlaunch/engineering` + `@openlaunch/orbit` + `@openlaunch/core` | **109.6 kB** excluding `satellite.js` |
+| `@openlaunchsdk/earth` + `@openlaunchsdk/core` | **35.7 kB** |
+| `@openlaunchsdk/raster` + `@openlaunchsdk/core` | **46.0 kB** |
+| `@openlaunchsdk/launches` + `@openlaunchsdk/core` | **22.8 kB** |
+| `@openlaunchsdk/orbit` + `@openlaunchsdk/core` | **52.9 kB** excluding `satellite.js` |
+| `@openlaunchsdk/engineering` + `@openlaunchsdk/orbit` + `@openlaunchsdk/core` | **109.6 kB** excluding `satellite.js` |
 
 These are **npm archive sizes, not browser bundle sizes, network download times or installed disk usage**. Minified/gzipped browser bundle measurements are still needed.
 
@@ -433,11 +433,11 @@ The workspaces are linked locally by npm, so the scoped imports work immediately
 ### Install selected npm packages (after publication)
 
 ```bash
-npm install @openlaunch/earth @openlaunch/raster
+npm install @openlaunchsdk/earth @openlaunchsdk/raster
 # Or just launch information:
-npm install @openlaunch/launches
+npm install @openlaunchsdk/launches
 # Orbital tracking requires satellite.js:
-npm install @openlaunch/orbit
+npm install @openlaunchsdk/orbit
 ```
 
 **Do not assume these installation commands work from the public npm registry yet.** Publishing requires verified access to the `@openlaunch` scope and a separate release process. An existing older `openlaunch-sdk` version from npm is not automatically the v1.1.0 code on GitHub.
@@ -447,14 +447,14 @@ npm install @openlaunch/orbit
 This is the practical combination for a map application over the Czech Republic. It separates **catalog metadata** from **actual pixel data**:
 
 ```ts
-import { EarthCatalogClient, bbox } from "@openlaunch/earth";
+import { EarthCatalogClient, bbox } from "@openlaunchsdk/earth";
 import {
   readCogWindowUrl,
   rasterStatistics,
   ndviRaster,
   alignRasterTo,
   calibrateRasterFromStac,
-} from "@openlaunch/raster";
+} from "@openlaunchsdk/raster";
 
 const earth = new EarthCatalogClient();
 const aoi = bbox(14.39, 50.06, 14.45, 50.11); // Prague sample AOI
@@ -504,7 +504,7 @@ See [GeoTIFF and COG technical details](docs/RASTER_V1.md).
 Use only launch information, without satellite dynamics or rocket-engineering dependencies:
 
 ```ts
-import { LaunchDataClient } from "@openlaunch/launches";
+import { LaunchDataClient } from "@openlaunchsdk/launches";
 
 const data = new LaunchDataClient(); // optional LL2 API key, custom fetch/cache
 const next = await data.launches.next();
@@ -516,8 +516,8 @@ The `launches` workspace includes typed LL2 launch/rocket/agency/astronaut/event
 ## Orbital tracking and engineering
 
 ```ts
-import { Sgp4Satellite } from "@openlaunch/orbit";
-import { simulateLaunch } from "@openlaunch/engineering";
+import { Sgp4Satellite } from "@openlaunchsdk/orbit";
+import { simulateLaunch } from "@openlaunchsdk/engineering";
 ```
 
 The orbit module models trajectories from TLE/OMM element sets via `satellite.js`, calculates passes and relative geometry and supports space-traffic screening. The engineering module provides research-grade 3DOF multistage launch simulation, Monte Carlo studies, rocket controls and target-orbit diagnostics.

@@ -1,10 +1,10 @@
-import { HttpClient, MemoryCache, query } from "@openlaunch/core";
-import { EarthCatalogClient, SpaceMapClient, bbox, StacClient } from "@openlaunch/earth";
-import { decodeGeoTiff, readCogWindowUrl, ndviRaster, type RasterGrid } from "@openlaunch/raster";
-import { LaunchDataClient, LaunchesResource } from "@openlaunch/launches";
-import { Sgp4Satellite, OrbitEngine, TrafficEngine } from "@openlaunch/orbit";
-import { matrixMul, vec3, LinearKalmanFilter } from "@openlaunch/math";
-import { simulateLaunch, sweepLaunchGuidance, type LaunchModel, type OrbitTarget } from "@openlaunch/engineering";
+import { HttpClient, MemoryCache, query } from "@openlaunchsdk/core";
+import { EarthCatalogClient, SpaceMapClient, bbox, StacClient } from "@openlaunchsdk/earth";
+import { decodeGeoTiff, readCogWindowUrl, ndviRaster, type RasterGrid } from "@openlaunchsdk/raster";
+import { LaunchDataClient, LaunchesResource } from "@openlaunchsdk/launches";
+import { Sgp4Satellite, OrbitEngine, TrafficEngine } from "@openlaunchsdk/orbit";
+import { matrixMul, vec3, LinearKalmanFilter } from "@openlaunchsdk/math";
+import { simulateLaunch, sweepLaunchGuidance, type LaunchModel, type OrbitTarget } from "@openlaunchsdk/engineering";
 
 // Static TypeScript consumer smoke: every public entry resolves to matching
 // declarations with no missing internal package subpaths or duplicate APIs.

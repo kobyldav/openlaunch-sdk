@@ -19,17 +19,17 @@ const publicFunctions={
 };
 
 for(const name of names){
-  test(`@openlaunch/${name} has independently resolvable ESM/CJS main exports`,async()=>{
-    const esm=await import("@openlaunch/"+name);
-    const cjs=require("@openlaunch/"+name);
+  test(`@openlaunchsdk/${name} has independently resolvable ESM/CJS main exports`,async()=>{
+    const esm=await import("@openlaunchsdk/"+name);
+    const cjs=require("@openlaunchsdk/"+name);
     for(const property of publicFunctions[name]){
       assert.ok(property in esm,`ESM missing ${name}.${property}`);
       assert.ok(property in cjs,`CJS missing ${name}.${property}`);
     }
   });
 }
-test("Earth STAC search uses scoped @openlaunch/core in a standalone workspace",async()=>{
-  const {StacClient,bbox}=await import("@openlaunch/earth");
+test("Earth STAC search uses scoped @openlaunchsdk/core in a standalone workspace",async()=>{
+  const {StacClient,bbox}=await import("@openlaunchsdk/earth");
   let called=false;
   const fetchImpl=async(url,options)=>{
     called=true;
@@ -45,8 +45,8 @@ test("Earth STAC search uses scoped @openlaunch/core in a standalone workspace",
   assert.equal(result.features.length,0);
 });
 test("Launches package constructs a resource without full OpenLaunch class",async()=>{
-  const {LaunchesResource}=await import("@openlaunch/launches");
-  const {HttpClient}=await import("@openlaunch/core");
+  const {LaunchesResource}=await import("@openlaunchsdk/launches");
+  const {HttpClient}=await import("@openlaunchsdk/core");
   const http=new HttpClient({
     baseUrl:"https://ll.example.test/2.3.0/",
     fetchImpl:async()=>new Response(JSON.stringify({count:0,next:null,previous:null,results:[]})),
@@ -59,7 +59,7 @@ test("Earth, launches and raster have no satellite.js or orbit/engineering depen
   for(const n of ["earth","launches","raster","math"]){
     const file=path.join(root,"packages",n,"package.json");
     const manifest=JSON.parse(await readFile(file,"utf8"));
-    for(const unwanted of ["satellite.js","@openlaunch/orbit","@openlaunch/engineering"]){
+    for(const unwanted of ["satellite.js","@openlaunchsdk/orbit","@openlaunchsdk/engineering"]){
       assert.equal(Object.hasOwn(manifest.dependencies??{},unwanted),false,n+" unexpectedly depends on "+unwanted);
     }
     // Only modules reachable from that package's own entrypoint are packaged.
@@ -87,13 +87,13 @@ test("Package build-report shows isolated module sizes",async()=>{
   const engineering=report.find(x=>x.pkg==="engineering");
   // Modular Earth now contains real provider/cache logic. Compare against a\n  // fixed budget, not the unrelated optional engineering package size.\n  assert.ok(earth.bytes<384*1024,"Earth package unexpectedly exceeds 384 KiB");\n  assert.ok(engineering.bytes<384*1024,"Engineering package unexpectedly exceeds 384 KiB");
   console.log("Workspace uncompressed size report:",report.map(x=>({
-    name:"@openlaunch/"+x.pkg,modules:x.modules,KiB:Math.round(x.bytes/1024)
+    name:"@openlaunchsdk/"+x.pkg,modules:x.modules,KiB:Math.round(x.bytes/1024)
   })));
 });
 
 test("Small standalone facades support one-line Earth and launch data clients",async()=>{
-  const {EarthCatalogClient}=await import("@openlaunch/earth");
-  const {LaunchDataClient}=await import("@openlaunch/launches");
+  const {EarthCatalogClient}=await import("@openlaunchsdk/earth");
+  const {LaunchDataClient}=await import("@openlaunchsdk/launches");
   const providers=new EarthCatalogClient();
   assert.equal(typeof providers.discoverObservations,"function");
   assert.equal(typeof providers.downloadPreview,"function");
@@ -107,9 +107,9 @@ test("Small standalone facades support one-line Earth and launch data clients",a
 
 test("Engineering re-exports math without bundling math implementations",async()=>{
  const e=JSON.parse(await readFile(path.join(root,"packages/engineering/package.json"),"utf8"));
- assert.equal(e.dependencies["@openlaunch/math"],"^1.22.0");
+ assert.equal(e.dependencies["@openlaunchsdk/math"],"^1.22.0");
  const index=await readFile(path.join(root,"packages/engineering/dist/esm/science/index.js"),"utf8");
- assert.match(index,/@openlaunch\/math\/internal\/science\/matrix/);
- const m=await import("@openlaunch/math");
+ assert.match(index,/@openlaunchsdk\/math\/internal\/science\/matrix/);
+ const m=await import("@openlaunchsdk/math");
  assert.equal(m.matrixMul([[2]],[[3]])[0][0],6);
 });

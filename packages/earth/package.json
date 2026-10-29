@@ -1,5 +1,5 @@
 {
-  "name": "@openlaunch/earth",
+  "name": "@openlaunchsdk/earth",
   "version": "1.22.0",
   "description": "Lightweight STAC, Copernicus, Planetary Computer, Open-Meteo and geospatial catalog access",
   "license": "MIT",
@@ -29,6 +29,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.22.0"
+    "@openlaunchsdk/core": "^1.22.0"
   }
 }

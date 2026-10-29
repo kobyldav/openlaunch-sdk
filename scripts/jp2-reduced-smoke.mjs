@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {decodeJp2Raster,reducedJp2Dimensions} from "@openlaunch/raster";
+import {decodeJp2Raster,reducedJp2Dimensions} from "@openlaunchsdk/raster";
 const image=Uint8Array.from(Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAIAAAACAAAQcHAAAAAAAPY29scgEAAAAAABEAAACZanAyY/9P/1EAKQAAAAAAIAAAACAAAAAAAAAAAAAAACAAAAAgAAAAAAAAAAAAAQcBAf9SAAwAAAABAAUEBAAB/1wAE0BASEhQSEhQSEhQSEhQSEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAGAAB/5PPtAgJ0YCAgICA/9k=","base64"));
 const reference={crs:"EPSG:4326",shape:[32,32],transform:[14,.01,0,51,0,-.01]};
 const codec={decode:async(_,opts)=>{

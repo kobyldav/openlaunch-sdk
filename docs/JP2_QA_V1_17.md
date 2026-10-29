@@ -14,8 +14,8 @@ npm install @cornerstonejs/codec-openjpeg
 
 ```ts
 import {OpenJPEGWASM} from "@cornerstonejs/codec-openjpeg";
-import {createOpenJpegWasmBackend} from "@openlaunch/raster";
-import {SpaceMapClient} from "@openlaunch/earth";
+import {createOpenJpegWasmBackend} from "@openlaunchsdk/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
  jp2AllowedHosts:["<trusted provider JP2 hostname>"],
  jp2Decoder:createOpenJpegWasmBackend(async()=>await OpenJPEGWASM),

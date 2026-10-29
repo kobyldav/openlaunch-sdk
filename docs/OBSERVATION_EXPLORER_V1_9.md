@@ -7,7 +7,7 @@
 Expose discovery in the OpenLaunch SDK, not frontend-specific Copernicus or Microsoft APIs. Users choose a Czech or worldwide location, date interval and optional layer preferences, without needing to know satellite missions. The SDK uses existing `ObservationDiscoveryClient` and provider STAC clients for optical (Sentinel-2), radar (Sentinel-1), and thermal (Landsat Collection 2 Level 2); static elevation (Copernicus DEM) is an opt-in fourth source.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const maps = new SpaceMapClient();
 const result = await maps.exploreObservations({
   area: { center:[14.42,50.08], radiusKm:10 },

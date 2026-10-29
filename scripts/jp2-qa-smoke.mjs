@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import {SpaceMapClient} from "@openlaunch/earth";
-import {bbox,readJp2Header} from "@openlaunch/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {bbox,readJp2Header} from "@openlaunchsdk/raster";
 const jp2=Uint8Array.from(Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAAgAAAAMAAQcHAAAAAAAPY29scgEAAAAAABEAAACVanAyY/9P/1EAKQAAAAAAAwAAAAIAAAAAAAAAAAAAAAMAAAACAAAAAAAAAAAAAQcBAf9SAAwAAAABAAEEBAAB/1wAB0BASEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAIAAB/5PPtAwIVKfAfCDAOgwD4QQEBAP/2Q==","base64"));
 const expected=Uint8Array.from([4,8,9,3,11,6]);
 const asset={href:"https://images.example.test/SCL.jp2",type:"image/jp2",

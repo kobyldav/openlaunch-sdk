@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {readJp2Header,decodeJp2Raster,createOpenJpegWasmBackend} from "@openlaunch/raster";
-import {SpaceMapClient} from "@openlaunch/earth";
-import {bbox} from "@openlaunch/raster";
+import {readJp2Header,decodeJp2Raster,createOpenJpegWasmBackend} from "@openlaunchsdk/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {bbox} from "@openlaunchsdk/raster";
 // Independently encoded 32x32, 8-bit, all pixel value 4; JP2 lossless.
 const bytes=Uint8Array.from(Buffer.from("AAAADGpQICANCocKAAAAFGZ0eXBqcDIgAAAAAGpwMiAAAAAtanAyaAAAABZpaGRyAAAAIAAAACAAAQcHAAAAAAAPY29scgEAAAAAABEAAACZanAyY/9P/1EAKQAAAAAAIAAAACAAAAAAAAAAAAAAACAAAAAgAAAAAAAAAAAAAQcBAf9SAAwAAAABAAUEBAAB/1wAE0BASEhQSEhQSEhQSEhQSEhQ/2QAJQABQ3JlYXRlZCBieSBPcGVuSlBFRyB2ZXJzaW9uIDIuNS40/5AACgAAAAAAGAAB/5PPtAgJ0YCAgICA/9k=","base64"));
 const require=createRequire(import.meta.url);

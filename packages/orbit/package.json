@@ -1,5 +1,5 @@
 {
-  "name": "@openlaunch/orbit",
+  "name": "@openlaunchsdk/orbit",
   "version": "1.22.0",
   "description": "SGP4/SDP4 propagation, satellite passes, traffic screening and observation geometry",
   "license": "MIT",
@@ -29,7 +29,7 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.22.0",
+    "@openlaunchsdk/core": "^1.22.0",
     "satellite.js": "6.0.2"
   }
 }

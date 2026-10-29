@@ -5,7 +5,7 @@ Status: feature branch, draft PR; not an npm publication or confirmation of prod
 ## Single API
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
  qaAllowedHosts:["<reviewed provider TIFF storage hostname>"],
  qaSignPlanetary:true,

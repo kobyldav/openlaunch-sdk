@@ -5,7 +5,7 @@
 ## New API
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
  webMapTileCache:{ttlMs:300_000,maxEntries:32,maxTotalBytes:8*1024*1024},
  webMapTileMaxBytes:512*1024,
