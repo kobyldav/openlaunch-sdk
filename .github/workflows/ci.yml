@@ -21,6 +21,8 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: npm
       - run: npm ci --no-audit --no-fund
+      - name: Validate npm release graph without publishing
+        run: node scripts/release-npm.mjs --plan
       - run: npm run check
       - name: Audit all public runtime exports and examples
         run: node scripts/api-surface-audit.mjs --output=test-results/ci-api
