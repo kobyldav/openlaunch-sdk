@@ -54,10 +54,10 @@ const output={
 };
 await writeFile(join(dir,"diagnosis-live.json"),JSON.stringify(output,null,2)+"\n");
 console.log("LIVE DIAGNOSIS, no network requests");
-console.log("Analyzed:",output.completed,"PASS:",output.passed,"FAIL:",output.failed);
-console.log("Terminated by cookbook deadline:",output.timeoutByHarness);
+console.log(`Analyzed: ${output.completed} PASS: ${output.passed} FAIL: ${output.failed}`);
+console.log(`Terminated by cookbook deadline: ${output.timeoutByHarness}`);
 for(const [category,total] of Object.entries(summary.causes))
- console.log("  "+category+": "+total);
+ console.log(`  ${category}: ${total}`);
 console.log("Providers:",JSON.stringify(Object.fromEntries(Object.entries(summary.providers).map(([k,v])=>[k,v.failed]))));
 console.log("Saved:",join(dir,"diagnosis-live.json"));
 if(output.failed)process.exitCode=1;
