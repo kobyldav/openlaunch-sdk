@@ -9,8 +9,8 @@ A dedicated GitHub Actions job on Node 20/22 runs the real `@cornerstonejs/codec
 No third-party WASM package is installed in ordinary `npm ci`. Only the dedicated integration workflow installs the version-pinned test codec. Runtime users opt in and explicitly provide the backend's decoder factory.
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
-import {createOpenJpegWasmBackend} from "@openlaunch/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {createOpenJpegWasmBackend} from "@openlaunchsdk/raster";
 import makeOpenJpegModule from "@cornerstonejs/codec-openjpeg/decodewasmjs";
 const codec = await makeOpenJpegModule(); // configure local wasm path as needed
 const maps = new SpaceMapClient({

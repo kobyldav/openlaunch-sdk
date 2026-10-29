@@ -9,7 +9,7 @@ STAC item `geometry` is a footprint polygon / multipolygon. `SpaceMapClient.expl
 The computation clips STAC polygon rings against the convex AOI, subtracts holes and uses local longitude/latitude planar area ratios. This is appropriate as an approximate filter for small geographic areas, not an exact geodesic or raster pixel coverage product. Multiple overlapping footprints in a MultiPolygon could overcount; output is capped at 100%. Invalid rings, excessive geometry and antimeridian-crossing edges return `null` rather than inventing a percentage.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const sdk = new SpaceMapClient({previewAllowedHosts:["<trusted image host>"]});
 const archive = await sdk.exploreObservations({
   area:{center:[14.42,50.08],radiusKm:10},

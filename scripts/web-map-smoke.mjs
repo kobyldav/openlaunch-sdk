@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const scene={type:"Feature",id:"S2-WEB",collection:"sentinel-2-l2a",geometry:null,
  properties:{datetime:"2026-10-14T10:00:00Z","eo:cloud_cover":5},
  assets:{visual:{href:"https://assets.example.test/preview.png?token=HIDDEN_TOKEN",

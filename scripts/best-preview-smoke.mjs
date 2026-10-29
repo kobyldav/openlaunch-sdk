@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
 const scenes=[
  {type:"Feature",id:"S2-CLOUDY",collection:"sentinel-2-l2a",geometry:null,

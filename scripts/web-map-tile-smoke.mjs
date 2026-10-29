@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const tile=Uint8Array.from([255,216,255,224,0,16,74,70,73,70,255,217]);
 let tileRequests=0;
 const maps=new SpaceMapClient({fetch:async(_url,init)=>{

@@ -1,6 +1,6 @@
 import { webcrypto } from "node:crypto";
 import assert from "node:assert/strict";
-import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunch/earth";
+import { SpaceMapClient, MeteosatCloudflareKvStore } from "@openlaunchsdk/earth";
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
 const kv=new Map();
 const store=new MeteosatCloudflareKvStore({

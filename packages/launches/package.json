@@ -1,5 +1,5 @@
 {
-  "name": "@openlaunch/launches",
+  "name": "@openlaunchsdk/launches",
   "version": "1.22.0",
   "description": "LL2 launch data, NASA provider and reusable launch resources without orbital physics",
   "license": "MIT",
@@ -29,6 +29,6 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.22.0"
+    "@openlaunchsdk/core": "^1.22.0"
   }
 }

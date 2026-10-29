@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const polygon=(w,s,e,n)=>({type:"Polygon",coordinates:[[
  [w,s],[e,s],[e,n],[w,n],[w,s]
 ]]});

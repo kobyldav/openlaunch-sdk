@@ -181,8 +181,8 @@
 
 - v1.2 Live Earth implementation from PR #11 is the single unified 18-layer SDK registry; no duplicate provider client implementation from PR #12
 - added SDK-controlled explicit image verification probes for NASA GIBS and EUMETView with provider error reporting and no invented acquisition times
-- new independently installable @openlaunch/math workspace: vectors, matrices, quaternions, numerics, units, statistics and PID/Kalman control
-- optional engineering reuses @openlaunch/math compiled modules, with legacy openlaunch-sdk and engineering exports retained
+- new independently installable @openlaunchsdk/math workspace: vectors, matrices, quaternions, numerics, units, statistics and PID/Kalman control
+- optional engineering reuses @openlaunchsdk/math compiled modules, with legacy openlaunch-sdk and engineering exports retained
 - updated TypeScript and isolated ESM/CommonJS npm package integration checks
 
 

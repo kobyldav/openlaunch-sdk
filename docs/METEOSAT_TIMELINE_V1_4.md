@@ -5,7 +5,7 @@
 ## Usage
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const client = new SpaceMapClient();
 const capability = await client.meteosatCapabilities();
 const selected = capability.layers.find(l => l.timeDimension);

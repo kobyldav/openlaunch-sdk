@@ -13,7 +13,7 @@ v1.3 is based on PR #11's more complete Live Earth implementation (18 satellite/
 ### Provider image probe
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 
 const maps = new SpaceMapClient();
 // Run on the backend, with caching and rate limits.
@@ -32,10 +32,10 @@ For Meteosat, use `{source:"meteosat",map:{layer,bounds3857,width,height,time?}}
 ### General math is optional
 
 ```ts
-import { matrixMul, vec3, LinearKalmanFilter } from "@openlaunch/math";
+import { matrixMul, vec3, LinearKalmanFilter } from "@openlaunchsdk/math";
 ```
 
-The seventh workspace `@openlaunch/math` owns shared vectors, matrices, quaternions, statistics, units, numerical methods, control/PID and Kalman filtering. Compiled engineering imports those modules rather than copying them. Legacy umbrella and engineering exports stay available in v1 for compatibility. The original TypeScript source remains under `src/science/` during migration.
+The seventh workspace `@openlaunchsdk/math` owns shared vectors, matrices, quaternions, statistics, units, numerical methods, control/PID and Kalman filtering. Compiled engineering imports those modules rather than copying them. Legacy umbrella and engineering exports stay available in v1 for compatibility. The original TypeScript source remains under `src/science/` during migration.
 
 ### Unfinished / risks
 

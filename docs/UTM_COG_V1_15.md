@@ -11,7 +11,7 @@
 - Applies transparently to `SpaceMapClient.analyzeRemoteAoiPixelQuality()` and `analyzeObservationQa()` where the STAC QA asset is a supported single-band COG.
 
 ```ts
-import {lonLatToGridCrs,gridCrsToLonLat,readCogWindowUrl} from "@openlaunch/raster";
+import {lonLatToGridCrs,gridCrsToLonLat,readCogWindowUrl} from "@openlaunchsdk/raster";
 const [x,y]=lonLatToGridCrs(14.4208,50.088,"EPSG:32633");
 const [lon,lat]=gridCrsToLonLat(x,y,"EPSG:32633");
 const clipped=await readCogWindowUrl("https://reviewed-provider.example/QA.tif",area,{

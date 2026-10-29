@@ -1,5 +1,5 @@
 {
-  "name": "@openlaunch/engineering",
+  "name": "@openlaunchsdk/engineering",
   "version": "1.22.0",
   "description": "Spacecraft physics, rocket trajectory, control, mission math and target-orbit studies",
   "license": "MIT",
@@ -29,8 +29,8 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunch/core": "^1.22.0",
-    "@openlaunch/orbit": "^1.22.0",
-    "@openlaunch/math": "^1.22.0"
+    "@openlaunchsdk/core": "^1.22.0",
+    "@openlaunchsdk/orbit": "^1.22.0",
+    "@openlaunchsdk/math": "^1.22.0"
   }
 }

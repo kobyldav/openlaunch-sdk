@@ -26,7 +26,7 @@ Next.js MapLibre map
 ## Server Integration
 
 ```ts
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const maps=new SpaceMapClient({
  previewAllowedHosts:["<reviewed storage hostname only>"],
  previewSignPlanetary:true, // optional if your chosen storage provider needs signing

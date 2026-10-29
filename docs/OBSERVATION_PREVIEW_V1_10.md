@@ -7,7 +7,7 @@
 The OpenLaunch SDK stays the technology owner for data ingestion, provider-specific image acquisition and metadata validation. A website renders images returned by this SDK instead of implementing direct Copernicus/Planetary Computer downloads.
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const sdk = new SpaceMapClient({
   previewAllowedHosts: ["<explicit verified image storage hostname>"],
   previewMaxBytes: 3*1024*1024,

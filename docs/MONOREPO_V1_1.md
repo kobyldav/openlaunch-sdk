@@ -20,7 +20,7 @@ openlaunch-sdk/
   tests/packages.test.mjs      # ESM/CJS, independence, API and file-size tests
 ```
 
-The six package source boundaries are **not implemented by re-exporting** `openlaunch-sdk`. Doing that would defeat installation size and the dependency isolation. Instead, `build-workspaces.mjs` runs *after* the existing TS ESM/CJS build, walks the ESM/CJS/TypeScript declaration relative-import graphs, and copies only reachable compiled modules into each workspace's `dist`. It replaces shared core imports with imports from the separately packed `@openlaunch/core`. Engineering references to orbit/traffic/sensor/scenario modules are externalized to `@openlaunch/orbit`. It fails when an expected module is not compiled.
+The six package source boundaries are **not implemented by re-exporting** `openlaunch-sdk`. Doing that would defeat installation size and the dependency isolation. Instead, `build-workspaces.mjs` runs *after* the existing TS ESM/CJS build, walks the ESM/CJS/TypeScript declaration relative-import graphs, and copies only reachable compiled modules into each workspace's `dist`. It replaces shared core imports with imports from the separately packed `@openlaunchsdk/core`. Engineering references to orbit/traffic/sensor/scenario modules are externalized to `@openlaunchsdk/orbit`. It fails when an expected module is not compiled.
 
 The source of truth stays the v1.0 `src/` implementation: this avoids maintaining duplicate algorithms while the physical source-tree migration is underway. This is a **transitional architecture**, not a claim that source files were already physically moved into six clean bounded contexts.
 
@@ -29,30 +29,30 @@ Each package exposes a top-level ESM/CJS entry and TypeScript declarations. `/in
 ## Dependency graph
 
 ```text
-@openlaunch/core          (no runtime dependencies)
+@openlaunchsdk/core          (no runtime dependencies)
        ↑
-       ├── @openlaunch/earth            (STAC metadata, provider APIs)
-       ├── @openlaunch/launches         (LL2 + NASA)
-       ├── @openlaunch/raster           (COG + pixel analysis)
-       └── @openlaunch/orbit            (+ satellite.js 6.0.2)
+       ├── @openlaunchsdk/earth            (STAC metadata, provider APIs)
+       ├── @openlaunchsdk/launches         (LL2 + NASA)
+       ├── @openlaunchsdk/raster           (COG + pixel analysis)
+       └── @openlaunchsdk/orbit            (+ satellite.js 6.0.2)
                     ↑
-                    └── @openlaunch/engineering
-                        (also depends on @openlaunch/core)
+                    └── @openlaunchsdk/engineering
+                        (also depends on @openlaunchsdk/core)
 
 openlaunch-sdk             (legacy umbrella; unchanged root imports)
 ```
 
-**Critical invariant:** installing `@openlaunch/earth`, `@openlaunch/raster` or `@openlaunch/launches` must **never** require `satellite.js`, `@openlaunch/orbit`, or `@openlaunch/engineering`. This is asserted by tests and package manifests. Browser bundles of these packages no longer pull in the monolithic OpenLaunch class.
+**Critical invariant:** installing `@openlaunchsdk/earth`, `@openlaunchsdk/raster` or `@openlaunchsdk/launches` must **never** require `satellite.js`, `@openlaunchsdk/orbit`, or `@openlaunchsdk/engineering`. This is asserted by tests and package manifests. Browser bundles of these packages no longer pull in the monolithic OpenLaunch class.
 
 ### Earth-only web application
 
 ```bash
-npm install @openlaunch/earth @openlaunch/raster
+npm install @openlaunchsdk/earth @openlaunchsdk/raster
 ```
 
 ```ts
-import { EarthCatalogClient, bbox } from "@openlaunch/earth";
-import { readCogWindowUrl, rasterStatistics } from "@openlaunch/raster";
+import { EarthCatalogClient, bbox } from "@openlaunchsdk/earth";
+import { readCogWindowUrl, rasterStatistics } from "@openlaunchsdk/raster";
 
 const catalog = new EarthCatalogClient();
 const aoi = bbox(14.40, 50.07, 14.45, 50.11);
@@ -84,32 +84,32 @@ This example requires an actual provider TIFF with a supported codec and CRS; ST
 ### Launch data without any engineering physics
 
 ```bash
-npm install @openlaunch/launches
+npm install @openlaunchsdk/launches
 ```
 
 ```ts
-import { LaunchDataClient } from "@openlaunch/launches";
+import { LaunchDataClient } from "@openlaunchsdk/launches";
 
 const sdk = new LaunchDataClient({ apiKey: process.env.LL2_API_KEY });
 const next = await sdk.launches.next();
 console.log(next?.name, next?.net, next?.rocket?.name);
 ```
 
-`LaunchDataClient` encapsulates the shared HTTP/cache library. For finer control, `LaunchesResource` can be constructed with `HttpClient` from `@openlaunch/core`.
+`LaunchDataClient` encapsulates the shared HTTP/cache library. For finer control, `LaunchesResource` can be constructed with `HttpClient` from `@openlaunchsdk/core`.
 
 ### Orbit and engineering only when needed
 
 ```bash
-npm install @openlaunch/orbit
-npm install @openlaunch/engineering
+npm install @openlaunchsdk/orbit
+npm install @openlaunchsdk/engineering
 ```
 
 ```ts
-import { Sgp4Satellite } from "@openlaunch/orbit";
-import { simulateLaunch } from "@openlaunch/engineering";
+import { Sgp4Satellite } from "@openlaunchsdk/orbit";
+import { simulateLaunch } from "@openlaunchsdk/engineering";
 ```
 
-Only the orbit package installs `satellite.js` directly. `@openlaunch/engineering` depends on orbit for modeled satellite interaction.
+Only the orbit package installs `satellite.js` directly. `@openlaunchsdk/engineering` depends on orbit for modeled satellite interaction.
 
 ## Backwards compatibility
 
@@ -118,8 +118,8 @@ Only the orbit package installs `satellite.js` directly. `@openlaunch/engineerin
 import { OpenLaunch, ndviRaster, simulateLaunch, Sgp4Satellite } from "openlaunch-sdk";
 
 // Prefer these narrower installs for new projects:
-import { EarthCatalogClient } from "@openlaunch/earth";
-import { readCogWindowUrl } from "@openlaunch/raster";
+import { EarthCatalogClient } from "@openlaunchsdk/earth";
+import { readCogWindowUrl } from "@openlaunchsdk/raster";
 ```
 
 Do not delete or rewrite the old `OpenLaunch` class. It stays in the umbrella release and retains `space.earth`, `space.orbit`, `space.trajectory`, and `space.mission`.
@@ -150,11 +150,11 @@ npm run build:packages
 | Install | Tarballs (compressed) | Compared with umbrella tarball |
 | --- | ---: | ---: |
 | Full `openlaunch-sdk@1.1.0` | 361.5 kB | Baseline |
-| `@openlaunch/earth` + `@openlaunch/core` | 35.7 kB | ~90% smaller |
-| `@openlaunch/raster` + `@openlaunch/core` | 46.0 kB | ~87% smaller |
-| `@openlaunch/launches` + `@openlaunch/core` | 22.8 kB | ~94% smaller |
-| `@openlaunch/orbit` (+ core, excluding satellite.js tarball) | 52.9 kB | Not an isolated web-data scenario |
-| `@openlaunch/engineering` (+ core + orbit; excluding satellite.js) | 109.6 kB | Research/engineering bundle |
+| `@openlaunchsdk/earth` + `@openlaunchsdk/core` | 35.7 kB | ~90% smaller |
+| `@openlaunchsdk/raster` + `@openlaunchsdk/core` | 46.0 kB | ~87% smaller |
+| `@openlaunchsdk/launches` + `@openlaunchsdk/core` | 22.8 kB | ~94% smaller |
+| `@openlaunchsdk/orbit` (+ core, excluding satellite.js tarball) | 52.9 kB | Not an isolated web-data scenario |
+| `@openlaunchsdk/engineering` (+ core + orbit; excluding satellite.js) | 109.6 kB | Research/engineering bundle |
 
 Measurements use `npm pack --dry-run` from CI. They exclude external npm dependencies and do **not** equal minified/gzip browser JS bundles or real network install times. The domain packages have separate, tested ESM and CJS entrypoints.
 
@@ -167,12 +167,12 @@ This PR **does not create or publish packages in the npm registry**. Publication
 After that, the dependency-safe publish order is:
 
 ```sh
-npm publish --access public --workspace @openlaunch/core
-npm publish --access public --workspace @openlaunch/earth
-npm publish --access public --workspace @openlaunch/raster
-npm publish --access public --workspace @openlaunch/launches
-npm publish --access public --workspace @openlaunch/orbit
-npm publish --access public --workspace @openlaunch/engineering
+npm publish --access public --workspace @openlaunchsdk/core
+npm publish --access public --workspace @openlaunchsdk/earth
+npm publish --access public --workspace @openlaunchsdk/raster
+npm publish --access public --workspace @openlaunchsdk/launches
+npm publish --access public --workspace @openlaunchsdk/orbit
+npm publish --access public --workspace @openlaunchsdk/engineering
 ```
 
 Build + validate before publishing: `npm ci && npm run check && npm run pack:check:packages && npm run test:packed`. Verify exact version/source hashes, npm publishing permissions and release provenance before running any publish command.
@@ -182,7 +182,7 @@ Build + validate before publishing: `npm ci && npm run check && npm run pack:che
 | Choice | Benefit | Cost / risk |
 |---|---|---|
 | Six npm workspaces | Small domain installs and clearer public entrypoints | Six semver/publish artifacts to test |
-| Shared `@openlaunch/core` | No HTTP/cache duplicate source in each publish package | Shared core becomes cross-package dependency |
+| Shared `@openlaunchsdk/core` | No HTTP/cache duplicate source in each publish package | Shared core becomes cross-package dependency |
 | Sparse compiled outputs | Smaller packages without changing physics internals | Domain boundaries are generated, not yet source-level folders |
 | Generated internal subpaths | Preserves existing TS declarations and relative imports | Keep internal paths private and maintain import contracts |
 | Legacy `openlaunch-sdk` wrapper | No breaking migration for current users | Monolith remains for users who choose it |

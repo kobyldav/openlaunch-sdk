@@ -12,7 +12,7 @@ The raster SDK now decodes single-band TIFF Compression=5 lossless LZW blocks in
 - WGS84 EPSG:4326, Web Mercator EPSG:3857, and WGS84 UTM EPSG:326xx/327xx remain available from v1.15.
 
 ```ts
-import {readCogWindowUrl,bbox} from "@openlaunch/raster";
+import {readCogWindowUrl,bbox} from "@openlaunchsdk/raster";
 const output=await readCogWindowUrl("https://reviewed-provider.example/SCL.tif",
   bbox(14,50.9,14.1,51),{allowedHosts:["reviewed-provider.example"]});
 ```

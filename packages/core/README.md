@@ -1,13 +1,13 @@
-# @openlaunch/core (v1.1.0)
+# @openlaunchsdk/core (v1.1.0)
 
 HTTP, caching, queries and typed LL2 primitives. Install only the capabilities your application needs:
 
 ```sh
-npm install @openlaunch/core
+npm install @openlaunchsdk/core
 ```
 
 ```ts
-import { HttpClient, MemoryCache, query } from '@openlaunch/core';
+import { HttpClient, MemoryCache, query } from '@openlaunchsdk/core';
 ```
 
 No satellite.js or science dependency.

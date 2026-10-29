@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const png=new Uint8Array([137,80,78,71,13,10,26,10,0]);
 const capabilities="<WMT_MS_Capabilities><Capability><Layer><Name>demo:clouds</Name><Extent name=\"time\">2020-01-01T10:00:00Z,2020-01-01T10:10:00Z,2020-01-01T10:20:00Z</Extent></Layer></Capability></WMT_MS_Capabilities>";
 let imageRequests=0;

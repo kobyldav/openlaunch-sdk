@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {SpaceMapClient} from "@openlaunch/earth";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
 const sample=Uint8Array.from([255,216,255,224,0,16,74,70,73,70,255,217]);
 let fetched=0;
 const maps=new SpaceMapClient({webMapTileCache:{maxEntries:8,maxTotalBytes:1024,ttlMs:60_000},

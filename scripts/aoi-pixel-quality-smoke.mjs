@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import {SpaceMapClient} from "@openlaunch/earth";
-import {bbox} from "@openlaunch/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {bbox} from "@openlaunchsdk/raster";
 const maps=new SpaceMapClient();
 const mask={width:4,height:2,crs:"EPSG:4326",transform:[14,.01,0,51,0,-.01],
  values:new Float64Array([4,8,3,11,6,9,0,5])};

@@ -2,7 +2,7 @@
  * Generate genuinely installable, independently packed workspaces from the
  * existing v1 source tree. Transitive imports are traced from the compiled
  * ESM/CommonJS + .d.ts graphs; modules outside a package's closure are NOT
- * copied to it. Shared SDK infrastructure is externalized to @openlaunch/core.
+ * copied to it. Shared SDK infrastructure is externalized to @openlaunchsdk/core.
  *
  * This incremental "strangler" migration deliberately leaves openlaunch-sdk
  * and its existing imports/API untouched during v1.1 adoption.
@@ -73,7 +73,7 @@ function dependencyFrom(module, specifier) {
 }
 function externalSpecifier(owner, module) {
   // This is a package export subpath to an independently installable module.
-  return `@openlaunch/${owner}/internal/${module}`;
+  return `@openlaunchsdk/${owner}/internal/${module}`;
 }
 async function readIfExists(file) {
   try { return await readFile(file, "utf8"); }
@@ -128,5 +128,5 @@ async function build(pkg) {
 }
 const report=[];
 for (const pkg of Object.keys(packages)) report.push(await build(pkg));
-for(const p of report) console.log(`@openlaunch/${p.pkg}: ${p.modules} compiled modules, ${(p.bytes/1024).toFixed(1)} KiB uncompressed, ${p.externalizedReferences} cross-package refs`);
+for(const p of report) console.log(`@openlaunchsdk/${p.pkg}: ${p.modules} compiled modules, ${(p.bytes/1024).toFixed(1)} KiB uncompressed, ${p.externalizedReferences} cross-package refs`);
 await writeFile(rootPath("packages","build-report.json"),JSON.stringify(report,null,2)+"\n");

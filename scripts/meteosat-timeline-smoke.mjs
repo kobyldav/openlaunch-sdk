@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 
 const fixture="<WMT_MS_Capabilities version=\"1.1.1\"><Service><Name>WMS</Name></Service><Capability>\n<Layer><Title>Root time inheritance</Title>\n<Dimension name=\"time\" units=\"ISO8601\">2020-01-01T10:00:00Z/2020-01-01T11:00:00Z/PT10M</Dimension>\n<Layer><Name>demo:clouds</Name><Title>Clouds &amp; Europe</Title></Layer>\n<Layer><Name>demo:infrared</Name><Title>Infrared</Title>\n<Extent name=\"time\">2020-01-01T10:20:00Z,2020-01-01T10:40:00Z,2020-01-01T11:00:00Z</Extent></Layer>\n<Layer><Name>demo:no-time</Name><Extent name=\"time\">current</Extent></Layer>\n</Layer></Capability></WMT_MS_Capabilities>";
 const sdk=new SpaceMapClient({fetch:async()=>new Response(fixture,{headers:{"content-type":"text/xml"}})});

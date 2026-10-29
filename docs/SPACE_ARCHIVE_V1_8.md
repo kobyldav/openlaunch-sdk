@@ -8,7 +8,7 @@ A map website should consume space-data APIs of the OpenLaunch SDK instead of im
 ## NASA GIBS daily archive
 
 ```ts
-import { SpaceMapClient } from "@openlaunch/earth";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
 const sdk = new SpaceMapClient();
 const timeline = await sdk.archivePlayback({
   source:"nasa-gibs",

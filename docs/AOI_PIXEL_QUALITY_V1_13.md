@@ -2,7 +2,7 @@
 
 **Development PR.** This is an analysis of real QA/SCL mask values, not simulated satellite pixels or a claim of current production provider availability.
 
-Use `SpaceMapClient.analyzeAoiPixelQuality({mask,area,source})` or `analyzeAoiPixelQuality` exported from `@openlaunch/raster`.
+Use `SpaceMapClient.analyzeAoiPixelQuality({mask,area,source})` or `analyzeAoiPixelQuality` exported from `@openlaunchsdk/raster`.
 
 ```ts
 const report=maps.analyzeAoiPixelQuality({

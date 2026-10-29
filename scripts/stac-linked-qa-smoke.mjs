@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
-import { SpaceMapClient } from "@openlaunch/earth";
-import { bbox } from "@openlaunch/raster";
+import { SpaceMapClient } from "@openlaunchsdk/earth";
+import { bbox } from "@openlaunchsdk/raster";
 const area=bbox(14,50.98,14.03,51);
 const item={type:"Feature",id:"S2-SMOKE",collection:"sentinel-2-l2a",
  geometry:null,properties:{datetime:"2026-10-10T10:00:00Z"},

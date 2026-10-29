@@ -31,9 +31,9 @@ function capture(command, args) {
 if (!modes.has(mode) || process.argv.length > 3) fail("Usage: node scripts/release-npm.mjs [--plan|--publish|--verify|--promote]");
 if (umbrella.name !== "openlaunch-sdk" || scoped.length !== 7) fail("Unexpected package set");
 for (const pkg of scoped) {
-  if (!pkg.name.startsWith("@openlaunch/") || pkg.private || pkg.version !== version) fail("Invalid workspace name/version: " + pkg.name);
+  if (!pkg.name.startsWith("@openlaunchsdk/") || pkg.private || pkg.version !== version) fail("Invalid workspace name/version: " + pkg.name);
   for (const [name, range] of Object.entries(pkg.dependencies || {})) {
-    if (name.startsWith("@openlaunch/") && (!byName.has(name) || range !== "^" + version)) fail(pkg.name + " has mismatched dependency " + name + "@" + range);
+    if (name.startsWith("@openlaunchsdk/") && (!byName.has(name) || range !== "^" + version)) fail(pkg.name + " has mismatched dependency " + name + "@" + range);
   }
 }
 const visiting = new Set(), visited = new Set(), sorted = [];
@@ -49,10 +49,10 @@ const all = [...sorted, umbrella.name];
 console.log("OpenLaunch npm " + version + " (" + mode + ")");
 all.forEach((name, i) => console.log((i + 1) + ". " + name + "@" + version));
 
-function ensureMain() {
+function ensureMain({ requireClean = true } = {}) {
   const branch = capture("git", ["branch", "--show-current"]);
   if (branch !== "main") fail("Current branch is " + branch + ", not main. Run git switch main && git pull --ff-only origin main");
-  if (capture("git", ["status", "--porcelain"])) fail("Git working tree is dirty; commit or stash changes");
+  if (requireClean && capture("git", ["status", "--porcelain"])) fail("Git working tree is dirty; commit or stash changes");
   if (capture("git", ["rev-parse", "HEAD"]) !== capture("git", ["rev-parse", "origin/main"])) fail("HEAD differs from origin/main; fetch and fast-forward main first");
 }
 function ensureRegistry() {
@@ -103,7 +103,7 @@ if (mode === "--plan") {
 } else if (mode === "--verify") {
   verify(); console.log("\nAll eight npm packages pass independent registry consumer smoke.");
 } else {
-  ensureMain(); ensureRegistry(); ensureLogin(); verify();
+  ensureMain({ requireClean: false }); ensureRegistry(); ensureLogin(); verify();
   for (const name of all) execute("npm", ["dist-tag", "add", name + "@" + version, "latest"]);
   for (const name of all) if (JSON.parse(capture("npm", ["view", name, "dist-tags.latest", "--json"])) !== version) fail("latest tag mismatch: " + name);
   console.log("\nAll eight npm packages now have latest=" + version);

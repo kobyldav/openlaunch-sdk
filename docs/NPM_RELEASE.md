@@ -4,8 +4,8 @@ The `main` branch currently contains an umbrella package `openlaunch-sdk` and se
 
 ## Prerequisites
 
-1. Control the npm `@openlaunch` namespace. The namespace belongs to the npm account or npm organization named `openlaunch`, **not** automatically to the owner of this GitHub repository. If the organization does not exist and its name is available, create an npm organization on the free public-package plan and grant your npm account write access. If the namespace belongs to someone else, **stop** and agree on a different scope before making coordinated name/dependency changes.
-2. Use the npm public registry and authenticate with npm 2FA. Do not put npm tokens, OTPs or passwords into the repository, issues or chat.
+1. Control the npm `@openlaunch` namespace. The namespace belongs to the npm organization named `openlaunchsdk`, **not** automatically to the owner of this GitHub repository. If the organization does not exist and its name is available, create an npm organization on the free public-package plan and grant your npm account write access. The organization `openlaunchsdk` was created by maintainer `kobdav` for free public packages; confirm your `npm org ls openlaunchsdk --json` membership before publishing.
+2. Enable 2FA on the personal npm account before publishing; use the public npm registry and authenticate with npm login. Do not put npm tokens, OTPs or passwords into the repository, issues or chat.
 3. Work from an up-to-date, clean **main** branch. `git pull` updates the currently checked out branch; a local feature branch is not acceptable for production release.
 
 ## Release from Fedora
@@ -18,6 +18,7 @@ git pull --ff-only origin main
 npm login
 npm whoami
 npm config get registry
+npm org ls openlaunchsdk --json
 node scripts/release-npm.mjs --plan
 node scripts/release-npm.mjs --publish
 ```
@@ -34,20 +35,20 @@ Inspect the package pages in npm. Then:
 node scripts/release-npm.mjs --verify
 node scripts/release-npm.mjs --promote
 npm view openlaunch-sdk version
-npm view @openlaunch/core version
-npm view @openlaunch/engineering version
+npm view @openlaunchsdk/core version
+npm view @openlaunchsdk/engineering version
 ```
 
-`--verify` installs exactly the versions on npm and checks ESM and CommonJS consumer imports for **all eight** names; it does not use local workspace symlinks. `--promote` repeats that verification, then switches each package's `latest` dist-tag, umbrella last.
+`--verify` installs exactly the versions on npm and checks ESM and CommonJS consumer imports for **all eight** names; it does not use local workspace symlinks. `--promote` repeats that verification, then switches each package's `latest` dist-tag, umbrella last. Because the build may modify tracked generated files, `--promote` only requires the correct `main` commit (not a pristine working tree); `--publish` still requires a pristine tree.
 
 Install examples after promotion:
 
 ```bash
 npm install openlaunch-sdk
-npm install @openlaunch/earth @openlaunch/raster
-npm install @openlaunch/launches
-npm install @openlaunch/orbit
-npm install @openlaunch/engineering
+npm install @openlaunchsdk/earth @openlaunchsdk/raster
+npm install @openlaunchsdk/launches
+npm install @openlaunchsdk/orbit
+npm install @openlaunchsdk/engineering
 ```
 
 ## Important failure cases

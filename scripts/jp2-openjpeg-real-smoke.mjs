@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import {createRequire} from "node:module";
-import {SpaceMapClient} from "@openlaunch/earth";
-import {bbox,readJp2Header,createOpenJpegWasmBackend,decodeJp2Raster} from "@openlaunch/raster";
+import {SpaceMapClient} from "@openlaunchsdk/earth";
+import {bbox,readJp2Header,createOpenJpegWasmBackend,decodeJp2Raster} from "@openlaunchsdk/raster";
 
 /**
  * Real OpenJPEG WASM smoke: no fake decoder. Install the pinned optional
