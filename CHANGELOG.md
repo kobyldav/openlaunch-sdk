@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.22.1 — npm metadata and documentation correction
+
+- Align public descriptions, repository links, keywords, and release-version headings across the umbrella and seven scoped npm packages.
+- Replace outdated or misleading README claims about unpublished workspaces and development-only releases; retain the v1.22.0 runtime APIs and behavior.
+- Add an automated release-metadata check for coordinated package/lockfile versions, workspace dependency ranges, and public-facing copy.
+- No new satellite data provider capabilities; this is a documentation and package-metadata release.
+
+
 ## 1.22.0 (development) — NASA GIBS Tile Cache and Bounded Batch
 
 - New `WebMapTileCache` with per-instance bounded in-memory LRU, TTL, total-byte and entry caps. Only verified binary images are cached, never HTTP failures, missing or spoofed images.
