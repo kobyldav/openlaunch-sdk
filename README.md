@@ -6,7 +6,7 @@ OpenLaunch **v1.22.1** is a TypeScript SDK comprising seven independent npm modu
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **npm release:** all eight packages are publicly available at v1.22.0. The upcoming v1.22.1 patch updates the public package metadata and documentation without changing the satellite-map APIs. Use `npm install openlaunch-sdk` or install individual `@openlaunchsdk/*` modules.
+> **Release 1.22.1:** this is a metadata-and-documentation correction to the published v1.22.0 APIs. All eight package names are available on npm; check the registry for the currently published version. Install `openlaunch-sdk` or individual `@openlaunchsdk/*` modules.
 
 ## Fedora full SDK verification (v1.22)
 
