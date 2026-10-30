@@ -2,11 +2,11 @@
 
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
-OpenLaunch v1.22.0 development builds on seven independent npm workspaces and keeps the original `openlaunch-sdk` API for existing projects. Install only the domains your application needs once the scoped packages have been published.
+OpenLaunch **v1.22.1** is a TypeScript SDK comprising seven independent npm modules and the backward-compatible `openlaunch-sdk` umbrella package. Install only the capabilities your application needs.
 
 [Space Archive v1.8](#space-archive--playback-v18-development) · [Live Earth v1.2](#live-earth--satellite-map-layers-v120) · [Modules](#modular-packages) · [Quick start](#quick-start) · [Earth & raster example](#earth-observation--raster-example) · [Launch example](#launch-data-example) · [Validation](#build-and-test) · [Documentation](#documentation) · [Limits](#accuracy-security-and-known-limitations)
 
-> **Release status:** v1.21.0 NASA verified tiles is merged into `main`; v1.22.0 adds isolate-local LRU caching and bounded batch processing on a development branch. No npm publication is implied. The `@openlaunchsdk/*` scoped packages are **not yet published to the npm registry**. Offline GitHub CI and real provider validation are separate evidence.
+> **Release 1.22.1:** this is a metadata-and-documentation correction to the published v1.22.0 APIs. All eight package names are available on npm; check the registry for the currently published version. Install `openlaunch-sdk` or individual `@openlaunchsdk/*` modules.
 
 ## Fedora full SDK verification (v1.22)
 
@@ -370,7 +370,7 @@ Or with the backward-compatible umbrella API: `new OpenLaunch().earth.maps.layer
 
 **Important:** `LIVE VIDEO` is an external provider stream, never a geo-aligned map raster. Meteosat near-real-time frames have provider delay; NOAA/NASA daily tiles are not continuous. The SDK reports `observedAt:null` and `liveVerified:false` until source-specific evidence exists — no fabricated live status. NASA FIRMS MAP_KEY and Copernicus OAuth credentials must stay on your **backend**, not in public web code.
 
-**Source release:** v1.2.0 is on `feature/live-earth-layers-v1.2.0`, with a draft PR. The `main` release remains v1.1.0 until explicit merge. The six scoped `@openlaunchsdk/*` npm packages are still not published to the registry.
+**Release note:** Live Earth first appeared in v1.2; its layers and provider adapters are included in the published `@openlaunchsdk/earth` and `openlaunch-sdk` packages.
 
 Details and security/integration examples: [Live Earth v1.2 architecture](docs/LIVE_EARTH_V1_2.md). Try offline: `npm run example:live-earth`.
 
@@ -382,7 +382,7 @@ Read [Space Data Foundation v1.3](docs/SPACE_DATA_FOUNDATION_V1_3.md) for the 18
 
 OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. It now includes STAC observation catalogs, real georeferenced TIFF pixel processing, SGP4/SDP4 satellite tracking, space-traffic geometry and generic launch-simulation tools.
 
-**v1.1 separates data products from aerospace engineering.** A map application that needs Sentinel/Landsat catalogs and NDVI can use Earth and Raster without pulling in the trajectory engine or `satellite.js`.
+**Modular packages separate data products from aerospace engineering.** A map application that needs Sentinel/Landsat catalogs and NDVI can use Earth and Raster without pulling in the trajectory engine or `satellite.js`.
 
 ## Modular packages
 
@@ -399,24 +399,13 @@ OpenLaunch started as a typed client for Launch Library 2, NASA and CelesTrak. I
 
 Every scoped package has separate **ESM, CommonJS and TypeScript declaration** entrypoints. The monorepo uses npm workspaces and a build step that copies only the reachable, compiled modules into each package. The original TypeScript source remains under `src/` for now; it has **not** yet been physically moved to `packages/*/src`.
 
-### Compressed npm archive sizes
+### Package size
 
-Measured with `npm pack --dry-run` in GitHub Actions (Node 22):
-
-| What you install | Compressed OpenLaunch archive total |
-| --- | ---: |
-| Entire umbrella `openlaunch-sdk` | **361.5 kB** |
-| `@openlaunchsdk/earth` + `@openlaunchsdk/core` | **35.7 kB** |
-| `@openlaunchsdk/raster` + `@openlaunchsdk/core` | **46.0 kB** |
-| `@openlaunchsdk/launches` + `@openlaunchsdk/core` | **22.8 kB** |
-| `@openlaunchsdk/orbit` + `@openlaunchsdk/core` | **52.9 kB** excluding `satellite.js` |
-| `@openlaunchsdk/engineering` + `@openlaunchsdk/orbit` + `@openlaunchsdk/core` | **109.6 kB** excluding `satellite.js` |
-
-These are **npm archive sizes, not browser bundle sizes, network download times or installed disk usage**. Minified/gzipped browser bundle measurements are still needed.
+Package archive sizes vary by release. Measure the current version with `npm run pack:check:packages` and `npm pack --dry-run --workspaces=false`. These are **not** browser bundle sizes, network download times or installed disk usage.
 
 ## Quick start
 
-### Run from GitHub source (available now)
+### Run from GitHub source
 
 Requirements: **Node.js 18+**, npm and network access for `npm ci`.
 
@@ -430,7 +419,7 @@ npm run example:raster
 
 The workspaces are linked locally by npm, so the scoped imports work immediately **inside the checked-out repository**.
 
-### Install selected npm packages (after publication)
+### Install selected npm packages
 
 ```bash
 npm install @openlaunchsdk/earth @openlaunchsdk/raster

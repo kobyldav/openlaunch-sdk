@@ -1,6 +1,6 @@
 {
   "name": "@openlaunchsdk/core",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "Shared typed HTTP, cache, query and normalized API primitives without satellite dependencies",
   "license": "MIT",
   "type": "module",
@@ -28,5 +28,24 @@
   "engines": {
     "node": ">=18"
   },
-  "dependencies": {}
+  "dependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobyldav/openlaunch-sdk.git",
+    "directory": "packages/core"
+  },
+  "homepage": "https://github.com/kobyldav/openlaunch-sdk/tree/main/packages/core#readme",
+  "bugs": {
+    "url": "https://github.com/kobyldav/openlaunch-sdk/issues"
+  },
+  "keywords": [
+    "typescript",
+    "http-client",
+    "cache",
+    "query-builder",
+    "spaceflight"
+  ],
+  "publishConfig": {
+    "access": "public"
+  }
 }

@@ -1,7 +1,7 @@
 {
   "name": "openlaunch-sdk",
-  "version": "1.22.0",
-  "description": "OpenLaunch SDK: bounded verified NASA GIBS tile cache and batch, secure satellite map workflows",
+  "version": "1.22.1",
+  "description": "TypeScript SDK for spaceflight data, satellite maps, Earth observation, orbital mechanics and mission engineering",
   "keywords": [
     "space",
     "spaceflight",
@@ -145,7 +145,7 @@
     "test": "npm run build && node --test tests/*.test.mjs && node scripts/cjs-smoke.cjs && node scripts/launch-trajectory-demo.mjs && node scripts/mission-intelligence-demo.mjs && node scripts/geospatial-raster-demo.mjs && node scripts/live-earth-demo.mjs && node scripts/meteosat-timeline-smoke.mjs && node scripts/meteosat-playback-smoke.mjs && node scripts/meteosat-cache-smoke.mjs && node scripts/meteosat-shared-cache-smoke.mjs && node scripts/space-archive-smoke.mjs && node scripts/observation-explorer-smoke.mjs && node scripts/observation-preview-smoke.mjs && node scripts/best-preview-smoke.mjs && node scripts/footprint-coverage-smoke.mjs && node scripts/aoi-pixel-quality-smoke.mjs && node scripts/stac-linked-qa-smoke.mjs && node scripts/utm-cog-smoke.mjs && node scripts/lzw-geotiff-smoke.mjs && node scripts/jp2-qa-smoke.mjs && node scripts/jp2-reduced-smoke.mjs && node scripts/web-map-smoke.mjs && node scripts/web-map-tile-smoke.mjs && node scripts/web-map-tile-cache-smoke.mjs && npm run test:packages",
     "test:live": "npm run build && node scripts/live-smoke.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "check": "npm run typecheck && npm run examples:check && npm test",
+    "check": "npm run check:release-metadata && npm run typecheck && npm run examples:check && npm test",
     "pack:check": "npm pack --dry-run",
     "prepublishOnly": "npm run check && npm run pack:check && npm run pack:check:packages && npm run test:packed",
     "examples:check": "tsc -p tsconfig.examples.json --noEmit",
@@ -186,7 +186,8 @@
     "examples:offline": "npm run build && node scripts/verify-cookbook.mjs --mode=offline",
     "examples:live": "npm run build && node scripts/verify-cookbook.mjs --mode=live",
     "test:fedora": "bash scripts/fedora-full-test.sh",
-    "api:audit": "npm run build && node scripts/api-surface-audit.mjs"
+    "api:audit": "npm run build && node scripts/api-surface-audit.mjs",
+    "check:release-metadata": "node scripts/check-release-metadata.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -199,5 +200,13 @@
   },
   "workspaces": [
     "packages/*"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobyldav/openlaunch-sdk.git"
+  },
+  "homepage": "https://github.com/kobyldav/openlaunch-sdk#readme",
+  "bugs": {
+    "url": "https://github.com/kobyldav/openlaunch-sdk/issues"
+  }
 }

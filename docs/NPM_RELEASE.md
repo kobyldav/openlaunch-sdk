@@ -1,65 +1,70 @@
-# Publishing OpenLaunch SDK and all seven npm packages
+# Publishing OpenLaunch SDK to npm
 
-The `main` branch currently contains an umbrella package `openlaunch-sdk` and seven scoped workspaces. npm publication is a separate step. Do not mistake a GitHub development version for a version available on the public npm registry.
+The monorepo contains eight public packages: the umbrella `openlaunch-sdk` and seven `@openlaunchsdk/*` workspaces. A GitHub merge does **not** publish to npm.
 
-## Prerequisites
+## Prepare the 1.22.1 correction
 
-1. Control the npm `@openlaunch` namespace. The namespace belongs to the npm organization named `openlaunchsdk`, **not** automatically to the owner of this GitHub repository. If the organization does not exist and its name is available, create an npm organization on the free public-package plan and grant your npm account write access. The organization `openlaunchsdk` was created by maintainer `kobdav` for free public packages; confirm your `npm org ls openlaunchsdk --json` membership before publishing.
-2. Enable 2FA on the personal npm account before publishing; use the public npm registry and authenticate with npm login. Do not put npm tokens, OTPs or passwords into the repository, issues or chat.
-3. Work from an up-to-date, clean **main** branch. `git pull` updates the currently checked out branch; a local feature branch is not acceptable for production release.
-
-## Release from Fedora
+On Fedora, after the pull request passes CI and is merged into a clean `main`:
 
 ```bash
-cd ~/Desktop/Openspace/openlaunch-sdk
-git fetch origin
 git switch main
 git pull --ff-only origin main
-npm login
-npm whoami
-npm config get registry
-npm org ls openlaunchsdk --json
+npm ci
+npm run check
+npm run pack:check:packages
+npm run test:packed
 node scripts/release-npm.mjs --plan
-node scripts/release-npm.mjs --publish
 ```
 
-`--publish` checks the git branch and clean working tree; checks npm authentication, registry and availability of the exact version; validates the local dependency graph; performs `npm ci`, all TypeScript/unit tests, pack checks and local isolated consumer tests; publishes workspaces in dependency order; publishes the backward-compatible umbrella last; and installs/imports all eight exact versions from the real public npm registry in a new temporary directory.
+The `check:release-metadata` check enforces matching package and lockfile versions, correct workspace dependency ranges, accurate README version headings, and complete public package metadata.
 
-All packages are initially published with the **`next`** dist-tag, so the previously installed `latest` release of `openlaunch-sdk` is not changed. Newly published scoped packages may only be installable using explicit versions or the `next` tag before promotion.
+## Stage, review and approve
 
-## Verify and promote
+Use Node 22.14+ and npm 11.15+ for staged publishing. On Fedora, `npx --yes npm@11.21.1` works without changing the global npm installation.
 
-Inspect the package pages in npm. Then:
+Stage **one module at a time** in dependency order:
+
+```bash
+set -e
+for pkg in core earth orbit math engineering launches raster; do
+  (cd "packages/$pkg" && npx --yes npm@11.21.1 stage publish --access=public --tag=next)
+done
+npx --yes npm@11.21.1 stage publish --access=public --tag=next --workspaces=false
+```
+
+Stop at any failure and inspect the staged packages. npm staging is not transactional. Never blindly re-stage an already submitted version.
+
+Sign in to https://www.npmjs.com/settings/kobdav/staged-packages and approve each package after reviewing its manifest and README; check the `openlaunchsdk` organization for scoped modules. Approval requires 2FA. The initial `0.0.0-stage` versions are publicly visible placeholders for new package names; they are not the final release.
+
+## Verify on the public registry
+
+After approving **all eight**:
 
 ```bash
 node scripts/release-npm.mjs --verify
-node scripts/release-npm.mjs --promote
-npm view openlaunch-sdk version
-npm view @openlaunchsdk/core version
-npm view @openlaunchsdk/engineering version
 ```
 
-`--verify` installs exactly the versions on npm and checks ESM and CommonJS consumer imports for **all eight** names; it does not use local workspace symlinks. `--promote` repeats that verification, then switches each package's `latest` dist-tag, umbrella last. Because the build may modify tracked generated files, `--promote` only requires the correct `main` commit (not a pristine working tree); `--publish` still requires a pristine tree.
+This command independently installs each exact version from npm and checks both ESM and CommonJS imports. Do **not** change `latest` if it fails.
 
-Install examples after promotion:
+## Promote the tested version
+
+After successful verification, set `latest` for the seven scoped modules and finally the umbrella. `node scripts/release-npm.mjs --promote` performs the operation, but an npm CLI session can demand additional browser authorization for `npm dist-tag`.
+
+If needed, an npm granular **Read and write (stage only)** token, scoped to these eight packages and explicitly permitted to bypass 2FA for this operation, can instead run `npm dist-tag add PACKAGE@1.22.1 latest`. Use a very short lifetime; keep it out of terminal history, logs, project files and chat, and **revoke it immediately** after successful promotion.
+
+Verify the registry tags for all eight names:
 
 ```bash
-npm install openlaunch-sdk
-npm install @openlaunchsdk/earth @openlaunchsdk/raster
-npm install @openlaunchsdk/launches
-npm install @openlaunchsdk/orbit
-npm install @openlaunchsdk/engineering
+for p in @openlaunchsdk/core @openlaunchsdk/earth @openlaunchsdk/orbit @openlaunchsdk/math @openlaunchsdk/engineering @openlaunchsdk/launches @openlaunchsdk/raster openlaunch-sdk; do
+  printf '%s: ' "$p"
+  npm view "$p" dist-tags.latest
+done
 ```
 
-## Important failure cases
+## Public metadata caveat
 
-- npm publishes are **not transactional**: interruption can leave only part of the eight packages published. The release script rejects existing exact versions rather than silently treating them as safe to skip. Inspect registry tarballs and finish a partial release deliberately, or release a new coordinated patch version.
-- `E403` on a scoped package usually means missing scope rights, authentication/2FA restrictions, or an already published version. `E404` alone does not prove the scope is yours.
-- If any registry consumer smoke fails, **do not run `--promote`**. Published versions cannot be overwritten; fix the code and issue a new release.
-- Live NASA/LL2/Copernicus credentials, provider availability and upstream API correctness are separate from the offline unit tests. This publication workflow does not claim live provider checks were passed.
+New versions cannot overwrite an already published `name@version` tarball. The placeholder description `Temporary package placeholder for staged publishing` may persist on a user profile due to registry metadata caching, even when the latest package manifest is correct. **After 1.22.1 is promoted**, inspect the package page, package manifest and profile summary. If the summary remains wrong, contact npm support rather than unpublishing a working release.
 
-## Future GitHub automation
+Future releases should use npm Trusted Publishing via GitHub Actions (OIDC) for all eight packages, with explicit dist-tag permissions and no long-lived publication tokens.
 
-After the initial manual publish, register GitHub Actions as an npm Trusted Publisher **for each of the eight packages** and add the exact repository URL to every package manifest. Use an explicitly reviewed workflow, modern Node/npm, `id-token: write`, and a GitHub-hosted runner. `npm dist-tag` needs a separate trusted-publisher permission. Never commit persistent npm publication tokens.
-
-References: https://docs.npmjs.com/trusted-publishers/ and https://docs.npmjs.com/creating-an-organization/
+Official docs: https://docs.npmjs.com/staged-publishing/ and https://docs.npmjs.com/trusted-publishers/
