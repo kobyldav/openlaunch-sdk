@@ -1,6 +1,6 @@
 {
   "name": "@openlaunchsdk/orbit",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "SGP4/SDP4 propagation, satellite passes, traffic screening and observation geometry",
   "license": "MIT",
   "type": "module",
@@ -29,7 +29,26 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunchsdk/core": "^1.22.0",
+    "@openlaunchsdk/core": "^1.22.1",
     "satellite.js": "6.0.2"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobyldav/openlaunch-sdk.git",
+    "directory": "packages/orbit"
+  },
+  "homepage": "https://github.com/kobyldav/openlaunch-sdk/tree/main/packages/orbit#readme",
+  "bugs": {
+    "url": "https://github.com/kobyldav/openlaunch-sdk/issues"
+  },
+  "keywords": [
+    "orbit",
+    "sgp4",
+    "satellite-tracking",
+    "ground-pass",
+    "space-traffic"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
