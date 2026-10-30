@@ -1,6 +1,6 @@
 {
   "name": "@openlaunchsdk/engineering",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "Spacecraft physics, rocket trajectory, control, mission math and target-orbit studies",
   "license": "MIT",
   "type": "module",
@@ -29,8 +29,27 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunchsdk/core": "^1.22.0",
-    "@openlaunchsdk/orbit": "^1.22.0",
-    "@openlaunchsdk/math": "^1.22.0"
+    "@openlaunchsdk/core": "^1.22.1",
+    "@openlaunchsdk/orbit": "^1.22.1",
+    "@openlaunchsdk/math": "^1.22.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobyldav/openlaunch-sdk.git",
+    "directory": "packages/engineering"
+  },
+  "homepage": "https://github.com/kobyldav/openlaunch-sdk/tree/main/packages/engineering#readme",
+  "bugs": {
+    "url": "https://github.com/kobyldav/openlaunch-sdk/issues"
+  },
+  "keywords": [
+    "rocket",
+    "trajectory",
+    "spacecraft",
+    "mission-planning",
+    "aerospace"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
