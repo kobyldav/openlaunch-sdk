@@ -74,7 +74,7 @@ test("Monolith remains backward-compatible and distinct from modular packages",a
   assert.equal(typeof whole.readCogWindowUrl,"function");
   const pkg=JSON.parse(await readFile(path.join(root,"package.json"),"utf8"));
   assert.deepEqual(pkg.workspaces,["packages/*"]);
-  assert.equal(pkg.version,"1.22.0");
+  assert.equal(pkg.version,JSON.parse(await readFile(path.join(root,"package-lock.json"),"utf8")).version);
 });
 test("Package build-report shows isolated module sizes",async()=>{
   const report=JSON.parse(await readFile(path.join(root,"packages/build-report.json"),"utf8"));
@@ -107,7 +107,8 @@ test("Small standalone facades support one-line Earth and launch data clients",a
 
 test("Engineering re-exports math without bundling math implementations",async()=>{
  const e=JSON.parse(await readFile(path.join(root,"packages/engineering/package.json"),"utf8"));
- assert.equal(e.dependencies["@openlaunchsdk/math"],"^1.22.0");
+ const release=JSON.parse(await readFile(path.join(root,"package.json"),"utf8")).version;
+ assert.equal(e.dependencies["@openlaunchsdk/math"],"^"+release);
  const index=await readFile(path.join(root,"packages/engineering/dist/esm/science/index.js"),"utf8");
  assert.match(index,/@openlaunchsdk\/math\/internal\/science\/matrix/);
  const m=await import("@openlaunchsdk/math");
