@@ -19,7 +19,10 @@ export async function boundedProviderGet(url:string,options:BoundedHttpOptions={
   const timeout=setTimeout(()=>controller.abort(),timeoutMs);
   try {
     const response=await fetchImpl(target.toString(),{
-      method:"GET",redirect:"error",signal:controller.signal,...(options.headers?{headers:options.headers}:{}),
+      // Workers rejects redirect:"error" before issuing a subrequest.
+      // "manual" is supported by Workers and Node. Treat every non-2xx,
+      // including 3xx, as a provider error; never follow URLs with credentials.
+      method:"GET",redirect:"manual",signal:controller.signal,...(options.headers?{headers:options.headers}:{}),
     });
     if(!response.ok)throw new Error("Provider HTTP "+response.status);
     const length=response.headers.get("content-length");
