@@ -1,6 +1,6 @@
 {
   "name": "@openlaunchsdk/math",
-  "version": "1.22.0",
+  "version": "1.22.1",
   "description": "Independent vectors, matrices, quaternions, numerics, statistics, units and control math",
   "license": "MIT",
   "type": "module",
@@ -29,6 +29,26 @@
     "node": ">=18"
   },
   "dependencies": {
-    "@openlaunchsdk/core": "^1.22.0"
+    "@openlaunchsdk/core": "^1.22.1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kobyldav/openlaunch-sdk.git",
+    "directory": "packages/math"
+  },
+  "homepage": "https://github.com/kobyldav/openlaunch-sdk/tree/main/packages/math#readme",
+  "bugs": {
+    "url": "https://github.com/kobyldav/openlaunch-sdk/issues"
+  },
+  "keywords": [
+    "math",
+    "vector",
+    "matrix",
+    "quaternion",
+    "kalman-filter",
+    "numerics"
+  ],
+  "publishConfig": {
+    "access": "public"
   }
 }
