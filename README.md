@@ -1,5 +1,7 @@
 # OpenLaunch SDK
 
+[![XERJ Corpus Hub contributor](https://hub.xerj.org/contributors/kobyldav/badge.svg)](https://hub.xerj.org/contributors/kobyldav)
+
 **Open-source TypeScript SDK for spaceflight data, Earth observation, GeoTIFF/COG raster processing, satellite orbits and engineering simulations.**
 
 OpenLaunch **v1.22.1** is a TypeScript SDK comprising seven independent npm modules and the backward-compatible `openlaunch-sdk` umbrella package. Install only the capabilities your application needs.
