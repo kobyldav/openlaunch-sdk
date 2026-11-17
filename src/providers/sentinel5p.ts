@@ -18,6 +18,8 @@ export interface S5pRasterRequest{
   from:Date|string;
   to:Date|string;
   species:S5pSpecies;
+  /** Optional EPSG:3857 area for precisely aligned web map rasters. */
+  webMercatorBounds?:readonly [number,number,number,number];
   width?:number;height?:number;
   minQa?:number;
   timeliness?:"NRTI"|"OFFL"|"RPRO";
@@ -72,6 +74,7 @@ export class Sentinel5pClient{
     const frame:ProcessedRaster=await this.copernicus.process({
       area:request.area,from,to, dataType:"sentinel-5p-l2",
       evalscript:s5pVisualScript(request.species),
+      ...(request.webMercatorBounds?{webMercatorBounds:request.webMercatorBounds}:{}),
       width,height,format:"image/png",mosaickingOrder:"mostRecent",
       ...(request.minQa!==undefined?{minQa:request.minQa}:{}),
       ...(request.timeliness?{timeliness:request.timeliness}:{}),
