@@ -51,3 +51,7 @@ The broad RPC validity range is not a terrain elevation estimate. The default de
 ### Local stereo recovery
 
 The optional `recoverMissing` pass revisits unmatched cells with smaller and larger patches, bounded by a robust neighborhood from the first-pass stereo heights. It requires new image correlation evidence and never inserts a neighbor height directly. The first-pass heights remain unchanged, and neither pass uses a DEM. `matchPass` records initial vs recovered stereo. The demo enables recovery by default; use `--no-recovery` for an A/B comparison. Quality view distinguishes recovered stereo (blue) from initial stereo (green) and interpolated points (orange). Large unsupported gaps remain visible. Recovery can introduce false matches, so the independent reference gate remains enabled for the bundled scene.
+
+## Source selection
+
+See [AERIAL_TERRAIN.md](AERIAL_TERRAIN.md) for switching satellite/aerial inputs and the Windows source selector. Real ASTER and synthetic perspective aerial examples are explicitly distinguished.

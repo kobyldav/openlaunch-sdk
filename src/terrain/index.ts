@@ -2,9 +2,11 @@ export * from "./camera.js";
 export * from "./reconstruct.js";
 export * from "./aster.js";
 import {reconstructTerrain,validateTerrainHeights,validateTerrainGeodetic} from "./reconstruct.js";
+import {reconstructTerrainFromSource} from "./source.js";
 import {discoverAsterStereo} from "./aster.js";
 export class TerrainReconstructionEngine {
   reconstruct = reconstructTerrain;
+  reconstructFromSource = reconstructTerrainFromSource;
   validate = validateTerrainHeights;
   validateGeodetic = validateTerrainGeodetic;
   discoverAster = discoverAsterStereo;
@@ -12,3 +14,4 @@ export class TerrainReconstructionEngine {
 export * from "./rpc-input.js";
 export * from "./quality.js";
 export * from "./pilot.js";
+export * from "./source.js";

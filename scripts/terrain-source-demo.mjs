@@ -1,0 +1,17 @@
+import {spawnSync} from "node:child_process";
+import {mkdir,writeFile,stat} from "node:fs/promises";
+import {resolve,join} from "node:path";
+const args=process.argv.slice(2),i=args.indexOf("--source"),source=i<0?"both":args[i+1];
+if(!["satellite","aerial","both"].includes(source))throw Error("--source satellite|aerial|both");
+const extra=args.filter((_,j)=>i<0||j!==i&&j!==i+1);
+if(extra.includes("--out"))throw Error("Source launcher manages output folders; use individual scripts for --out");
+if(source==="both"&&extra.length)throw Error("Additional arguments require one selected source");
+const root=resolve("test-results");await mkdir(root,{recursive:true});
+const run=(script,dir,opts)=>{const r=spawnSync(process.execPath,[script,"--out",join(root,dir),...opts],{stdio:"inherit"});if(r.error)throw r.error;return r.status??1;};
+const status=[];
+if(source!=="aerial")status.push(run("scripts/terrain-real-demo.mjs","terrain-satellite",source==="both"?["--size","32"]:extra));
+if(source!=="satellite")status.push(run("scripts/terrain-aerial-demo.mjs","terrain-aerial",extra));
+const exists=async p=>!!(await stat(join(root,p)).catch(()=>null));
+const cards=await Promise.all([["Satellite","terrain-satellite","Actual ASTER stereo imagery"],["Aerial","terrain-aerial","Synthetic unless you supplied a calibrated aerial manifest"]].map(async([name,dir,info])=>'<section><h2>'+name+'</h2><p>'+info+'</p>'+(await exists(dir+"/terrain.html")?'<a href="'+dir+'/terrain.html">Open 3D reconstruction</a>':'<p>Not generated yet</p>')+'</section>'));
+await writeFile(join(root,"terrain-sources.html"),'<!doctype html><meta charset="utf-8"><title>OpenLaunch terrain sources</title><style>body{font:16px system-ui;background:#111b27;color:#f1f6fa;margin:40px}section{padding:24px;margin:16px 0;background:#1c2c3c;border-radius:12px}a{color:#87bfff}</style><h1>OpenLaunch | Choose geometry source</h1><p>Both modes use the same local stereo engine. Different scenes are not the same geographical area.</p>'+cards.join(""));
+console.log("Source selector: "+join(root,"terrain-sources.html"));if(status.some(x=>x!==0))process.exitCode=1;

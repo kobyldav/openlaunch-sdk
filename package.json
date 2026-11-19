@@ -194,7 +194,9 @@
     "api:audit": "npm run build && node scripts/api-surface-audit.mjs",
     "check:release-metadata": "node scripts/check-release-metadata.mjs",
     "example:terrain": "npm run build && node scripts/terrain-windows-demo.mjs",
-    "example:terrain-real": "npm run build && node scripts/terrain-real-demo.mjs"
+    "example:terrain-real": "npm run build && node scripts/terrain-real-demo.mjs",
+    "example:terrain-source": "npm run build && node scripts/terrain-source-demo.mjs",
+    "example:terrain-aerial": "npm run build && node scripts/terrain-aerial-demo.mjs"
   },
   "engines": {
     "node": ">=18"
