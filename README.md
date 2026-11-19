@@ -599,3 +599,7 @@ Generated `dist/`, `dist-cjs/` and `packages/*/dist/` outputs are build artifact
 The live Earth source-provider extension is documented in [docs/LIVE_EARTH_V1_2.md](docs/LIVE_EARTH_V1_2.md).\n\n## License and contribution
 
 **MIT** — see [LICENSE](LICENSE). Issues and pull requests are welcome. Keep tests green on the supported Node versions, avoid breaking legacy `openlaunch-sdk` imports and clearly label simulated vs provider-observed data. The `@openlaunch` npm scope must be verified and intentionally published before independent consumers can install these packages from the registry.
+
+### Experimental terrain reconstruction (feature branch)
+
+Locally reconstruct WGS84 ellipsoidal surface heights from calibrated stereo or multi-view images, not from an existing DEM. See [terrain reconstruction](docs/TERRAIN_RECONSTRUCTION.md) for input contracts, limits and validation status. ASTER catalog discovery is available; native HDF-EOS calibration ingestion is not yet implemented.

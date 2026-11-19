@@ -1,3 +1,4 @@
+import { TerrainReconstructionEngine } from "./terrain/index.js";
 import { MemoryCache, type CacheAdapter } from "./cache.js";
 import { HttpClient, type HttpTelemetryEvent } from "./http.js";
 import type { Query, ThrottleStatus } from "./types.js";
@@ -46,6 +47,7 @@ export interface OpenLaunchOptions {
 }
 
 export class OpenLaunch {
+  readonly terrain = new TerrainReconstructionEngine();
   readonly launches: LaunchesResource;
   readonly rockets: RocketsResource;
   readonly agencies: AgenciesResource;

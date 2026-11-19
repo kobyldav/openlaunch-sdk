@@ -11,3 +11,4 @@ export * from "./aoi-quality.js";
 export * from "./utm.js";
 export * from "./tiff-lzw.js";
 export * from "./jp2.js";
+export * from "../terrain/index.js";

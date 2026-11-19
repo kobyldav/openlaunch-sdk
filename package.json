@@ -126,6 +126,11 @@
       "types": "./dist/mission/index.d.ts",
       "import": "./dist/mission/index.js",
       "require": "./dist-cjs/mission/index.js"
+    },
+    "./terrain": {
+      "types": "./dist/terrain/index.d.ts",
+      "import": "./dist/terrain/index.js",
+      "require": "./dist-cjs/terrain/index.js"
     }
   },
   "files": [
