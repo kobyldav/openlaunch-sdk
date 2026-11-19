@@ -20,7 +20,7 @@ const BYTE_SIZE:Readonly<Record<number,number>>={
  * Supports uncompressed, TIFF LZW or zlib Deflate tiles/strips, horizontal predictor,
  * 8/16/32-bit integer and 32/64-bit IEEE float samples, EPSG:4326/3857/UTM WGS84.
  * Not a general TIFF library: JP2, JPEG, multi-band pixel-interleaving,
- * predictor 3 and arbitrary CRSs fail explicitly.
+ * arbitrary CRSs fail explicitly. Floating-point predictor 3 is supported by the full-file reader.
  *
  * Operates on bounded supplied bytes, not remote COG HTTP range requests.
  */
@@ -57,7 +57,8 @@ async function decodeSingleBandTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
   if(!([1,2].includes(sampleFormat)&&[8,16,32].includes(bps) || sampleFormat===3&&[32,64].includes(bps)))
     throw new RangeError("Unsupported SampleFormat / BitsPerSample");
   if(![1,5,8,32946].includes(compression))throw new RangeError("Unsupported TIFF compression (expected none/LZW/Deflate)");
-  if(predictor!==1 && predictor!==2)throw new RangeError("Unsupported TIFF predictor (only 1/2)");
+  if(![1,2,3].includes(predictor))throw new RangeError("Unsupported TIFF predictor (only 1/2/3)");
+  if(predictor===3&&sampleFormat!==3)throw new RangeError("Floating-point predictor requires IEEE float samples");
   if(predictor===2&&sampleFormat===3)throw new RangeError("Float predictor 2 unsupported: use a compatible integer GeoTIFF");
 
   const nodataText=tiff.ascii(42113);
@@ -97,6 +98,7 @@ async function decodeSingleBandTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
     if(raw.byteLength>expected)throw new RangeError("Decoded TIFF block size exceeds expected allocation");
     const buf=new Uint8Array(raw); // clone before applying predictor
     if(predictor===2)undoHorizontalPredictor(buf,blockWidth,physicalHeight,bps,tiff.littleEndian);
+    if(predictor===3)undoFloatPredictor(buf,blockWidth,physicalHeight,bps,tiff.littleEndian);
     const dv=new DataView(buf.buffer,buf.byteOffset,buf.byteLength);
     for(let row=0;row<usedHeight;row++)for(let col=0;col<Math.min(blockWidth,width-blockCol*blockWidth);col++){
       const offset=(row*blockWidth+col)*bytesPerSample;
@@ -270,5 +272,18 @@ export class TiffDirectory {
     const def=this.tags.get(tag);if(!def)return undefined;
     if(def.type!==2)throw new RangeError("Invalid TIFF ASCII type");
     return new TextDecoder("ascii").decode(this.bytes.subarray(def.dataOffset,def.dataOffset+def.count)).replace(/\0+$/,"");
+  }
+}
+
+/** TIFF floating-point predictor 3: undo byte differences, then unshuffle MSB-first planes.
+ * Single-band IEEE 32/64-bit only; reconstruct bytes in the declared TIFF byte order. */
+export function undoFloatPredictor(bytes:Uint8Array,width:number,height:number,bits:number,little:boolean):void {
+  if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||![32,64].includes(bits)||bytes.length!==width*height*(bits/8))throw new RangeError("Invalid floating-point predictor block");
+  const bps=bits/8,stride=width*bps,planes=new Uint8Array(stride);
+  for(let y=0;y<height;y++){
+    const start=y*stride;
+    planes[0]=bytes[start]!;
+    for(let j=1;j<stride;j++)planes[j]=(planes[j-1]!+bytes[start+j]!)&255;
+    for(let x=0;x<width;x++)for(let b=0;b<bps;b++)bytes[start+x*bps+b]=planes[(little?bps-1-b:b)*width+x]!;
   }
 }

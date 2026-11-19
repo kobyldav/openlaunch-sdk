@@ -15,3 +15,15 @@ test("quality pass removes isolated spikes without mutating raw data; interpolat
  const values=new Float64Array(25).fill(100);values[12]=900;const grid={width:5,height:5,crs:"EPSG:4326",transform:[14,.001,0,50,0,-.001],values};
  const r=refineTerrainSurface(grid,{outlierM:30,fillRadius:1});assert.equal(r.rejected,1);assert.equal(r.filled,1);assert.equal(r.flags[12],3);assert.equal(r.grid.values[12],100);assert.equal(values[12],900);
 });
+
+test("floating point TIFF predictor 3 restores byte planes and differences",async()=>{
+ const {undoFloatPredictor}=await import("../dist/eo/geotiff.js");
+ for(const bits of [32,64])for(const little of [true,false]){
+  const n=bits/8,raw=new Uint8Array(6*n),v=new DataView(raw.buffer);
+  const samples=[1.25,-3.5,42.125,0,9.75,-100];
+  samples.forEach((x,i)=>bits===32?v.setFloat32(i*n,x,little):v.setFloat64(i*n,x,little));
+  const enc=new Uint8Array(raw.length),w=3;
+  for(let y=0;y<2;y++){const start=y*w*n;for(let b=0;b<n;b++)for(let x=0;x<w;x++)enc[start+b*w+x]=raw[start+x*n+(little?n-1-b:b)];for(let j=w*n-1;j>0;j--)enc[start+j]=(enc[start+j]-enc[start+j-1])&255;}
+  undoFloatPredictor(enc,w,2,bits,little);assert.deepEqual(enc,raw);
+ }
+});
