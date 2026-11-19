@@ -7,7 +7,8 @@ import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
 const args=process.argv.slice(2),root=resolve("test-results/terrain-benchmark");
 const mode=args.includes("--offline")?"offline":args.includes("--real-only")?"real":"all";
 const requested=args.includes("--case")?args[args.indexOf("--case")+1]:null;
-const manifest=args.includes("--aerial-manifest")?args[args.indexOf("--aerial-manifest")+1]:null;
+const manifests=args.flatMap((v,i)=>v==="--aerial-manifest"?[args[i+1]]:[]);
+if(manifests.some(v=>!v||v.startsWith("--")))throw Error("Missing --aerial-manifest path");
 if(requested&&!sceneIds.includes(requested)&&!["aster-baseline","aster-detail","aster-north","aster-east","s2p-pair","s2p-triplet","real-aerial"].includes(requested))throw Error("Unknown benchmark case");
 await mkdir(root,{recursive:true});
 const rows=[];
@@ -15,7 +16,7 @@ const escape=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").rep
 const pct=v=>Number.isFinite(v)?(100*v).toFixed(1)+"%":"—";
 const num=v=>Number.isFinite(v)?v.toFixed(2):"—";
 function record(id,kind,report,status,note){
- rows.push({id,kind,status,coverage:report?.coverage??null,filteredCoverage:report?.filteredCoverage??null,rmseM:report?.validation?.rmseM??report?.reference?.centeredRmseM??null,metric:report?.validation?"absolute synthetic / supplied checkpoints":report?.reference?"centered external comparison":null,elapsedMs:report?.elapsedMs??null,reference:report?.reference??null,report:report??null,note});
+ rows.push({id,kind,status,coverage:report?.coverage??null,filteredCoverage:report?.filteredCoverage??null,rmseM:report?.validation?.rmseM??report?.reference?.centeredRmseM??null,metric:report?.validation?(report.synthetic?"synthetic absolute error":"supplied checkpoint absolute error"):report?.reference?(id.startsWith("s2p")?"centered S2P comparison (not ground truth)":"centered external HGT comparison"):null,elapsedMs:report?.elapsedMs??null,reference:report?.reference??null,report:report??null,note});
 }
 const allowed=id=>!requested||requested===id;
 async function synthetic(id){
@@ -56,7 +57,7 @@ async function child(id,kind,script,opts){
  await rm(join(out,"terrain.html"),{force:true});
  const r=spawnSync(process.execPath,[script,"--out",out,...opts],{stdio:"inherit",timeout:300000});
  const report=await readFile(join(out,"report.json"),"utf8").then(JSON.parse).catch(()=>null);
- record(id,kind,report,r.status===0&&report?"PASS":"FAIL",r.error?.message??(r.status===0?"Completed; see metric type":"Exit "+r.status+"; inspect logs"));
+ record(id,kind,report,r.status===0&&report?(kind.startsWith("real aerial")&&!report.validation?"UNVALIDATED":"PASS"):"FAIL",r.error?.message??(r.status===0?"Completed; see metric type":"Exit "+r.status+"; inspect logs"));
 }
 const cache=join(root,"cache");
 if(mode!=="real")for(const id of sceneIds)if(allowed(id)){try{await synthetic(id);}catch(e){record(id,"synthetic aerial",null,"FAIL",String(e));}}
@@ -67,7 +68,7 @@ if(mode!=="offline"){
  }
  for(const id of ["s2p-pair","s2p-triplet"])if(allowed(id))await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id]);
  if(allowed("real-aerial")){
-  if(manifest)await child("real-aerial","real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--manifest",resolve(manifest)]);
+  if(manifests.length){for(let i=0;i<manifests.length;i++)await child(i===0?"real-aerial":"real-aerial-"+(i+1),"real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--manifest",resolve(manifests[i])]);}
   else record("real-aerial","real aerial",null,"NOT RUN","Supply --aerial-manifest with calibrated images. ISPRS Avenches / Höngg not automatically ingested.");
  }
 }
@@ -76,7 +77,7 @@ await writeFile(join(root,"summary.json"),JSON.stringify({mode,cases:rows},null,
 const table=["case,kind,status,coverage,filteredCoverage,rmseM,metric,elapsedMs,note",...rows.map(r=>[r.id,r.kind,r.status,r.coverage,r.filteredCoverage,r.rmseM,r.metric,r.elapsedMs,r.note].map(v=>'"'+String(v??"").replaceAll('"','""')+'"').join(","))];
 await writeFile(join(root,"summary.csv"),table.join("\n")+"\n");
 const trs=await Promise.all(rows.map(async r=>{const has=await stat(join(root,r.id,"terrain.html")).then(()=>true).catch(()=>false);return "<tr><td>"+escape(r.id)+"</td><td>"+escape(r.kind)+"</td><td class='"+r.status.toLowerCase().replaceAll(" ","-")+"'>"+r.status+"</td><td>"+pct(r.coverage)+"</td><td>"+pct(r.filteredCoverage)+"</td><td>"+num(r.rmseM)+"</td><td>"+escape(r.metric)+"</td><td>"+num(r.elapsedMs===null?null:r.elapsedMs/1000)+"</td><td>"+(has?'<a href="'+r.id+'/terrain.html">3D model</a> · ':'')+escape(r.note)+"</td></tr>";}));
-await writeFile(join(root,"index.html"),'<!doctype html><meta charset="utf-8"><title>OpenLaunch terrain benchmark</title><style>body{background:#101a25;color:#e7edf3;font:15px system-ui;margin:24px}table{border-collapse:collapse;width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #334354}a{color:#84bfff}.pass{color:#73d8a9}.fail{color:#ff9a89}.not-run{color:#e9c582}</style><h1>OpenLaunch | Terrain benchmark</h1><p>Real and synthetic scenes are separate. Coverage is not accuracy. Failed cases are shown, not silently replaced. A centered reference comparison is not absolute elevation accuracy.</p><p><a href="summary.json">JSON</a> · <a href="summary.csv">CSV</a></p><table><thead><tr><th>Case</th><th>Input</th><th>Result</th><th>Matched</th><th>Filtered</th><th>RMSE (m)</th><th>Metric</th><th>Seconds</th><th>Details</th></tr></thead><tbody>'+trs.join("")+'</tbody></table>');
+await writeFile(join(root,"index.html"),'<!doctype html><meta charset="utf-8"><title>OpenLaunch terrain benchmark</title><style>body{background:#101a25;color:#e7edf3;font:15px system-ui;margin:24px}table{border-collapse:collapse;width:100%}td,th{padding:12px;text-align:left;border-bottom:1px solid #334354}a{color:#84bfff}.pass{color:#73d8a9}.fail{color:#ff9a89}.not-run,.unvalidated{color:#e9c582}</style><h1>OpenLaunch | Terrain benchmark</h1><p>Real and synthetic scenes are separate. Coverage is not accuracy. Failed cases are shown, not silently replaced. A centered reference comparison is not absolute elevation accuracy.</p><p><a href="summary.json">JSON</a> · <a href="summary.csv">CSV</a></p><table><thead><tr><th>Case</th><th>Input</th><th>Result</th><th>Matched</th><th>Filtered</th><th>RMSE (m)</th><th>Metric</th><th>Seconds</th><th>Details</th></tr></thead><tbody>'+trs.join("")+'</tbody></table>');
 console.table(rows.map(r=>({case:r.id,status:r.status,coverage:pct(r.coverage),rmse:num(r.rmseM),seconds:num(r.elapsedMs===null?null:r.elapsedMs/1000)})));
 console.log("Benchmark dashboard: "+join(root,"index.html"));
 if(rows.some(r=>r.status==="FAIL"))process.exitCode=1;

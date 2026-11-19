@@ -8,7 +8,7 @@ const args=process.argv.slice(2),opt=name=>{const i=args.indexOf("--"+name);if(i
 const out=resolve(opt("out")??"test-results/terrain-aerial");
 await mkdir(out,{recursive:true});
 const manifestPath=opt("manifest");
-let grid,source,minHeightM,maxHeightM,heightStepM,resolutionM,reference,description;
+let grid,source,minHeightM,maxHeightM,heightStepM,resolutionM,reference,description,referencePath;
 if(manifestPath){
  const path=resolve(manifestPath),m=JSON.parse(await readFile(path,"utf8"));
  if(m.version!==1||m.sourceKind!=="aerial"||m.verticalDatum!=="WGS84 ellipsoid"||!Array.isArray(m.images)||m.images.length<2||m.images.length>8)throw Error("Invalid aerial manifest; see documentation");
@@ -22,6 +22,7 @@ if(manifestPath){
    return {...raw,source:im.source,calibration:im.calibration};
  }));
  source={kind:"aerial",images};description="User-supplied calibrated aerial photographs";
+ if(m.referenceCheckpoints){if(typeof m.referenceCheckpoints!=="string")throw Error("Invalid reference path");referencePath=resolve(dirname(path),m.referenceCheckpoints);}
 }else{
  // Simulated perspective cameras over an independently rendered relief.
  // Only intensities and calibration go into the reconstruction.
@@ -51,8 +52,14 @@ const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,hei
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(2,resolutionM*4),fillRadius:1});
 const vals=Array.from(refined.grid.values).filter(Number.isFinite).sort((a,b)=>a-b);
 const [gx,gy]=pixelToWorld(grid.transform,grid.width/2,grid.height/2),[lon,lat]=gridCrsToLonLat(gx,gy,grid.crs);
+// The independent reference file is read only AFTER all image-based heights are computed.
+if(referencePath){
+ const check=JSON.parse(await readFile(referencePath,"utf8"));
+ if(check.verticalDatum!=="WGS84 ellipsoid"||!Array.isArray(check.points)||check.points.length<10||check.points.some(p=>!Number.isFinite(p.col)||!Number.isFinite(p.row)||!Number.isFinite(p.heightM)))throw Error("Invalid independent checkpoints");
+ reference=check.points;
+}
 const validation=reference?validateTerrainHeights(result.elevationMap,reference):null;
-const report={sourceKind:"aerial",synthetic:!manifestPath,source:description,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,initialMatches:result.validPixels-result.recoveredPixels,heightRangeM:vals.length?[vals[0],vals.at(-1)]:null,validation,elapsedMs:Date.now()-started,accuracy:reference?"synthetic validation only":"not independently validated"};
+const report={sourceKind:"aerial",synthetic:!manifestPath,source:description,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,initialMatches:result.validPixels-result.recoveredPixels,heightRangeM:vals.length?[vals[0],vals.at(-1)]:null,validation,elapsedMs:Date.now()-started,accuracy:manifestPath?(reference?"supplied independent checkpoint comparison":"not independently validated"):"synthetic validation only"};
 await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));
 await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));
 const csv=["lon,lat,raw_height_m,refined_height_m,confidence,quality_flag,match_pass"];
@@ -60,4 +67,4 @@ for(let i=0;i<result.totalPixels;i++){const [x,y]=pixelToWorld(grid.transform,i%
 await writeFile(join(out,"heights.csv"),csv.join("\n")+"\n");
 await writeRealTerrainViewer(out,{result,refined,report});
 console.log(JSON.stringify(report,null,2));console.log("Open "+join(out,"terrain.html"));
-if(report.coverage<.3||(validation&&(validation.rmseM===null||validation.rmseM>3||report.coverage<.65)))throw Error("Aerial reconstruction quality gate failed");
+if(report.coverage<.3||(!manifestPath&&validation&&(validation.rmseM===null||validation.rmseM>3||report.coverage<.65))||(referencePath&&(!validation||validation.count<10||validation.rmseM===null||validation.rmseM>3||report.coverage<.65)))throw Error("Aerial reconstruction quality gate failed");
