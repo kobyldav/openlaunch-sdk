@@ -1759,6 +1759,19 @@
       ],
       "network": false,
       "description": "Offline deterministic provider contract example with assertions; intentionally does not verify live acquisitions."
+    },
+    {
+      "path": "21-terrain/01-stereo-height.ts",
+      "title": "Local stereo terrain reconstruction",
+      "category": "terrain",
+      "symbols": [
+        "createTerrainRpcCamera",
+        "reconstructTerrain",
+        "validateTerrainHeights",
+        "terrainPointCloudPly"
+      ],
+      "network": false,
+      "description": "Reconstruct synthetic 140 m ellipsoidal terrain from two calibrated images without any external DEM."
     }
   ]
 }

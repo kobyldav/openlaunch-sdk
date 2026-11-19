@@ -1,5 +1,5 @@
-import { gridCrsToLonLat,pixelToWorld,validateRaster,type RasterGrid } from "../eo/raster.js";
-import { geodeticToEcef } from "../science/geodesy.js";
+import { gridCrsToLonLat,pixelToWorld,validateRaster,lonLatToGridCrs,worldToPixel,type RasterGrid } from "../eo/raster.js";
+import { geodeticToEcef } from "../geo/ellipsoid.js";
 import type { TerrainCamera,TerrainPixel } from "./camera.js";
 
 export interface TerrainImage {width:number;height:number;values:ArrayLike<number>;source:string;camera:TerrainCamera;}
@@ -100,4 +100,22 @@ export function validateTerrainHeights(dem:RasterGrid,points:readonly {col:numbe
   validateRaster(dem);let count=0,sum=0,sq=0,abs=0;
   for(const p of points){const x=Math.round(p.col),y=Math.round(p.row);if(!Number.isFinite(p.heightM)||!Number.isFinite(x)||!Number.isFinite(y)||x<0||y<0||x>=dem.width||y>=dem.height)continue;const e=dem.values[y*dem.width+x]!-p.heightM;if(!Number.isFinite(e))continue;count++;sum+=e;sq+=e*e;abs+=Math.abs(e);}
   return {count,ignored:points.length-count,biasM:count?sum/count:null,rmseM:count?Math.sqrt(sq/count):null,maeM:count?abs/count:null};
+}
+
+/** Independent geodetic checkpoints, e.g. ICESat-2 samples converted to WGS84 ellipsoidal heights. */
+export function validateTerrainGeodetic(dem:RasterGrid,points:readonly {longitudeDeg:number;latitudeDeg:number;heightM:number}[]){
+  const pixels=points.map(p=>{
+    try{const [x,y]=lonLatToGridCrs(p.longitudeDeg,p.latitudeDeg,dem.crs);
+      const [col,row]=worldToPixel(dem.transform,x,y);return {col:col-0.5,row:row-0.5,heightM:p.heightM};}
+    catch{return {col:NaN,row:NaN,heightM:p.heightM};}
+  });
+  return validateTerrainHeights(dem,pixels);
+}
+/** ASCII PLY point cloud with double-precision ECEF coordinates (metres). */
+export function terrainPointCloudPly(result:TerrainReconstruction):string {
+  const {positionsEcefM,confidence}=result.pointCloud;
+  if(positionsEcefM.length!==3*confidence.length||confidence.length>500_000)throw new RangeError("Invalid point cloud");
+  const lines=["ply","format ascii 1.0","comment WGS84 ECEF metres","element vertex "+confidence.length,"property double x","property double y","property double z","property float confidence","end_header"];
+  for(let i=0;i<confidence.length;i++)lines.push([positionsEcefM[3*i],positionsEcefM[3*i+1],positionsEcefM[3*i+2],confidence[i]].join(" "));
+  return lines.join("\n")+"\n";
 }

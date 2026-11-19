@@ -3,19 +3,9 @@ import { add3, rotateZ3, sub3, type Vec3 } from "./vector.js";
 import { gmstRadians } from "./time.js";
 import { toDegrees, toRadians } from "./units.js";
 
-export const WGS84 = Object.freeze({ a: 6_378_137, f: 1 / 298.257223563, b: 6_356_752.314245, e2: 6.69437999014e-3 });
-export interface GeodeticPosition { latitudeDeg: number; longitudeDeg: number; altitudeM: number; }
+import { WGS84, geodeticToEcef, type GeodeticPosition } from "../geo/ellipsoid.js";
+export { WGS84, geodeticToEcef, type GeodeticPosition };
 export interface LookAngles { azimuthDeg: number; elevationDeg: number; rangeM: number; }
-
-export function geodeticToEcef(position: GeodeticPosition): Vec3 {
-  const lat = toRadians(position.latitudeDeg), lon = toRadians(position.longitudeDeg);
-  const sinLat = Math.sin(lat), cosLat = Math.cos(lat);
-  const n = WGS84.a / Math.sqrt(1 - WGS84.e2 * sinLat * sinLat);
-  const x = (n + position.altitudeM) * cosLat * Math.cos(lon);
-  const y = (n + position.altitudeM) * cosLat * Math.sin(lon);
-  const z = (n * (1 - WGS84.e2) + position.altitudeM) * sinLat;
-  return [x, y, z];
-}
 
 export function ecefToGeodetic(ecef: Vec3): GeodeticPosition {
   const [x, y, z] = ecef;

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {reconstructTerrain,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
+import {reconstructTerrain,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,validateTerrainGeodetic,terrainPointCloudPly,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
 const poly=(...pairs)=>{const a=Array(20).fill(0);for(const [i,v] of pairs)a[i]=v;return a;};
 const rpc=(shift)=>createTerrainRpcCamera({
  longitudeOffset:14,latitudeOffset:50,heightOffset:100,longitudeScale:.01,latitudeScale:.01,heightScale:100,
@@ -19,6 +19,8 @@ test("RPC00B order, calibrated stereo recovers known 140 m surface without DEM",
  assert.equal(r.pointCloud.positionsEcefM.length,r.validPixels*3);
  assert.ok(r.mesh.triangles.length>0);assert.equal(r.verticalDatum,"WGS84 ellipsoid");
  const q=validateTerrainHeights(r.elevationMap,[{col:2,row:2,heightM:140}]);assert.equal(q.count,1);assert.ok(q.rmseM<4);
+ const geo=validateTerrainGeodetic(r.elevationMap,[{longitudeDeg:14.000125,latitudeDeg:50.000125,heightM:140}]);assert.equal(geo.count,1);assert.ok(geo.rmseM<4);
+ assert.match(terrainPointCloudPly(r),/comment WGS84 ECEF metres/);
 });
 test("ambiguous, flat or identical geometry does not invent heights",()=>{
  for(const images of [[image(0,"a",true),image(1,"b",true)],[image(0,"a"),image(0,"b")]]){

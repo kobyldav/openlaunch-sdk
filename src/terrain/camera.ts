@@ -1,5 +1,5 @@
-import { geodeticToEcef } from "../science/geodesy.js";
-import type { Vec3 } from "../science/vector.js";
+import { geodeticToEcef } from "../geo/ellipsoid.js";
+type Vec3 = readonly [number,number,number];
 
 export type TerrainGroundPoint = {longitudeDeg:number; latitudeDeg:number; heightM:number};
 export type TerrainPixel = {x:number;y:number};

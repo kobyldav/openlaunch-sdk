@@ -11,7 +11,7 @@ const require=createRequire(import.meta.url);
 const publicFunctions={
  core:["HttpClient","MemoryCache","query"],
  earth:["EarthCatalogClient","SpaceMapClient","NasaGibsClient","MeteosatClient","MeteosatImageCache","MeteosatCloudflareKvStore","NasaFirmsClient","Sentinel5pClient","SpaceVideoClient","StacClient","CopernicusClient","PlanetaryComputerClient","ObservationDiscoveryClient","bbox"],
- raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","ndwiRaster","ndmiRaster","nbrRaster","calibrateRasterFromStac","elevationToLocalMesh"],
+ raster:["decodeGeoTiff","readCogWindowUrl","ndviRaster","ndwiRaster","ndmiRaster","nbrRaster","calibrateRasterFromStac","elevationToLocalMesh","reconstructTerrain","createTerrainRpcCamera"],
  launches:["LaunchDataClient","LaunchesResource","NasaClient","LL2_PRODUCTION_BASE_URL"],
  orbit:["Sgp4Satellite","OrbitEngine","TrafficEngine"],
  math:["vec3","matrixMul","quatNormalize","LinearKalmanFilter"],

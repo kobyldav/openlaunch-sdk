@@ -31,3 +31,5 @@ ASTER catalog: `space.terrain.discoverAster({bounds:[14,49,15,50],from:new Date(
 ## Limits and next validation
 
 CPU height sweep is intentionally bounded; tile large AOIs. Local planar patch assumption can fail on steep slopes, water, vegetation motion, shadows, clouds and occlusion. RPC normalization is bounded and pushbroom assumes monotonic projection. Multi-view currently averages correlations against the first image, not robust bundle adjustment. Mesh is ECEF-relative, not ENU; retain origin for positioning. No automatic cloud classification, bare-earth filtering, texture UV atlas, native HDF reader, WebGPU, InSAR or LiDAR inversion. Use a real calibrated stereo pair and compare with independently surveyed/ICESat-2 checkpoints in the same datum before making accuracy claims. Synthetic tests exercise geometry and recovery, not operational satellite accuracy. No new runtime dependency.
+
+Use `validateTerrainGeodetic` for lon/lat checkpoints and `terrainPointCloudPly` to export the ECEF point cloud (double precision). Run the offline synthetic example `examples/21-terrain/01-stereo-height.ts` after compiling examples; it requires no external data or key.
