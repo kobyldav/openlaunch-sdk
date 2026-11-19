@@ -23,7 +23,8 @@ if(local){
  if(!opt("left")||!opt("right"))throw Error("Both --left and --right are required");
  input=[["left",opt("left"),opt("left-xml")],["right",opt("right"),opt("right-xml")]];
 }else{
- const archive=join(out,"ASTER_example.tar");
+ const cache=resolve(opt("cache")??out);await mkdir(cache,{recursive:true});
+ const archive=join(cache,"ASTER_example.tar");
  const present=await stat(archive).catch(()=>null);
  if(!present||present.size!==152197120){
    console.log("Downloading public ASTER stereo archive (152 MB). Only sensor TIFF and RPC XML are read, never reference DEM.");
@@ -39,7 +40,7 @@ if(local){
  const choose=band=>{const t=candidates.find(x=>new RegExp("(?:band)?3"+band+"(?:[_.-]|$)","i").test(basename(x)));if(!t)throw Error("ASTER band "+band+" not found. Image entries: "+candidates.join(", "));const stem=t.replace(/\.tiff?$/i,"");const xml=list.find(x=>x.toLowerCase()===(stem+".xml").toLowerCase());return [band,t,xml];};
  input=[choose("N"),choose("B")];
  const extract=(name)=>{if(!name||name.startsWith("-")||name.includes("\0"))throw Error("Invalid archive member");return execFileSync("tar",["-xOf",archive,"--",name],{maxBuffer:256*1024*1024});};
- for(const [id,tif,xml] of input){const p=join(out,id+".tif"),q=xml?join(out,id+".xml"):undefined;await writeFile(p,extract(tif));if(q)await writeFile(q,extract(xml));input[input.findIndex(a=>a[0]===id)]=[id,p,q];}
+ for(const [id,tif,xml] of input){const p=join(cache,id+".tif"),q=xml?join(cache,id+".xml"):undefined;await writeFile(p,extract(tif));if(q)await writeFile(q,extract(xml));input[input.findIndex(a=>a[0]===id)]=[id,p,q];}
 }
 const data=await Promise.all(input.map(async([id,tif,xml])=>loadTerrainRpcImage(await readFile(tif),id,{...(xml?{xml:await readFile(xml,"utf8")}:{ }),zeroIsNoData:!local})));
 const images=data.map(d=>d.image),rpcs=data.map(d=>d.rpc);

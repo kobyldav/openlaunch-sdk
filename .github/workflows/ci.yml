@@ -81,3 +81,26 @@ jobs:
             test-results/terrain-real/heights.csv
             test-results/terrain-real-detail/report.json
             test-results/terrain-real-detail/terrain.html
+
+  terrain-benchmark-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Run terrain test matrix (including expected rejection cases)
+        run: node scripts/terrain-benchmark.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain-benchmark
+          path: |
+            test-results/terrain-benchmark/index.html
+            test-results/terrain-benchmark/summary.*
+            test-results/terrain-benchmark/*/report.json
+            test-results/terrain-benchmark/*/terrain.html
