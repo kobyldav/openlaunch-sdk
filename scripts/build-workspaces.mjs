@@ -10,7 +10,7 @@
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
 import { posix as path } from "node:path";
 import { fileURLToPath } from "node:url";
-import { join } from "node:path";
+import { join, dirname } from "node:path";
 const root = fileURLToPath(new URL("../", import.meta.url));
 const rootPath = (...p) => join(root, ...p);
 const types = ["esm", "cjs", "types"];
@@ -112,7 +112,7 @@ async function build(pkg) {
         return full;
       });
       const outfile = distOutput(pkg,kind,mod);
-      await mkdir(path.dirname(outfile),{recursive:true});
+      await mkdir(dirname(outfile),{recursive:true});
       await writeFile(outfile,code);
       sum+=Buffer.byteLength(code);
     }

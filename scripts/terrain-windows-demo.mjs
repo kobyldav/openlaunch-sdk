@@ -44,7 +44,7 @@ await mkdir(out,{recursive:true});
 const obj=["# OpenLaunch synthetic terrain; local ENU metres; Y-up OBJ"];
 const ids=new Map();
 for(let i=0;i<vertices.length;i++){const v=vertices[i];if(v){ids.set(i,ids.size+1);obj.push("v "+[v[0],v[2],-v[1]].map(x=>x.toFixed(5)).join(" "));}}
-for(const f of faces)obj.push("f "+f.map(i=>ids.get(i)).join(" "));
+for(const f of faces)obj.push("f "+[f[0],f[2],f[1]].map(i=>ids.get(i)).join(" "));
 const csv=["longitude_deg,latitude_deg,reconstructed_height_m,confidence,synthetic_reference_height_m"];
 for(let i=0;i<result.totalPixels;i++){const p=checkpoints[i],v=result.elevationMap.values[i],q=result.confidenceMap.values[i];csv.push([grid.transform[0]+(p.col+.5)*step,grid.transform[3]+(p.row+.5)*step,Number.isFinite(v)?v:"",Number.isFinite(q)?q:"",p.heightM].join(","));}
 const pgm=im=>"P2\n"+im.width+" "+im.height+"\n255\n"+Array.from(im.values,v=>Math.max(0,Math.min(255,Math.round((v+2.6)/5.2*255)))).join(" ")+"\n";
