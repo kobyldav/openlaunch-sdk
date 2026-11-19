@@ -43,3 +43,11 @@ test("CMR discovery bounded, identifies input data only",async()=>{
  assert.deepEqual(results[0].links,["https://example.org/file.hdf"]);
  assert.equal(new TerrainReconstructionEngine().reconstruct,reconstructTerrain);
 });
+
+test("optional recovery preserves original matches and never fills untextured data",()=>{
+ const first=reconstructTerrain(opts),next=reconstructTerrain({...opts,recoverMissing:true});
+ for(let i=0;i<first.totalPixels;i++)if(Number.isFinite(first.elevationMap.values[i])){assert.equal(next.elevationMap.values[i],first.elevationMap.values[i]);assert.equal(next.matchPass[i],1);}
+ assert.equal(next.validPixels,first.validPixels+next.recoveredPixels);
+ const flat=reconstructTerrain({...opts,images:[image(0,"a",true),image(1,"b",true)],recoverMissing:true});
+ assert.equal(flat.validPixels,0);assert.equal(flat.recoveredPixels,0);
+});

@@ -64,6 +64,8 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run example:terrain-real -- --size 32
+      - name: Higher density stereo check (same 960 m area)
+        run: node scripts/terrain-real-demo.mjs --size 64 --resolution 15 --out test-results/terrain-real-detail
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -73,3 +75,5 @@ jobs:
             test-results/terrain-real/terrain.html
             test-results/terrain-real/terrain.obj
             test-results/terrain-real/heights.csv
+            test-results/terrain-real-detail/report.json
+            test-results/terrain-real-detail/terrain.html

@@ -64,10 +64,12 @@ if(!opt("min-height")&&!opt("max-height")){
  ({minHeightM,maxHeightM}=pilot);console.log("Image-only height pilot",pilot);
 }
 console.log("Reconstructing actual stereo images, no DEM", {lon,lat,size,res,minHeightM,maxHeightM,heightStepM});
-const result=reconstructTerrain({images,grid,minHeightM,maxHeightM,heightStepM,patchRadius:3,minCorrelation:.72,minPeakGap:.025,peakExclusionM:40,maxWork:250_000_000});
+const result=reconstructTerrain({images,grid,minHeightM,maxHeightM,heightStepM,patchRadius:3,minCorrelation:.72,minPeakGap:.025,peakExclusionM:40,recoverMissing:!args.includes("--no-recovery"),maxWork:250_000_000});
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(35,heightStepM*2),fillRadius:1});
 const report={synthetic:false,source:local?"user-supplied calibrated stereo":archiveUrl,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM:res,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,elapsedMs:Date.now()-started,accuracy:"not independently validated"};
 report.pilot=pilot;
+report.recoveredPixels=result.recoveredPixels;
+report.initialMatches=result.validPixels-result.recoveredPixels;
 const vals=Array.from(refined.grid.values).filter(Number.isFinite).sort((a,b)=>a-b);
 report.heightRangeM=vals.length?[vals[0],vals[vals.length-1]]:null;
 report.filteredCoverage=vals.length/result.totalPixels;
@@ -77,7 +79,7 @@ if(!local&&!args.includes("--no-reference")){
 }
 await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));
 await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));
-const csv=["lon,lat,raw_height_m,refined_height_m,confidence,quality_flag"];for(let i=0;i<result.totalPixels;i++){const fmt=v=>Number.isFinite(v)?v:"";csv.push([grid.transform[0]+(i%size+.5)*dx,grid.transform[3]-(Math.floor(i/size)+.5)*dy,fmt(result.elevationMap.values[i]),fmt(refined.grid.values[i]),fmt(result.confidenceMap.values[i]),refined.flags[i]].join(","));}
+const csv=["lon,lat,raw_height_m,refined_height_m,confidence,quality_flag,match_pass"];for(let i=0;i<result.totalPixels;i++){const fmt=v=>Number.isFinite(v)?v:"";csv.push([grid.transform[0]+(i%size+.5)*dx,grid.transform[3]-(Math.floor(i/size)+.5)*dy,fmt(result.elevationMap.values[i]),fmt(refined.grid.values[i]),fmt(result.confidenceMap.values[i]),refined.flags[i],result.matchPass[i]].join(","));}
 await writeFile(join(out,"heights.csv"),csv.join("\n")+"\n");
 await writeRealTerrainViewer(out,{result,refined,report});
 console.log(JSON.stringify(report,null,2));console.log("Open "+join(out,"terrain.html"));

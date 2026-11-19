@@ -13,12 +13,16 @@ export interface TerrainReconstructionOptions {
   sampleStride?:number;
   /** Ignore competing hypotheses inside this height distance when scoring uniqueness. */
   peakExclusionM?:number;
+  /** Retry missing cells using image matches and a local search band from first-pass heights. */
+  recoverMissing?:boolean;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
   pointCloud:{positionsEcefM:Float64Array;confidence:Float32Array};
   mesh:{originEcefM:readonly [number,number,number];positions:Float32Array;triangles:Uint32Array};
   validPixels:number;totalPixels:number;sources:string[];
+  /** 0=unmatched, 1=initial stereo, 2=local stereo recovery. No interpolated samples. */
+  matchPass:Uint8Array; recoveredPixels:number;
   verticalDatum:"WGS84 ellipsoid";model:"stereo-height-sweep";
 }
 function sample(im:TerrainImage,p:TerrainPixel):number {
@@ -51,19 +55,37 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   if(!Number.isSafeInteger(grid.width)||!Number.isSafeInteger(grid.height)||grid.width<1||grid.height<1||n>500_000||!Number.isSafeInteger(steps)||steps<3||steps>1024)throw new RangeError("Invalid terrain grid or height count");
   const stride=o.sampleStride??1,exclusion=o.peakExclusionM??0;
   if(!Number.isInteger(stride)||stride<1||stride>100||!Number.isFinite(exclusion)||exclusion<0)throw new RangeError("Invalid pilot options");
-  const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*(2*r+1)**2*images.length;
+  const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*((2*r+1)**2+(o.recoverMissing?25+81:0))*images.length;
   if(!Number.isSafeInteger(budget)||budget<1||budget>500_000_000||work>budget)throw new RangeError("Terrain search exceeds work budget; tile the AOI or reduce hypotheses");
   const values=new Float64Array(n).fill(NaN),conf=new Float64Array(n).fill(NaN),tex=new Float64Array(n).fill(NaN);
   const elevationMap:RasterGrid={...grid,values,source:"OpenLaunch stereo reconstruction",unit:"m ellipsoid"};
   validateRaster(elevationMap);
   const scores=new Float64Array(steps);
-  const patch=Array.from({length:(2*r+1)**2},(_,i)=>[i%(2*r+1)-r,Math.floor(i/(2*r+1))-r] as const);
+  const makePatch=(radius:number)=>Array.from({length:(2*radius+1)**2},(_,i)=>[i%(2*radius+1)-radius,Math.floor(i/(2*radius+1))-radius] as const);
+  const matchPass=new Uint8Array(n);
   const hs=Array.from({length:steps},(_,i)=>o.minHeightM+(o.maxHeightM-o.minHeightM)*i/(steps-1));
   const cloud:number[]=[],quality:number[]=[],ecef=new Float64Array(n*3).fill(NaN);
   let origin:readonly [number,number,number]=[0,0,0];
+  const pass=(radius:number,recovery:boolean,seed?:Float64Array)=>{
+  const patch=makePatch(radius);
   for(let row=0;row<grid.height;row+=stride)for(let col=0;col<grid.width;col+=stride){
     if(o.signal?.aborted)throw new Error("Terrain reconstruction aborted");
     const i=row*grid.width+col;
+    let lower=o.minHeightM,upper=o.maxHeightM,guide=NaN,tolerance=Infinity;
+    if(recovery){
+      if(Number.isFinite(values[i]))continue;
+      const neighbors:number[]=[];
+      for(let dy=-4;dy<=4;dy++)for(let dx=-4;dx<=4;dx++){
+        const x=col+dx,y=row+dy;if(x<0||x>=grid.width||y<0||y>=grid.height||(!dx&&!dy))continue;
+        const v=seed![y*grid.width+x]!;if(Number.isFinite(v))neighbors.push(v);
+      }
+      if(neighbors.length<5)continue;
+      neighbors.sort((a,b)=>a-b);
+      guide=neighbors[Math.floor(neighbors.length/2)]!;
+      const spread=neighbors[Math.floor(neighbors.length*.85)]!-neighbors[Math.floor(neighbors.length*.15)]!;
+      tolerance=Math.min(160,Math.max(45,spread+20));
+      lower=Math.max(lower,guide-tolerance-30);upper=Math.min(upper,guide+tolerance+30);
+    }
     const ground=patch.map(([dx,dy])=>{const [x,y]=pixelToWorld(grid.transform,col+0.5+dx,row+0.5+dy);const [longitudeDeg,latitudeDeg]=gridCrsToLonLat(x,y,grid.crs);return {longitudeDeg,latitudeDeg};});
     const center=ground[Math.floor(ground.length/2)]!;
     const endpoints=images.map(im=>[im.camera.project({...center,heightM:hs[0]!}),im.camera.project({...center,heightM:hs[steps-1]!})] as const);
@@ -71,27 +93,32 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     if(!a||!b||!endpoints.slice(1).some(([c,d])=>c&&d&&Math.hypot((d.x-c.x)-(b.x-a.x),(d.y-c.y)-(b.y-a.y))>=minParallax))continue;
     scores.fill(NaN);
     for(let k=0;k<steps;k++){
-      const h=hs[k]!;
+      const h=hs[k]!;if(h<lower||h>upper)continue;
       const samples=images.map(im=>ground.map(g=>{const p=im.camera.project({...g,heightM:h});return p?sample(im,p):NaN;}));
       const s=samples.slice(1).map(v=>ncc(samples[0]!,v));
       if(s.every(Number.isFinite))scores[k]=s.reduce((sum,v)=>sum+v,0)/s.length;
     }
     let best=-1;
     for(let k=0;k<steps;k++)if(Number.isFinite(scores[k])&&(best<0||scores[k]!>scores[best]!))best=k;
-    if(best<=0||best>=steps-1||scores[best]!<minCorr)continue; // boundary peaks are not bounded
+    if(best<=0||best>=steps-1||scores[best]!<(recovery?Math.max(.65,minCorr-.05):minCorr))continue; // boundary peaks are not bounded
     let other=-Infinity;
     for(let k=0;k<steps;k++)if(Math.abs(k-best)>1&&Math.abs(hs[k]!-hs[best]!)>=exclusion&&Number.isFinite(scores[k]))other=Math.max(other,scores[k]!);
-    if(!Number.isFinite(other)||scores[best]!-other<minGap)continue;
+    if(!Number.isFinite(other)||scores[best]!-other<(recovery?Math.max(.015,minGap*.7):minGap))continue;
     const l=scores[best-1]!,m=scores[best]!,u=scores[best+1]!,den=l-2*m+u;
     const delta=Number.isFinite(den)&&den< -1e-12?Math.max(-0.5,Math.min(0.5,0.5*(l-u)/den)):0;
     const h=hs[best]!+delta*(hs[1]!-hs[0]!);
+    if(recovery&&(!Number.isFinite(l)||!Number.isFinite(u)||Math.abs(h-guide)>tolerance))continue;
     const q=Math.min(1,Math.max(0,m)*Math.min(1,(m-other)/0.2));
-    values[i]=h;conf[i]=q;
+    values[i]=h;conf[i]=q;matchPass[i]=recovery?2:1;
     const p=images[0]!.camera.project({...center,heightM:h});if(p)tex[i]=sample(images[0]!,p);
     const v=geodeticToEcef({...center,altitudeM:h});
     if(!cloud.length)origin=v;
     cloud.push(...v);quality.push(q);ecef.set(v,i*3);
   }
+  };
+  pass(r,false);
+  if(o.recoverMissing&&stride===1){const seed=values.slice();pass(2,true,seed);pass(4,true,seed);}
+  const recoveredPixels=matchPass.reduce((sum,v)=>sum+(v===2?1:0),0);
   const positions=new Float32Array(n*3).fill(NaN),triangles:number[]=[];
   for(let i=0;i<n;i++)if(Number.isFinite(values[i]))for(let k=0;k<3;k++)positions[3*i+k]=ecef[3*i+k]!-origin[k]!;
   for(let y=0;y<grid.height-1;y++)for(let x=0;x<grid.width-1;x++){
@@ -99,7 +126,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     if([a,b,c].every(i=>Number.isFinite(values[i])))triangles.push(a,c,b);
     if([b,c,d].every(i=>Number.isFinite(values[i])))triangles.push(b,c,d);
   }
-  return {elevationMap,confidenceMap:{...grid,values:conf,source:"matching heuristic",unit:"1"},texture:{...grid,values:tex,source:images[0]!.source,unit:"input intensity"},pointCloud:{positionsEcefM:new Float64Array(cloud),confidence:new Float32Array(quality)},mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},validPixels:quality.length,totalPixels:n,sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep"};
+  return {elevationMap,confidenceMap:{...grid,values:conf,source:"matching heuristic",unit:"1"},texture:{...grid,values:tex,source:images[0]!.source,unit:"input intensity"},pointCloud:{positionsEcefM:new Float64Array(cloud),confidence:new Float32Array(quality)},mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},validPixels:quality.length,totalPixels:n,matchPass,recoveredPixels,sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep"};
 }
 /** Compare against independent ellipsoidal checkpoints; nearest grid pixel, no interpolation. */
 export function validateTerrainHeights(dem:RasterGrid,points:readonly {col:number;row:number;heightM:number}[]):{count:number;ignored:number;biasM:number|null;rmseM:number|null;maeM:number|null}{
