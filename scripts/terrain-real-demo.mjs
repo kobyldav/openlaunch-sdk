@@ -4,7 +4,8 @@ import {Readable,Transform} from "node:stream";
 import {pipeline} from "node:stream/promises";
 import {execFileSync} from "node:child_process";
 import {resolve,join,basename} from "node:path";
-import {loadTerrainRpcImage,reconstructTerrain,refineTerrainSurface,terrainPointCloudPly,discoverAsterStereo} from "../dist/terrain/index.js";
+import {loadTerrainRpcImage,reconstructTerrain,refineTerrainSurface,terrainPointCloudPly,discoverAsterStereo,estimateTerrainHeightBand} from "../dist/terrain/index.js";
+import {compareReference} from "./terrain-reference-check.mjs";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
 const archiveUrl="https://github.com/NeoGeographyToolkit/StereoPipelineSolvedExamples/releases/download/ASTER/ASTER_example.tar";
 const args=process.argv.slice(2), opt=name=>{const i=args.indexOf("--"+name);return i>=0?args[i+1]:undefined;};
@@ -47,24 +48,37 @@ const numeric=(name,fallback)=>{const value=opt(name)===undefined?fallback:Numbe
 const size=numeric("size",48),res=numeric("resolution",30);
 if(!Number.isInteger(size)||size<8||size>150||res<5||res>200)throw Error("size must be 8–150, resolution 5–200 m");
 const lo=Math.max(...rpcs.map(r=>r.heightOffset-r.heightScale)),hi=Math.min(...rpcs.map(r=>r.heightOffset+r.heightScale));
-const minHeightM=numeric("min-height",Math.max(lo,-100)),maxHeightM=numeric("max-height",hi);
+let minHeightM=numeric("min-height",Math.max(lo,-100)),maxHeightM=numeric("max-height",hi);
 if(!(maxHeightM>minHeightM))throw Error("RPC height domains do not overlap");
-const heightStepM=numeric("height-step",Math.max(10,(maxHeightM-minHeightM)/80));
+let heightStepM=numeric("height-step",10);
 const centerLon=rpcs.reduce((s,r)=>s+r.longitudeOffset,0)/rpcs.length,centerLat=rpcs.reduce((s,r)=>s+r.latitudeOffset,0)/rpcs.length;
 const dy=res/111320,dx=dy/Math.cos(centerLat*Math.PI/180);
 const score=(lon,lat)=>{let total=0;for(const im of images){const p=im.camera.project({longitudeDeg:lon,latitudeDeg:lat,heightM:(minHeightM+maxHeightM)/2});if(!p||p.x<50||p.y<50||p.x>im.width-51||p.y>im.height-51)return -Infinity;let a=[];for(let y=-24;y<=24;y+=6)for(let x=-24;x<=24;x+=6){const v=im.values[(Math.round(p.y)+y)*im.width+Math.round(p.x)+x];if(Number.isFinite(v))a.push(v);}if(a.length<70)return -Infinity;const mean=a.reduce((s,v)=>s+v,0)/a.length;total+=a.reduce((s,v)=>s+(v-mean)**2,0)/a.length;}return total;};
 let lon=numeric("lon",centerLon),lat=numeric("lat",centerLat);
 if(!opt("lon")&&!opt("lat")){let best=-Infinity;for(let j=-3;j<=3;j++)for(let i=-3;i<=3;i++){const x=centerLon+i*Math.min(...rpcs.map(r=>r.longitudeScale))*.12,y=centerLat+j*Math.min(...rpcs.map(r=>r.latitudeScale))*.12,s=score(x,y);if(s>best){best=s;lon=x;lat=y;}}if(!Number.isFinite(best))throw Error("No common textured image patch located; provide --lon and --lat.");}
 const grid={width:size,height:size,crs:"EPSG:4326",transform:[lon-size/2*dx,dx,0,lat+size/2*dy,0,-dy]};
-console.log("Reconstructing actual stereo images, no DEM", {lon,lat,size,res,minHeightM,maxHeightM,heightStepM});
 const started=Date.now();
-const result=reconstructTerrain({images,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.55,minPeakGap:.007,maxWork:250_000_000});
-const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(45,heightStepM*2),fillRadius:1});
+let pilot=null;
+if(!opt("min-height")&&!opt("max-height")){
+ pilot=estimateTerrainHeightBand({images,grid,minHeightM,maxHeightM,heightStepM});
+ ({minHeightM,maxHeightM}=pilot);console.log("Image-only height pilot",pilot);
+}
+console.log("Reconstructing actual stereo images, no DEM", {lon,lat,size,res,minHeightM,maxHeightM,heightStepM});
+const result=reconstructTerrain({images,grid,minHeightM,maxHeightM,heightStepM,patchRadius:3,minCorrelation:.72,minPeakGap:.025,peakExclusionM:40,maxWork:250_000_000});
+const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(35,heightStepM*2),fillRadius:1});
 const report={synthetic:false,source:local?"user-supplied calibrated stereo":archiveUrl,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM:res,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,elapsedMs:Date.now()-started,accuracy:"not independently validated"};
+report.pilot=pilot;
+const vals=Array.from(refined.grid.values).filter(Number.isFinite).sort((a,b)=>a-b);
+report.heightRangeM=vals.length?[vals[0],vals[vals.length-1]]:null;
+report.filteredCoverage=vals.length/result.totalPixels;
+if(!local&&!args.includes("--no-reference")){
+ try{report.reference=await compareReference(refined.grid,out);report.referencePassed=report.reference.centeredRmseM<=60&&Math.abs(report.reference.meanDifferenceM)<=150;}
+ catch(e){report.referenceError=String(e);report.referencePassed=false;}
+}
 await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));
 await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));
 const csv=["lon,lat,raw_height_m,refined_height_m,confidence,quality_flag"];for(let i=0;i<result.totalPixels;i++){const fmt=v=>Number.isFinite(v)?v:"";csv.push([grid.transform[0]+(i%size+.5)*dx,grid.transform[3]-(Math.floor(i/size)+.5)*dy,fmt(result.elevationMap.values[i]),fmt(refined.grid.values[i]),fmt(result.confidenceMap.values[i]),refined.flags[i]].join(","));}
 await writeFile(join(out,"heights.csv"),csv.join("\n")+"\n");
 await writeRealTerrainViewer(out,{result,refined,report});
 console.log(JSON.stringify(report,null,2));console.log("Open "+join(out,"terrain.html"));
-if(result.validPixels<result.totalPixels*.15)throw Error("Low stereo coverage: try another AOI, height search or better calibrated pair. No invented heights.");
+if(result.validPixels<result.totalPixels*.3||report.filteredCoverage<.25||report.referencePassed===false)throw Error("Reconstruction quality gate failed. Diagnostic files retained; do not treat as a valid terrain model.");

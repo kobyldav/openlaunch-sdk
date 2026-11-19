@@ -11,3 +11,4 @@ export class TerrainReconstructionEngine {
 }
 export * from "./rpc-input.js";
 export * from "./quality.js";
+export * from "./pilot.js";

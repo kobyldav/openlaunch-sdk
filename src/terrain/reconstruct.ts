@@ -9,6 +9,10 @@ export interface TerrainReconstructionOptions {
   minHeightM:number;maxHeightM:number;heightStepM:number;
   patchRadius?:number;minCorrelation?:number;minPeakGap?:number;
   minParallaxPx?:number;maxWork?:number;signal?:AbortSignal;
+  /** Sparse pilot sampling; full grid geometry and patch spacing are preserved. */
+  sampleStride?:number;
+  /** Ignore competing hypotheses inside this height distance when scoring uniqueness. */
+  peakExclusionM?:number;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
@@ -45,7 +49,9 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
   const steps=Math.ceil((o.maxHeightM-o.minHeightM)/o.heightStepM)+1,n=grid.width*grid.height;
   if(!Number.isSafeInteger(grid.width)||!Number.isSafeInteger(grid.height)||grid.width<1||grid.height<1||n>500_000||!Number.isSafeInteger(steps)||steps<3||steps>1024)throw new RangeError("Invalid terrain grid or height count");
-  const budget=o.maxWork??20_000_000,work=n*steps*(2*r+1)**2*images.length;
+  const stride=o.sampleStride??1,exclusion=o.peakExclusionM??0;
+  if(!Number.isInteger(stride)||stride<1||stride>100||!Number.isFinite(exclusion)||exclusion<0)throw new RangeError("Invalid pilot options");
+  const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*(2*r+1)**2*images.length;
   if(!Number.isSafeInteger(budget)||budget<1||budget>500_000_000||work>budget)throw new RangeError("Terrain search exceeds work budget; tile the AOI or reduce hypotheses");
   const values=new Float64Array(n).fill(NaN),conf=new Float64Array(n).fill(NaN),tex=new Float64Array(n).fill(NaN);
   const elevationMap:RasterGrid={...grid,values,source:"OpenLaunch stereo reconstruction",unit:"m ellipsoid"};
@@ -55,7 +61,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   const hs=Array.from({length:steps},(_,i)=>o.minHeightM+(o.maxHeightM-o.minHeightM)*i/(steps-1));
   const cloud:number[]=[],quality:number[]=[],ecef=new Float64Array(n*3).fill(NaN);
   let origin:readonly [number,number,number]=[0,0,0];
-  for(let row=0;row<grid.height;row++)for(let col=0;col<grid.width;col++){
+  for(let row=0;row<grid.height;row+=stride)for(let col=0;col<grid.width;col+=stride){
     if(o.signal?.aborted)throw new Error("Terrain reconstruction aborted");
     const i=row*grid.width+col;
     const ground=patch.map(([dx,dy])=>{const [x,y]=pixelToWorld(grid.transform,col+0.5+dx,row+0.5+dy);const [longitudeDeg,latitudeDeg]=gridCrsToLonLat(x,y,grid.crs);return {longitudeDeg,latitudeDeg};});
@@ -74,7 +80,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     for(let k=0;k<steps;k++)if(Number.isFinite(scores[k])&&(best<0||scores[k]!>scores[best]!))best=k;
     if(best<=0||best>=steps-1||scores[best]!<minCorr)continue; // boundary peaks are not bounded
     let other=-Infinity;
-    for(let k=0;k<steps;k++)if(Math.abs(k-best)>1&&Number.isFinite(scores[k]))other=Math.max(other,scores[k]!);
+    for(let k=0;k<steps;k++)if(Math.abs(k-best)>1&&Math.abs(hs[k]!-hs[best]!)>=exclusion&&Number.isFinite(scores[k]))other=Math.max(other,scores[k]!);
     if(!Number.isFinite(other)||scores[best]!-other<minGap)continue;
     const l=scores[best-1]!,m=scores[best]!,u=scores[best+1]!,den=l-2*m+u;
     const delta=Number.isFinite(den)&&den< -1e-12?Math.max(-0.5,Math.min(0.5,0.5*(l-u)/den)):0;
