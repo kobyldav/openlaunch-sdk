@@ -25,6 +25,15 @@ const BYTE_SIZE:Readonly<Record<number,number>>={
  * Operates on bounded supplied bytes, not remote COG HTTP range requests.
  */
 export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTiffDecodeOptions={}):Promise<RasterGrid>{
+  const {width,height,values,tiff}=await decodeSingleBandTiff(source,options,false);
+  const grid:RasterGrid={width,height,values,crs:readCrs(tiff),transform:readTransform(tiff),source:"decoded-geotiff",unit:"native-sample"};
+  validateRaster(grid);return grid;
+}
+/** Decode raw single-band sensor imagery without inventing an affine georeference. */
+export async function decodeTerrainTiff(source:ArrayBuffer|Uint8Array,options:GeoTiffDecodeOptions={}):Promise<{width:number;height:number;values:Float64Array}>{
+  const {width,height,values}=await decodeSingleBandTiff(source,options,true);return {width,height,values};
+}
+async function decodeSingleBandTiff(source:ArrayBuffer|Uint8Array,options:GeoTiffDecodeOptions,rawImage:boolean){
   const bytes=source instanceof Uint8Array?source:new Uint8Array(source);
   const maxInputBytes=options.maxInputBytes??64*1024*1024;
   if(!(Number.isSafeInteger(maxInputBytes)&&maxInputBytes>0&&maxInputBytes<=256*1024*1024))
@@ -33,7 +42,7 @@ export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
   const tiff=new TiffDirectory(bytes);
   const width=tiff.scalar(256),height=tiff.scalar(257);
   const maxPixels=options.maxPixels??4_194_304;
-  if(!Number.isInteger(maxPixels)||maxPixels<1||maxPixels>16_777_216)throw new RangeError("maxPixels must be 1..16777216");
+  if(!Number.isInteger(maxPixels)||maxPixels<1||maxPixels>(rawImage?33_554_432:16_777_216))throw new RangeError("maxPixels exceeds TIFF pixel budget");
   if(!(Number.isSafeInteger(width)&&Number.isSafeInteger(height)&&width>0&&height>0&&width*height<=maxPixels))
     throw new RangeError("GeoTIFF dimensions exceed maxPixels or are invalid");
 
@@ -51,8 +60,6 @@ export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
   if(predictor!==1 && predictor!==2)throw new RangeError("Unsupported TIFF predictor (only 1/2)");
   if(predictor===2&&sampleFormat===3)throw new RangeError("Float predictor 2 unsupported: use a compatible integer GeoTIFF");
 
-  const crs=readCrs(tiff);
-  const transform=readTransform(tiff);
   const nodataText=tiff.ascii(42113);
   const nodata=nodataText===undefined?undefined:Number(nodataText.trim());
   const useNodata=nodataText!==undefined && !Number.isNaN(nodata);
@@ -98,12 +105,7 @@ export async function decodeGeoTiff(source:ArrayBuffer|Uint8Array,options:GeoTif
         useNodata&&value===nodata?NaN:value;
     }
   }
-  const grid:RasterGrid={
-    width,height,crs,transform,values:output,
-    source:"decoded-geotiff",unit:"native-sample",
-  };
-  validateRaster(grid);
-  return grid;
+  return {width,height,values:output,tiff};
 }
 function checkedSlice(bytes:Uint8Array,offset:number,length:number):Uint8Array {
   if(!Number.isSafeInteger(offset)||!Number.isSafeInteger(length)||offset<0||length<=0||offset+length>bytes.byteLength)

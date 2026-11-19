@@ -24,7 +24,7 @@ function sample(im:TerrainImage,p:TerrainPixel):number {
   return (1-g)*((1-f)*a+f*b)+g*((1-f)*c+f*d);
 }
 function checkImage(im:TerrainImage):void {
-  if(!Number.isSafeInteger(im.width)||!Number.isSafeInteger(im.height)||im.width<2||im.height<2||im.width*im.height>16_777_216||im.values.length!==im.width*im.height||!im.source||typeof im.camera?.project!=="function")throw new RangeError("Invalid stereo image");
+  if(!Number.isSafeInteger(im.width)||!Number.isSafeInteger(im.height)||im.width<2||im.height<2||im.width*im.height>33_554_432||im.values.length!==im.width*im.height||!im.source||typeof im.camera?.project!=="function")throw new RangeError("Invalid stereo image");
 }
 /** Zero-mean normalized cross-correlation: no external matcher or DEM. */
 function ncc(a:readonly number[],b:readonly number[]):number {

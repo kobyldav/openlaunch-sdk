@@ -9,3 +9,5 @@ export class TerrainReconstructionEngine {
   validateGeodetic = validateTerrainGeodetic;
   discoverAster = discoverAsterStereo;
 }
+export * from "./rpc-input.js";
+export * from "./quality.js";
