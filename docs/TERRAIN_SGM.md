@@ -36,3 +36,17 @@ no coarse-to-fine pyramid, no dedicated GPU/worker, and no independent survey
 accuracy. SGM currently disallows \`recoverMissing:true\`, multi-round recovery,
 sparse sampling, and image-evidence substep refinement to avoid mixing methods.
 For large AOIs use \`reconstructTerrainTiled\` with a bounded \`tileSize\`.
+
+## Real-data A/B dashboard
+
+\`\`\`cmd
+npm run example:terrain-sgm
+start "" "test-results\terrain-sgm\index.html"
+\`\`\`
+
+This runs the original height sweep and the new native SGM over the same real
+calibrated S2P image triplet, saving separate original DSMs, metrics and interactive
+viewers. The dashboard visibly reports a strict PASS/FAIL for each method. The
+comparison command returns a zero exit code when both methods *run and provide
+valid metrics*, even if their quality gates fail; this is a **diagnostic job** and
+is not a production-acceptance claim.

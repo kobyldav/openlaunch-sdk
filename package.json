@@ -197,7 +197,8 @@
     "example:terrain-real": "npm run build && node scripts/terrain-real-demo.mjs",
     "example:terrain-source": "npm run build && node scripts/terrain-source-demo.mjs",
     "example:terrain-aerial": "npm run build && node scripts/terrain-aerial-demo.mjs",
-    "example:terrain-benchmark": "npm run build && node scripts/terrain-benchmark.mjs"
+    "example:terrain-benchmark": "npm run build && node scripts/terrain-benchmark.mjs",
+    "example:terrain-sgm": "npm run build && node scripts/terrain-sgm-compare.mjs"
   },
   "engines": {
     "node": ">=18"

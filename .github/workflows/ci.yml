@@ -127,3 +127,27 @@ jobs:
             test-results/terrain-large/summary.*
             test-results/terrain-large/s2p-triplet-large/report.json
             test-results/terrain-large/s2p-triplet-large/terrain.html
+
+  terrain-sgm-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Build SDK
+        run: npm run build
+      - name: Compare independent native SGM and height-sweep methods on real stereo
+        run: node scripts/terrain-sgm-compare.mjs --dataset s2p-triplet
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain-sgm-comparison
+          path: |
+            test-results/terrain-sgm/index.html
+            test-results/terrain-sgm/comparison.json
+            test-results/terrain-sgm/*/report.json
+            test-results/terrain-sgm/*/terrain.html
