@@ -118,8 +118,8 @@ export async function fetchSentinel2RgbTile(o:Sentinel2RgbTileOptions):Promise<S
    const [r,g,b]:CogReadResult[]=await Promise.all([
      read(red,area,options),read(green,area,options),read(blue,area,options)
    ]);
-   validateRaster(r.raster);validateRaster(g.raster);validateRaster(b.raster);
    if(!r||!g||!b)throw new Error("Missing RGB COG window");
+   validateRaster(r.raster);validateRaster(g.raster);validateRaster(b.raster);
    const rr=r.raster,gg=reprojectRasterTo(g.raster,rr,"nearest"),bb=reprojectRasterTo(b.raster,rr,"nearest");
    const valid=[rr,gg,bb].reduce((n,grid)=>n+Array.from(grid.values).filter(Number.isFinite).length,0);
    if(valid===0)throw new Error("Selected scene has no usable RGB samples in AOI");
