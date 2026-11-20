@@ -173,3 +173,25 @@ jobs:
             test-results/terrain-sgm-large/index.html
             test-results/terrain-sgm-large/comparison.json
             test-results/terrain-sgm-large/*/report.json
+
+  terrain-sgm-halo-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Compare 128x128 stereo with and without 4-pixel SGM tile overlap
+        run: node scripts/terrain-sgm-compare.mjs --dataset s2p-triplet --size 128 --tile-halo 4 --out test-results/terrain-sgm-halo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain-sgm-halo-compare
+          path: |
+            test-results/terrain-sgm-halo/index.html
+            test-results/terrain-sgm-halo/comparison.json
+            test-results/terrain-sgm-halo/*/report.json
