@@ -15,6 +15,8 @@ export interface TerrainReconstructionOptions {
   peakExclusionM?:number;
   /** Retry missing cells using image matches and a local search band from first-pass heights. */
   recoverMissing?:boolean;
+  /** Refine a winning height against the actual images (rather than a parabola through sweep samples). */
+  peakRefinement?:"parabolic"|"image-evidence";
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
@@ -49,6 +51,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   images.forEach(checkImage);
   if(new Set(images.map(i=>i.source)).size!==images.length)throw new RangeError("Image source IDs must be distinct");
   const r=o.patchRadius??2,minCorr=o.minCorrelation??0.75,minGap=o.minPeakGap??0.03,minParallax=o.minParallaxPx??0.5;
+  if(o.peakRefinement!==undefined&&o.peakRefinement!=="parabolic"&&o.peakRefinement!=="image-evidence")throw new RangeError("Unknown peak refinement method");
   if(!Number.isInteger(r)||r<1||r>5||!Number.isFinite(minCorr)||minCorr<0||minCorr>1||!Number.isFinite(minGap)||minGap<0||minGap>1||!Number.isFinite(minParallax)||minParallax<=0)throw new RangeError("Invalid matching parameters");
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
   const steps=Math.ceil((o.maxHeightM-o.minHeightM)/o.heightStepM)+1,n=grid.width*grid.height;
@@ -91,12 +94,17 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     const endpoints=images.map(im=>[im.camera.project({...center,heightM:hs[0]!}),im.camera.project({...center,heightM:hs[steps-1]!})] as const);
     const [a,b]=endpoints[0]!;
     if(!a||!b||!endpoints.slice(1).some(([c,d])=>c&&d&&Math.hypot((d.x-c.x)-(b.x-a.x),(d.y-c.y)-(b.y-a.y))>=minParallax))continue;
+    const scoreAt=(h:number):number=>{
+      const samples=images.map(im=>ground.map(g=>{
+        const p=im.camera.project({...g,heightM:h});
+        return p?sample(im,p):NaN;
+      }));
+      const pairScores=samples.slice(1).map(v=>ncc(samples[0]!,v));
+      return pairScores.every(Number.isFinite)?pairScores.reduce((sum,v)=>sum+v,0)/pairScores.length:NaN;
+    };
     scores.fill(NaN);
     for(let k=0;k<steps;k++){
-      const h=hs[k]!;if(h<lower||h>upper)continue;
-      const samples=images.map(im=>ground.map(g=>{const p=im.camera.project({...g,heightM:h});return p?sample(im,p):NaN;}));
-      const s=samples.slice(1).map(v=>ncc(samples[0]!,v));
-      if(s.every(Number.isFinite))scores[k]=s.reduce((sum,v)=>sum+v,0)/s.length;
+      const h=hs[k]!;if(h>=lower&&h<=upper)scores[k]=scoreAt(h);
     }
     let best=-1;
     for(let k=0;k<steps;k++)if(Number.isFinite(scores[k])&&(best<0||scores[k]!>scores[best]!))best=k;
@@ -106,7 +114,27 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     if(!Number.isFinite(other)||scores[best]!-other<(recovery?Math.max(.015,minGap*.7):minGap))continue;
     const l=scores[best-1]!,m=scores[best]!,u=scores[best+1]!,den=l-2*m+u;
     const delta=Number.isFinite(den)&&den< -1e-12?Math.max(-0.5,Math.min(0.5,0.5*(l-u)/den)):0;
-    const h=hs[best]!+delta*(hs[1]!-hs[0]!);
+    let h=hs[best]!+delta*(hs[1]!-hs[0]!);
+    if(o.peakRefinement==="image-evidence"){
+      // The winning discrete hypothesis is already checked for texture and uniqueness.
+      // Fine optimization reprojects real pixels at continuous heights; no DEM or spatial
+      // smoothing is involved. Search ONLY the adjacent valid hypotheses.
+      let low=Math.max(lower,hs[best-1]!),high=Math.min(upper,hs[best+1]!);
+      const ratio=(Math.sqrt(5)-1)/2;
+      let x=high-ratio*(high-low),y=low+ratio*(high-low);
+      let sx=scoreAt(x),sy=scoreAt(y);
+      if(Number.isFinite(sx)&&Number.isFinite(sy)){
+        for(let iter=0;iter<9;iter++){
+          if(sx>sy){high=y;y=x;sy=sx;x=high-ratio*(high-low);sx=scoreAt(x);}
+          else{low=x;x=y;sx=sy;y=low+ratio*(high-low);sy=scoreAt(y);}
+          if(!Number.isFinite(sx)||!Number.isFinite(sy))break;
+        }
+        // Avoid moving to a weaker correspondence merely to obtain a finer number.
+        const bestEvidence=[{h:hs[best]!,score:m},{h:x,score:sx},{h:y,score:sy}]
+          .filter(v=>Number.isFinite(v.score)).sort((a,b)=>b.score-a.score)[0];
+        if(bestEvidence)h=bestEvidence.h;
+      }
+    }
     if(recovery&&(!Number.isFinite(l)||!Number.isFinite(u)||Math.abs(h-guide)>tolerance))continue;
     const q=Math.min(1,Math.max(0,m)*Math.min(1,(m-other)/0.2));
     values[i]=h;conf[i]=q;matchPass[i]=recovery?2:1;

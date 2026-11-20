@@ -55,3 +55,7 @@ The optional `recoverMissing` pass revisits unmatched cells with smaller and lar
 ## Source selection
 
 See [AERIAL_TERRAIN.md](AERIAL_TERRAIN.md) for switching satellite/aerial inputs and the Windows source selector. Real ASTER and synthetic perspective aerial examples are explicitly distinguished.
+
+### Image-evidence peak refinement
+
+`peakRefinement: "image-evidence"` optionally refines the best discrete height using nine bounded one-dimensional golden-section iterations, each time reprojecting the actual input pixels and recomputing normalized cross-correlation. This is **not** a resampling of any reference DEM or interpolation of heights from nearby points. It cannot fix wrong coarse matches, calibration drift, or occlusion. The real ASTER/S2P examples now use it; pass `--parabolic` to the ASTER example for A/B comparison. Subpixel numerical optimization does not guarantee subpixel or sub-metre physical accuracy.

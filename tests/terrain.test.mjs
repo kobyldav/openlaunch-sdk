@@ -51,3 +51,15 @@ test("optional recovery preserves original matches and never fills untextured da
  const flat=reconstructTerrain({...opts,images:[image(0,"a",true),image(1,"b",true)],recoverMissing:true});
  assert.equal(flat.validPixels,0);assert.equal(flat.recoveredPixels,0);
 });
+
+test("image-evidence peak refinement uses real image correlation and preserves geometric rejection",()=>{
+ const base=reconstructTerrain(opts);
+ const fine=reconstructTerrain({...opts,peakRefinement:"image-evidence"});
+ assert.equal(fine.validPixels,base.validPixels);
+ for(let i=0;i<fine.totalPixels;i++)if(Number.isFinite(fine.elevationMap.values[i])){
+   assert.ok(Math.abs(fine.elevationMap.values[i]-140)<4);
+ }
+ const failed=reconstructTerrain({...opts,images:[image(0,"a",true),image(1,"b",true)],peakRefinement:"image-evidence"});
+ assert.equal(failed.validPixels,0);
+ assert.throws(()=>reconstructTerrain({...opts,peakRefinement:"unknown"}),/peak refinement/);
+});

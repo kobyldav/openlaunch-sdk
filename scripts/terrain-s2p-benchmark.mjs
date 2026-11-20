@@ -27,7 +27,7 @@ const grid={width:size,height:size,crs:"EPSG:4326",transform:[lon-size*dx/2,dx,0
 const started=Date.now(),step=Math.max(.5,(hi-lo)/800);
 const pilot=estimateTerrainHeightBand({images,grid,minHeightM:lo,maxHeightM:hi,heightStepM:step},{pilotStepM:Math.max(1,step),clusterRadiusM:20,marginM:25});
 const minHeightM=pilot.minHeightM,maxHeightM=pilot.maxHeightM,heightStepM=Math.max(.5,(maxHeightM-minHeightM)/120);
-const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,recoverMissing:true,maxWork:250_000_000});
+const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,peakRefinement:"image-evidence",recoverMissing:true,maxWork:250_000_000});
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:8,fillRadius:1}),vals=Array.from(refined.grid.values).filter(Number.isFinite);
 const report={sourceKind:"satellite",synthetic:false,source:base+"input_"+dataset,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:vals.length?[Math.min(...vals),Math.max(...vals)]:null,elapsedMs:Date.now()-started,pilot};
 // Only after reconstruction: compare against s2p expected output, not independent ground truth.
