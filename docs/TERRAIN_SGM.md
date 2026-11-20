@@ -53,7 +53,7 @@ is not a production-acceptance claim.
 
 ## Overlapping tile context
 
-`reconstructTerrainTiled({matcher:"sgm",tileSize:32,tileHaloPixels:4,...})` includes a 4-pixel neighborhood outside every tile in the regularization and trims the halo on output. This prevents artificial SGM path resets exactly on tile borders; the result is assembled into the original global raster coordinate system without duplicating points. Tile pilots still use the corresponding expanded sensor footprint, and no DEM is imported. Default halo remains 0 for reproducibility of historical results; memory/work scale with the enlarged tile dimensions. Control `--tile-halo 4` in the real S2P benchmark and compare against `--tile-halo 0`.
+`reconstructTerrainTiled({matcher:"sgm",tileSize:32,tileHaloPixels:4,...})` includes a 4-pixel neighborhood outside every tile in the regularization and trims the halo on output. This prevents artificial SGM path resets exactly on tile borders; the result is assembled into the original global raster coordinate system without duplicating points. Tile pilots always use the exact unexpanded tile core (for fair A/B calibration), and no DEM is imported. Default halo remains 0 for reproducibility of historical results; memory/work scale with the enlarged tile dimensions. Control `--tile-halo 4` in the real S2P benchmark and compare against `--tile-halo 0`.
 
 ## Coarse-to-fine stereo, experimental
 

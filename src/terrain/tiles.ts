@@ -45,10 +45,16 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
     const haloWidth=haloRight-haloCol,haloHeight=haloBottom-haloRow;
     const [x,y]=pixelToWorld(grid.transform,haloCol,haloRow);
     const subgrid:TerrainGrid={width:haloWidth,height:haloHeight,crs:grid.crs,transform:[x,grid.transform[1],grid.transform[2],y,grid.transform[4],grid.transform[5]]};
+    // The image-only pilot must always use the ORIGINAL tile core so that
+    // halo/no-halo comparisons share the same height hypothesis domain.
+    const [coreX,coreY]=pixelToWorld(grid.transform,col,row);
+    const coreGrid:TerrainGrid={width,height,crs:grid.crs,
+      transform:[coreX,grid.transform[1],grid.transform[2],
+                 coreY,grid.transform[4],grid.transform[5]]};
     let minHeightM=options.minHeightM,maxHeightM=options.maxHeightM;
     if(localHeightPilot&&maxHeightM-minHeightM>30){
       try{
-        const band=estimateTerrainHeightBand({...options,grid:subgrid,images},{
+        const band=estimateTerrainHeightBand({...options,grid:coreGrid,images},{
           pilotStepM:Math.max(1,options.heightStepM*2),clusterRadiusM:18,marginM:30
         });
         // A low-consensus tile is not allowed to silently shift the search band.
