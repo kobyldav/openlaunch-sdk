@@ -29,11 +29,20 @@ export interface TerrainReconstruction {
   matchPass:Uint8Array; recoveredPixels:number;
   verticalDatum:"WGS84 ellipsoid";model:"stereo-height-sweep";
 }
-function sample(im:TerrainImage,p:TerrainPixel):number {
-  if(!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.y<0||p.x>=im.width-1||p.y>=im.height-1)return NaN;
-  const x=Math.floor(p.x),y=Math.floor(p.y),f=p.x-x,g=p.y-y,i=y*im.width+x;
-  const a=im.values[i]!,b=im.values[i+1]!,c=im.values[i+im.width]!,d=im.values[i+im.width+1]!;
-  return (1-g)*((1-f)*a+f*b)+g*((1-f)*c+f*d);
+/** Bilinear sensor-image sampling. Zero-weight missing neighbours do not
+ * contaminate a valid pixel centre or the last source row/column. Never
+ * blend nodata across a nonzero-weight contributing pixel. */
+export function sampleTerrainImage(im:TerrainImage,p:TerrainPixel):number {
+  if(!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.y<0||p.x>im.width-1||p.y>im.height-1)return NaN;
+  const x=Math.min(Math.floor(p.x),im.width-2),y=Math.min(Math.floor(p.y),im.height-2),f=p.x-x,g=p.y-y,i=y*im.width+x;
+  let sum=0;
+  for(const [index,weight] of [[i,(1-f)*(1-g)],[i+1,f*(1-g)],[i+im.width,(1-f)*g],[i+im.width+1,f*g]]){
+    if(weight<=1e-12)continue;
+    const v=im.values[index]!;
+    if(!Number.isFinite(v))return NaN;
+    sum+=v*weight;
+  }
+  return sum;
 }
 function checkImage(im:TerrainImage):void {
   if(!Number.isSafeInteger(im.width)||!Number.isSafeInteger(im.height)||im.width<2||im.height<2||im.width*im.height>33_554_432||im.values.length!==im.width*im.height||!im.source||typeof im.camera?.project!=="function")throw new RangeError("Invalid stereo image");
@@ -100,7 +109,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     const scoreAt=(h:number):number=>{
       const samples=images.map(im=>ground.map(g=>{
         const p=im.camera.project({...g,heightM:h});
-        return p?sample(im,p):NaN;
+        return p?sampleTerrainImage(im,p):NaN;
       }));
       const pairScores=samples.slice(1).map(v=>ncc(samples[0]!,v));
       return pairScores.every(Number.isFinite)?pairScores.reduce((sum,v)=>sum+v,0)/pairScores.length:NaN;

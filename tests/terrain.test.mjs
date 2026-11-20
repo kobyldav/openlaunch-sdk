@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {reconstructTerrain,reconstructTerrainTiled,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,validateTerrainGeodetic,terrainPointCloudPly,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
+import {reconstructTerrain,reconstructTerrainTiled,sampleTerrainImage,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,validateTerrainGeodetic,terrainPointCloudPly,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
 const poly=(...pairs)=>{const a=Array(20).fill(0);for(const [i,v] of pairs)a[i]=v;return a;};
 const rpc=(shift)=>createTerrainRpcCamera({
  longitudeOffset:14,latitudeOffset:50,heightOffset:100,longitudeScale:.01,latitudeScale:.01,heightScale:100,
@@ -95,4 +95,16 @@ test("match patch footprint is independent of output grid sampling",()=>{
  assert.deepEqual(Array.from(s.elevationMap.values),Array.from(same.elevationMap.values));
  assert.throws(()=>reconstructTerrain({...opts,patchSpacingScale:0}),/patchSpacingScale/);
  assert.throws(()=>reconstructTerrain({...opts,patchSpacingScale:9}),/patchSpacingScale/);
+});
+
+test("image bilinear interpolation retains valid edge pixels but never invents masked intensity",()=>{
+ const img={width:2,height:2,source:"mask",values:[7,NaN,NaN,NaN],camera:{project:()=>null}};
+ assert.equal(sampleTerrainImage(img,{x:0,y:0}),7);
+ assert.ok(Number.isNaN(sampleTerrainImage(img,{x:.25,y:0})));
+ assert.ok(Number.isNaN(sampleTerrainImage(img,{x:1,y:1})));
+ const full={...img,values:[1,2,3,4]};
+ assert.equal(sampleTerrainImage(full,{x:1,y:1}),4);
+ assert.equal(sampleTerrainImage(full,{x:0,y:1}),3);
+ assert.equal(sampleTerrainImage(full,{x:.5,y:.5}),2.5);
+ assert.ok(Number.isNaN(sampleTerrainImage(full,{x:1.01,y:0})));
 });
