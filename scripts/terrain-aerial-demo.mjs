@@ -6,6 +6,10 @@ import {gridCrsToLonLat,pixelToWorld} from "../dist/eo/raster.js";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
 const args=process.argv.slice(2),opt=name=>{const i=args.indexOf("--"+name);if(i<0)return undefined;if(!args[i+1]||args[i+1].startsWith("--"))throw Error("Missing --"+name+" value");return args[i+1];};
 const out=resolve(opt("out")??"test-results/terrain-aerial");
+const matcher=opt("matcher")??"height-sweep";
+const sgmPyramidLevels=Number(opt("sgm-pyramid-levels")??1);
+if(!["height-sweep","sgm"].includes(matcher)||![1,2].includes(sgmPyramidLevels))
+ throw Error("--matcher height-sweep|sgm and --sgm-pyramid-levels 1|2");
 await mkdir(out,{recursive:true});
 const manifestPath=opt("manifest");
 let grid,source,minHeightM,maxHeightM,heightStepM,resolutionM,reference,description,referencePath;
@@ -48,7 +52,7 @@ if(manifestPath){
 if(![minHeightM,maxHeightM,heightStepM,resolutionM].every(Number.isFinite)||heightStepM<=0||maxHeightM<=minHeightM)throw Error("Invalid height search");
 console.log("Aerial stereo mode:",description);
 const started=Date.now();
-const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.72,minPeakGap:.015,peakExclusionM:Math.max(heightStepM*3,2),recoverMissing:true,maxWork:250_000_000});
+const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,heightStepM,matcher,sgmPyramidLevels,patchRadius:2,minCorrelation:.72,minPeakGap:.015,peakExclusionM:Math.max(heightStepM*3,2),recoverMissing:matcher==="height-sweep",maxWork:250_000_000});
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(2,resolutionM*4),fillRadius:1});
 const vals=Array.from(refined.grid.values).filter(Number.isFinite).sort((a,b)=>a-b);
 const [gx,gy]=pixelToWorld(grid.transform,grid.width/2,grid.height/2),[lon,lat]=gridCrsToLonLat(gx,gy,grid.crs);
@@ -59,7 +63,7 @@ if(referencePath){
  reference=check.points;
 }
 const validation=reference?validateTerrainHeights(result.elevationMap,reference):null;
-const report={sourceKind:"aerial",synthetic:!manifestPath,source:description,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,initialMatches:result.validPixels-result.recoveredPixels,heightRangeM:vals.length?[vals[0],vals.at(-1)]:null,validation,elapsedMs:Date.now()-started,accuracy:manifestPath?(reference?"supplied independent checkpoint comparison":"not independently validated"):"synthetic validation only"};
+const report={matcher,sgmPyramidLevels,sourceKind:"aerial",synthetic:!manifestPath,source:description,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,initialMatches:result.validPixels-result.recoveredPixels,heightRangeM:vals.length?[vals[0],vals.at(-1)]:null,validation,elapsedMs:Date.now()-started,accuracy:manifestPath?(reference?"supplied independent checkpoint comparison":"not independently validated"):"synthetic validation only"};
 await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));
 await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));
 const csv=["lon,lat,raw_height_m,refined_height_m,confidence,quality_flag,match_pass"];
