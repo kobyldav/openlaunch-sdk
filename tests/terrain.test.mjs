@@ -184,3 +184,15 @@ test("SGM halos on tiled reconstruction retain identical global evidence at tile
  assert.throws(()=>reconstructTerrainTiled({...o,tileSize:3,tileHaloPixels:-1}),/halo/);
  assert.throws(()=>reconstructTerrainTiled({...o,tileSize:250,tileHaloPixels:4}),/halo/);
 });
+
+test("two-scale SGM uses original image evidence and never fills featureless images",()=>{
+ const o={...opts,matcher:"sgm",minCorrelation:.5,minPeakGap:.003,maxWork:5000000};
+ const fine=reconstructTerrain({...o,sgmPyramidLevels:2,sgmPriorWeight:.07});
+ assert.equal(fine.model,"stereo-height-sgm");
+ assert.ok(fine.validPixels>=10,"guided SGM valid pixels "+fine.validPixels);
+ for(const h of fine.elevationMap.values)if(Number.isFinite(h))assert.ok(Math.abs(h-140)<6);
+ const masked=reconstructTerrain({...o,images:[image(0,"no-texture-a",true),image(1,"no-texture-b",true)],sgmPyramidLevels:2});
+ assert.equal(masked.validPixels,0);
+ assert.throws(()=>reconstructTerrain({...o,sgmPyramidLevels:3}),/pyramid/);
+ assert.throws(()=>reconstructTerrain({...o,sgmPyramidLevels:2,sgmPriorWeight:-1}),/pyramid/);
+});

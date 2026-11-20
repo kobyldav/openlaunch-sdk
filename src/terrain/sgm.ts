@@ -104,6 +104,10 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
     !Number.isSafeInteger(n)||n<1||n>100_000||n*levels>4_000_000)
     throw new RangeError("Invalid SGM search geometry or memory bound");
   const radius=o.patchRadius??2,spacing=o.patchSpacingScale??1;
+  const pyramid=o.sgmPyramidLevels??1;
+  const priorWeight=o.sgmPriorWeight??.07,priorRadius=o.sgmPriorRadiusM??Math.max(8,o.heightStepM*8);
+  if(![1,2].includes(pyramid)||!Number.isFinite(priorWeight)||priorWeight<0||priorWeight>.5||
+     !Number.isFinite(priorRadius)||priorRadius<=0)throw new RangeError("Invalid SGM pyramid parameters");
   const minPairs=o.minMatchingPairs??images.length-1;
   const minParallax=o.minParallaxPx??.5,minCorr=o.minCorrelation??.7,minGap=o.minPeakGap??.008;
   if(!Number.isInteger(radius)||radius<1||radius>5||!Number.isFinite(spacing)||spacing<.25||spacing>8||
@@ -114,8 +118,38 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
     o.peakRefinement==="image-evidence"||o.recoveryExpansionRounds!==undefined&&o.recoveryExpansionRounds>1||
     o.recoverMissing===true)
     throw new RangeError("Unsupported SGM parameter combination; use dense, independently measured samples");
-  const work=n*levels*((2*radius+1)**2)*images.length+8*n*levels;
+  const coarseWidth=Math.ceil(grid.width/2),coarseHeight=Math.ceil(grid.height/2);
+  const coarseLevels=Math.ceil((o.maxHeightM-o.minHeightM)/(o.heightStepM*2))+1;
+  const costPerPoint=levels*((2*radius+1)**2)*images.length+8*levels;
+  const work=n*costPerPoint+(pyramid===2?coarseWidth*coarseHeight*
+    (coarseLevels*((2*radius+1)**2)*images.length+8*coarseLevels):0);
   if(work>(o.maxWork??20_000_000)||work>500_000_000)throw new RangeError("SGM exceeds work budget; use smaller tiles");
+  // A coarse DSM is calculated from exactly the same original calibrated sensor
+  // imagery. It can suggest a soft unary penalty but never supplies output heights.
+  let guide:Float64Array|null=null;
+  if(pyramid===2&&priorWeight>0){
+    const coarseGrid:typeof grid={
+      width:coarseWidth,height:coarseHeight,crs:grid.crs,
+      transform:[grid.transform[0],grid.transform[1]*2,grid.transform[2]*2,
+                 grid.transform[3],grid.transform[4]*2,grid.transform[5]*2]
+    };
+    const coarse=reconstructTerrainSgm({...o,grid:coarseGrid,
+      heightStepM:o.heightStepM*2,sgmPyramidLevels:1});
+    guide=new Float64Array(n).fill(NaN);
+    for(let y=0;y<grid.height;y++)for(let x=0;x<grid.width;x++){
+      const cx=Math.floor(x/2),cy=Math.floor(y/2),p=cy*coarseWidth+cx;
+      const h=coarse.elevationMap.values[p]!;
+      if(!coarse.matchPass[p]||!Number.isFinite(h)||coarse.confidenceMap.values[p]!<.2)continue;
+      let support=0;
+      for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){
+        const nx=cx+dx,ny=cy+dy;
+        if(nx<0||ny<0||nx>=coarseWidth||ny>=coarseHeight)continue;
+        const ni=ny*coarseWidth+nx,z=coarse.elevationMap.values[ni]!;
+        if(coarse.matchPass[ni]&&Number.isFinite(z)&&Math.abs(h-z)<=priorRadius)support++;
+      }
+      if(support>=2)guide[y*grid.width+x]=h;
+    }
+  }
   const heightValues=Array.from({length:levels},(_,d)=>o.minHeightM+(o.maxHeightM-o.minHeightM)*d/(levels-1));
   const values=new Float64Array(n).fill(NaN),confidence=new Float64Array(n).fill(NaN);
   const texture=new Float64Array(n).fill(NaN),reasons=new Uint8Array(n),pass=new Uint8Array(n);
@@ -160,7 +194,11 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
       const valid=pairs.filter(Number.isFinite);
       if(valid.length<minPairs)continue;
       const mean=valid.reduce((a,b)=>a+b,0)/valid.length;
-      costs[off+d]=(1-mean)*.5;
+      // Image-only coarse guidance is a SOFT prior, never a source of valid labels.
+      // Hard photometric invalidity is preserved in the cost volume.
+      const prior=guide&&Number.isFinite(guide[i])?
+        priorWeight*Math.min(1,Math.abs(h-guide[i]!)/priorRadius):0;
+      costs[off+d]=(1-mean)*.5+prior;
     }
     const mid=images[0]!.camera.project({...center,heightM:heightValues[Math.floor(levels/2)]!});
     if(mid)brightness[i]=sampleTerrainImage(images[0]!,mid);
@@ -179,7 +217,9 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
       (best<0||aggregated[off+d]!<aggregated[off+best]!))best=d;
     if(best<0){reasons[i]=2;continue;}
     if(best===0||best===levels-1){reasons[i]=3;continue;}
-    const rawScore=1-2*costs[off+best]!;
+    const prior=guide&&Number.isFinite(guide[i])?
+      priorWeight*Math.min(1,Math.abs(heightValues[best]!-guide[i]!)/priorRadius):0;
+    const rawScore=1-2*(costs[off+best]!-prior); // only original photometric NCC
     if(!Number.isFinite(rawScore)||rawScore<minCorr){reasons[i]=4;continue;}
     if(pairBest){
       const strong=pairBest.filter((arr,j)=>{

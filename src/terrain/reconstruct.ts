@@ -31,6 +31,10 @@ export interface TerrainReconstructionOptions {
   /** Experimental calibrated height-volume semi-global matching. */
   matcher?:"height-sweep"|"sgm";
   sgmPaths?:4|8;sgmP1?:number;sgmP2?:number;sgmContrastScale?:number;
+  /** Experimental two-resolution image-only SGM (default: 1). */
+  sgmPyramidLevels?:1|2;
+  /** Additional unary penalty from stable coarse stereo measurements. */
+  sgmPriorWeight?:number;sgmPriorRadiusM?:number;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
