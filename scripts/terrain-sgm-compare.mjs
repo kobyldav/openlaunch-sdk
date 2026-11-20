@@ -14,7 +14,7 @@ const halo=Number(opt("tile-halo","0"));
 if(!Number.isInteger(halo)||halo<0||halo>32)throw Error("Invalid --tile-halo");
 const pyramid=Number(opt("sgm-pyramid-levels","1"));
 if(![1,2].includes(pyramid))throw Error("--sgm-pyramid-levels 1|2");
-const rows=[];
+const rows=[],surfaces=[];
 const variants=["height-sweep","sgm",...(halo>0&&size>64?["sgm-halo"]:[]),...(pyramid===2?["sgm-pyramid"]:[])];
 for(const matcher of variants){
   const dir=join(out,matcher);
@@ -30,16 +30,35 @@ for(const matcher of variants){
   if(r.error||r.status!==0||!report?.reference||!Number.isFinite(report.reference.centeredRmseM))
     throw Error(matcher+" did not produce an independently checkable diagnostic: "+
       (r.error?.message??r.status));
+  const compared=await readFile(join(dir,"heights-vs-s2p.csv"),"utf8");
+  const pixels=compared.trim().split("\n").slice(1).map(line=>{
+    const [idx,method,reference]=line.split(",");
+    return {idx:Number(idx),height:method===""?NaN:Number(method),reference:reference===""?NaN:Number(reference)};
+  });
+  if(pixels.length!==report.totalPixels||pixels.some((p,i)=>p.idx!==i))
+    throw Error("Invalid per-pixel A/B source alignment for "+matcher);
+  surfaces.push(pixels);
   rows.push({matcher,coverage:report.coverage,
     centeredRmseM:report.reference.centeredRmseM,
     referenceMatched:report.reference.count,elapsedMs:report.elapsedMs,
     passedStrictComparison:report.referencePassed,
     reconstructedPoints:report.validPixels,totalPoints:report.totalPixels});
 }
+// Compare every algorithm on the same valid reference-supported pixels.
+const commonIndices=surfaces[0].flatMap((p,i)=>
+  surfaces.every(surface=>Number.isFinite(surface[i].height)&&Number.isFinite(surface[i].reference))?[i]:[]);
+if(commonIndices.length<10)throw Error("Insufficient common pixels for SGM comparison");
+for(let j=0;j<rows.length;j++){
+  const errors=commonIndices.map(i=>surfaces[j][i].height-surfaces[j][i].reference);
+  const bias=errors.reduce((a,b)=>a+b,0)/errors.length;
+  rows[j].commonSupportCount=errors.length;
+  rows[j].commonSupportMeanDifferenceM=bias;
+  rows[j].commonSupportCenteredRmseM=Math.sqrt(errors.reduce((sum,e)=>sum+(e-bias)**2,0)/errors.length);
+}
 const [base,sgm]=rows;
-const betterAccuracy=sgm.centeredRmseM<base.centeredRmseM;
+const betterAccuracy=sgm.commonSupportCenteredRmseM<base.commonSupportCenteredRmseM;
 const betterCoverage=sgm.coverage>base.coverage;
-const comparison={dataset,size,tileHaloPixels:halo,sgmPyramidLevels:pyramid,reference:"Published S2P pipeline output, NOT independent ground truth",
+const comparison={dataset,size,tileHaloPixels:halo,sgmPyramidLevels:pyramid,commonSupportCount:commonIndices.length,reference:"Published S2P pipeline output, NOT independent ground truth",
   qualityGatesNotBypassed:true,comparisonOnly:true,betterAccuracy,betterCoverage,rows};
 await writeFile(join(out,"comparison.json"),JSON.stringify(comparison,null,2));
 const esc=v=>String(v).replaceAll("&","&amp;").replaceAll("<","&lt;");
@@ -47,10 +66,10 @@ await writeFile(join(out,"index.html"),
   '<!doctype html><meta charset="utf-8"><title>OpenLaunch SGM comparison</title>'+
   '<style>body{background:#101b28;color:#eef4fa;font:16px system-ui;margin:28px}th,td{text-align:left;padding:14px;border-bottom:1px solid #455}a{color:#8ac7ff}</style>'+
   '<h1>OpenLaunch | SGM vs height-sweep</h1>'+
-  '<p>Both algorithms use identical calibrated real sensor imagery. S2P reference is opened only AFTER reconstruction. Centered RMSE does not measure absolute height accuracy.</p>'+
-  '<table><tr><th>Method</th><th>Coverage</th><th>Centered RMSE</th><th>Time</th><th>Strict gate</th><th>3D</th></tr>'+
+  '<p>Both algorithms use identical calibrated real sensor imagery. S2P reference is opened only AFTER reconstruction. Centered RMSE does not measure absolute height accuracy. The common-points column uses identical valid reference pixels across all methods, to avoid selection bias from differing coverage.</p>'+
+  '<table><tr><th>Method</th><th>Coverage</th><th>Centered RMSE</th><th>RMSE on common points</th><th>Time</th><th>Strict gate</th><th>3D</th></tr>'+
   rows.map(r=>'<tr><td>'+esc(r.matcher)+'</td><td>'+(r.coverage*100).toFixed(1)+'%</td><td>'+
-  r.centeredRmseM.toFixed(2)+' m</td><td>'+(r.elapsedMs/1000).toFixed(1)+' s</td><td>'+
+  r.centeredRmseM.toFixed(2)+' m</td><td>'+r.commonSupportCenteredRmseM.toFixed(2)+' m</td><td>'+(r.elapsedMs/1000).toFixed(1)+' s</td><td>'+
   (r.passedStrictComparison?"PASS":"FAIL")+'</td><td><a href="'+r.matcher+'/terrain.html">View</a></td></tr>').join("")+
   '</table><p><a href="comparison.json">Raw JSON comparison</a></p>');
 console.table(rows);

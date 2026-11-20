@@ -43,6 +43,13 @@ const report={matcher:method,sgmPyramidLevels:matcher.sgmPyramidLevels,tileHaloP
 try{
  const dem=await decodeGeoTiff(await download("expected_output/"+dataset+"/dsm.tif","reference-s2p.tif"));
  const aligned=reprojectRasterTo(dem,result.elevationMap,"nearest");
+ // Write post-reconstruction per-pixel evidence; NEVER read during stereo matching.
+ const rows=["pixel_index,method_height_m,reference_height_m"];
+ for(let i=0;i<aligned.values.length;i++){
+   const h=refined.grid.values[i],r=aligned.values[i];
+   rows.push([i,Number.isFinite(h)?h:"",Number.isFinite(r)?r:""].join(","));
+ }
+ await writeFile(join(out,"heights-vs-s2p.csv"),rows.join("\n")+"\n");
  const errors=[];for(let i=0;i<aligned.values.length;i++){const a=refined.grid.values[i],b=aligned.values[i];if(Number.isFinite(a)&&Number.isFinite(b))errors.push(a-b);}
  if(errors.length<10)throw Error("Insufficient reference overlap");
  const mean=errors.reduce((s,x)=>s+x,0)/errors.length;
