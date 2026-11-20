@@ -223,3 +223,25 @@ jobs:
             test-results/terrain-sgm-pyramid/index.html
             test-results/terrain-sgm-pyramid/comparison.json
             test-results/terrain-sgm-pyramid/*/report.json
+
+  terrain-prague-sentinel2-live-windows:
+    runs-on: windows-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Discover real Prague Sentinel-2 and read only RGB COG AOI windows
+        run: node scripts/terrain-prague-sentinel2.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: real-sentinel2-prague
+          path: |
+            test-results/terrain-prague-sentinel2/index.html
+            test-results/terrain-prague-sentinel2/report.json
+            test-results/terrain-prague-sentinel2/prague-sentinel2-rgb.png
