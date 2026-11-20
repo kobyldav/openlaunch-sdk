@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenLaunch SDK | Real Prague 3D</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0c1826;color:#f0f6fc;font:14px system-ui,Arial}
+  header{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:12px;padding:14px 20px;border-bottom:1px solid #284056}
+  h1{font-size:19px;font-weight:650;margin:0}
+  main{padding:15px;max-width:1500px;margin:auto}
+  canvas{display:block;width:100%;height:min(70vh,800px);min-height:400px;background:#102334;border-radius:12px;touch-action:none;cursor:grab}
+  canvas:active{cursor:grabbing}
+  .toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:14px;margin:0 0 13px}
+  label{display:inline-flex;align-items:center;gap:7px}
+  input[type=range]{width:130px}
+  a{color:#91cbff}
+  .info{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:15px}
+  .info>div{background:#15283b;border:1px solid #29455a;border-radius:8px;padding:13px}
+  .fine{color:#b5c9db;font-size:12px;line-height:1.5}
+  .meta{font-variant-numeric:tabular-nums}
+  .legend{display:inline-block;width:10px;height:10px;background:#738191;border-radius:2px;margin-right:5px}
+  button{background:#254865;color:white;border:1px solid #45718c;border-radius:5px;padding:7px 11px;cursor:pointer}
+</style>
+</head>
+<body>
+<header><h1>OpenLaunch SDK · Real satellite 3D terrain</h1><span id="scene" class="fine">Loading model…</span></header>
+<main>
+<div class="toolbar">
+<label>Vertical exaggeration <input id="vertical" type="range" min="1" max="6" step=".25" value="1"> <b id="vertValue">1×</b></label>
+<label><input id="wire" type="checkbox"> Wireframe</label>
+<label><input id="image" type="checkbox" checked> Sentinel-2 colour</label>
+<button id="reset">Reset view</button>
+<a href="terrain.obj">Download 3D OBJ</a>
+<a href="report.json">Data provenance (JSON)</a>
+</div>
+<canvas id="view"></canvas>
+<p class="fine">Drag to rotate · Mouse wheel to zoom · Touch gestures supported. This is a real 2.5D Copernicus GLO-30 surface with Sentinel-2 colour sampled at the 30m mesh vertices, not a high-resolution 3D city scan. <span class="legend"></span> Grey means missing valid RGB imagery. Vertical scale is physically correct at 1×.</p>
+<div class="info">
+ <div><strong>Satellite observation</strong><p id="acquired" class="meta"></p><p id="cloud" class="fine"></p></div>
+ <div><strong>Elevation model</strong><p>Copernicus DEM GLO-30</p><p id="heights" class="fine"></p></div>
+ <div><strong>Output geometry</strong><p id="geometry" class="meta"></p><p id="coverage" class="fine"></p></div>
+</div>
+</main>
+<script>
+"use strict";
+const D=__MODEL_DATA__;
+const $=id=>document.getElementById(id);
+const canvas=$("view"),ctx=canvas.getContext("2d");
+const m=D.report.metadata,points=D.positions,triangles=D.triangles,colors=D.rgb,valid=D.rgbValid;
+const heights=points.filter((_,i)=>i%3===2&&points[i]!==null).map(Number);
+const minH=heights.length?Math.min(...heights):0,maxH=heights.length?Math.max(...heights):1;
+let angle=-0.72,tilt=0.62,zoom=1,drag=null;
+$("scene").textContent=m.sceneId+" · "+m.acquiredAt.slice(0,10);
+$("acquired").textContent=m.acquiredAt+" · "+m.imageryNativeResolutionM+" m native RGB";
+$("cloud").textContent="Scene-wide cloud fraction: "+(m.sceneCloudPercent??"unknown")+" %. Actual cloud-free pixels not guaranteed.";
+$("heights").textContent="EGM2008 heights "+minH.toFixed(1)+"–"+maxH.toFixed(1)+" m; ~30 m source spacing.";
+$("geometry").textContent=D.width+" × "+D.height+" grid · "+D.report.mesh.triangles+" triangles";
+$("coverage").textContent=m.sampledHeights+"/"+m.totalHeights+" valid elevations · "+m.sampledColors+" RGB vertices.";
+function draw(){
+ const pixelRatio=Math.min(2,window.devicePixelRatio||1);
+ const w=Math.round(canvas.clientWidth*pixelRatio),h=Math.round(canvas.clientHeight*pixelRatio);
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+ ctx.clearRect(0,0,w,h);
+ const stretch=Number($("vertical").value);
+ $("vertValue").textContent=stretch+"×";
+ const ca=Math.cos(angle),sa=Math.sin(angle),st=Math.sin(tilt),ct=Math.cos(tilt);
+ const positions=[];
+ let extent=0;
+ for(let i=0;i<points.length;i+=3){
+   if(points[i]===null||points[i+1]===null||points[i+2]===null){positions.push(null);continue;}
+   extent=Math.max(extent,Math.abs(points[i]),Math.abs(points[i+1]));
+ }
+ const scale=Math.min(w,h)*0.7/Math.max(extent*2,(maxH-minH)*stretch,1)*zoom;
+ for(let i=0;i<points.length;i+=3){
+   const east=points[i],north=points[i+1],elev=points[i+2];
+   if(east===null||north===null||elev===null){positions.push(null);continue;}
+   const a=ca*east-sa*north,b=sa*east+ca*north,z=(elev-minH)*stretch;
+   positions.push([w/2+a*scale,h*0.61+(b*st-z*ct)*scale,b*ct+z*st]);
+ }
+ const faces=[];
+ for(let i=0;i<triangles.length;i+=3){
+   const a=triangles[i],b=triangles[i+1],c=triangles[i+2];
+   if(!positions[a]||!positions[b]||!positions[c])continue;
+   faces.push([a,b,c,(positions[a][2]+positions[b][2]+positions[c][2])/3]);
+ }
+ faces.sort((a,b)=>a[3]-b[3]);
+ const wire=$("wire").checked,image=$("image").checked;
+ for(const f of faces){
+   const ids=f.slice(0,3),p=ids.map(i=>positions[i]);
+   let rgb;
+   if(!image) {
+     const z=ids.reduce((t,i)=>t+points[3*i+2],0)/3;
+     const v=(z-minH)/(maxH-minH||1);
+     rgb=[50+150*v,115+95*v,190-90*v];
+   }else if(ids.every(i=>valid[i])){
+     rgb=[0,1,2].map(c=>ids.reduce((t,i)=>t+colors[3*i+c],0)/3);
+   }else rgb=[105,117,130];
+   ctx.beginPath();
+   ctx.moveTo(p[0][0],p[0][1]);ctx.lineTo(p[1][0],p[1][1]);ctx.lineTo(p[2][0],p[2][1]);ctx.closePath();
+   ctx.fillStyle="rgb("+rgb.map(Math.round).join(",")+")";ctx.fill();
+   if(wire){ctx.strokeStyle="rgba(12,22,35,.35)";ctx.lineWidth=.6*pixelRatio;ctx.stroke();}
+ }
+}
+$("vertical").oninput=draw;$("wire").onchange=draw;$("image").onchange=draw;
+$("reset").onclick=()=>{angle=-.72;tilt=.62;zoom=1;$("vertical").value=1;draw();};
+canvas.addEventListener("pointerdown",e=>{drag=[e.clientX,e.clientY];canvas.setPointerCapture(e.pointerId);});
+canvas.addEventListener("pointermove",e=>{
+ if(!drag)return;
+ angle+=(e.clientX-drag[0])*.008;tilt=Math.max(.08,Math.min(1.5,tilt+(e.clientY-drag[1])*.008));
+ drag=[e.clientX,e.clientY];draw();
+});
+for(const event of ["pointerup","pointercancel"])canvas.addEventListener(event,()=>drag=null);
+canvas.addEventListener("wheel",e=>{e.preventDefault();zoom=Math.max(.2,Math.min(10,zoom*Math.exp(-e.deltaY*.001)));draw();},{passive:false});
+window.addEventListener("resize",draw);
+draw();
+</script>
+</body>
+</html>
