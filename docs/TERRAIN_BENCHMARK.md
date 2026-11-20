@@ -34,3 +34,7 @@ A 128×128 satellite model with roughly 70% coverage and ~11 m centered RMSE is 
 ## Rejection diagnostics for every pixel
 
 The matcher now emits `rejectionReasons` (codes 0–8) with every DSM, including tiled DSMs. `scripts/terrain-s2p-benchmark.mjs` exports a per-reason histogram `rejectionCounts`. It distinguishes insufficient viewing parallax, missing valid image hypotheses, boundary maxima, weak correlation, contradictory stereo pairs, ambiguous maxima, missing seed neighbours, and inconsistency with recovered matches. Reasons are diagnostic only and may reflect the final recovery attempt, not every rejection in the first pass. Always inspect this histogram before relaxing thresholds or filling holes.
+
+### Experimental recovery does not currently pass the large-scene quality gate
+
+At 128×128 on the S2P triplet, the strict three-view matcher with local pilot achieved ~67.3% coverage and 6.62 m centered RMSE against S2P, failing quality. Allowing an occluded view gave ~68.1% / 6.79 m, and three iterative measured-only recovery rounds ~68.2% / 7.05 m. These optional experiments **regressed accuracy** and therefore are **disabled by default** in the large benchmark. Use `--occlusion-fallback` and/or `--recovery-rounds 3` on the internal S2P benchmark script only for further controlled experimentation. Do not lower thresholds merely to make these variants pass. Significant improvement needs a dense matching/regularized cost-volume pipeline and real independent validation.
