@@ -88,7 +88,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   const stride=o.sampleStride??1,exclusion=o.peakExclusionM??0,rounds=o.recoveryExpansionRounds??1;
   if(!Number.isInteger(rounds)||rounds<1||rounds>4)throw new RangeError("recoveryExpansionRounds must be 1..4");
   if(!Number.isInteger(stride)||stride<1||stride>100||!Number.isFinite(exclusion)||exclusion<0)throw new RangeError("Invalid pilot options");
-  const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*((2*r+1)**2+(o.recoverMissing?25+81:0))*images.length;
+  const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*((2*r+1)**2+(o.recoverMissing?rounds*(25+81):0))*images.length;
   if(!Number.isSafeInteger(budget)||budget<1||budget>500_000_000||work>budget)throw new RangeError("Terrain search exceeds work budget; tile the AOI or reduce hypotheses");
   const values=new Float64Array(n).fill(NaN),conf=new Float64Array(n).fill(NaN),tex=new Float64Array(n).fill(NaN);
   const elevationMap:RasterGrid={...grid,values,source:"OpenLaunch stereo reconstruction",unit:"m ellipsoid"};
