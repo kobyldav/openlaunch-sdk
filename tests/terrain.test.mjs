@@ -155,3 +155,15 @@ test("measured-only iterative recovery never changes accepted stereo heights",()
  }
  assert.throws(()=>reconstructTerrain({...opts,recoveryExpansionRounds:0}),/recoveryExpansionRounds/);
 });
+
+test("native SGM reconstructs a calibrated synthetic stereo plane without reference heights",()=>{
+ const result=reconstructTerrain({...opts,matcher:"sgm",minCorrelation:.5,minPeakGap:.003,maxWork:1000000});
+ assert.equal(result.model,"stereo-height-sgm");
+ assert.ok(result.validPixels>=10,"valid SGM pixels "+result.validPixels);
+ let err=0;
+ for(const h of result.elevationMap.values)if(Number.isFinite(h))err+=Math.abs(h-140);
+ assert.ok(err/result.validPixels<5,"Mean plane error "+err/result.validPixels);
+ const rejected=reconstructTerrain({...opts,matcher:"sgm",images:[image(0,"flat-a",true),image(1,"flat-b",true)]});
+ assert.equal(rejected.validPixels,0);
+ assert.ok(Array.from(rejected.rejectionReasons).every(reason=>reason>0));
+});
