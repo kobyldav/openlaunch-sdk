@@ -16,3 +16,4 @@ export * from "./quality.js";
 export * from "./pilot.js";
 export * from "./source.js";
 export * from "./tiles.js";
+export * from "./sgm.js";

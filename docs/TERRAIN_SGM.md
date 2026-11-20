@@ -1,0 +1,38 @@
+# Experimental native SGM: first implementation stage
+
+The new \`matcher:"sgm"\` option uses a **height-indexed cost volume** made solely
+from calibrated original sensor-image projections, photometric NCC and 4/8
+Semi-Global Matching (Hirschmüller-style) dynamic-programming paths.
+This is genuine multi-direction cost aggregation, **not** merely interpolating
+a previously computed DEM. It also is **not yet full epipolar rectification,
+image-space disparity SGM, multiresolution processing, or triangulation of facades**.
+The output is still a 2.5D DSM of roofs and terrain.
+
+The path aggregation is exposed as \`aggregateTerrainCostVolume\` for unit tests.
+Invalid height hypotheses remain invalid even after regularisation. Strong
+sensor evidence is required at the chosen height; SGM cannot turn an
+unobserved / untextured point into a measured one.
+
+Options: \`matcher:"sgm"\`, \`sgmPaths:4|8\`, \`sgmP1\`, \`sgmP2\`,
+\`sgmContrastScale\` (intensity difference for adaptive penalties).
+The original \`matcher:"height-sweep"\` remains the default.
+
+Real satellite experiment (diagnostic; does not weaken existing production gate):
+
+\`\`\`cmd
+npm run build
+node scripts/terrain-s2p-benchmark.mjs --dataset s2p-triplet --out test-results/sgm-triplet --matcher sgm --diagnostic-only
+start "" "test-results\sgm-triplet\terrain.html"
+\`\`\`
+
+Compare \`report.json\` with the original height-sweep benchmark. Use
+\`--diagnostic-only\` ONLY for experiments: it preserves \`referencePassed:false\`
+and does not mean the result meets acceptance criteria. Real S2P reference
+heights are read **after** the SDK reconstructs the surface; the S2P DSM is
+comparison output from another algorithm, not independent ground truth.
+
+Current limits: no epipolar regridding, no left/right consistency test yet,
+no coarse-to-fine pyramid, no dedicated GPU/worker, and no independent survey
+accuracy. SGM currently disallows \`recoverMissing:true\`, multi-round recovery,
+sparse sampling, and image-evidence substep refinement to avoid mixing methods.
+For large AOIs use \`reconstructTerrainTiled\` with a bounded \`tileSize\`.

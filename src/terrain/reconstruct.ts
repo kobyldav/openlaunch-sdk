@@ -1,3 +1,4 @@
+import {reconstructTerrainSgm} from "./sgm.js";
 import { gridCrsToLonLat,pixelToWorld,validateRaster,lonLatToGridCrs,worldToPixel,type RasterGrid } from "../eo/raster.js";
 import { geodeticToEcef } from "../geo/ellipsoid.js";
 import type { TerrainCamera,TerrainPixel } from "./camera.js";
@@ -27,6 +28,9 @@ export interface TerrainReconstructionOptions {
   /** Number of independently usable matches against the reference image.
    * Defaults to all other images. Lowering permits occluded third views. */
   minMatchingPairs?:number;
+  /** Experimental calibrated height-volume semi-global matching. */
+  matcher?:"height-sweep"|"sgm";
+  sgmPaths?:4|8;sgmP1?:number;sgmP2?:number;sgmContrastScale?:number;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
@@ -41,7 +45,7 @@ export interface TerrainReconstruction {
    * 7=insufficient seed neighbors, 8=inconsistent recovery.
    * Diagnostic reason codes are NOT probabilities or ground truth. */
   rejectionReasons:Uint8Array;
-  verticalDatum:"WGS84 ellipsoid";model:"stereo-height-sweep";
+  verticalDatum:"WGS84 ellipsoid";model:"stereo-height-sweep"|"stereo-height-sgm";
 }
 /** Bilinear sensor-image sampling. Zero-weight missing neighbours do not
  * contaminate a valid pixel centre or the last source row/column. Never
@@ -71,6 +75,8 @@ function ncc(a:readonly number[],b:readonly number[]):number {
 /** Project local ground patches at candidate ellipsoid heights into each image.
  * Only independent image measurements and calibrated camera projections are inputs. */
 export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainReconstruction {
+  if(o.matcher==="sgm")return reconstructTerrainSgm(o);
+  if(o.matcher!==undefined&&o.matcher!=="height-sweep")throw new RangeError("Unknown terrain matcher");
   const {grid,images}=o;
   if(images.length<2||images.length>8)throw new RangeError("Require 2–8 calibrated images");
   images.forEach(checkImage);

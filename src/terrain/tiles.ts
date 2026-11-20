@@ -93,6 +93,6 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
     pointCloud:{positionsEcefM:new Float64Array(points),confidence:new Float32Array(qualities)},
     mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},
     validPixels,totalPixels:n,matchPass:passes,recoveredPixels,rejectionReasons:rejections,
-    sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep",sourceKind:source.kind,tiles:completed,pilotTiles,pilotFallbacks
+    sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:options.matcher==="sgm"?"stereo-height-sgm":"stereo-height-sweep",sourceKind:source.kind,tiles:completed,pilotTiles,pilotFallbacks
   };
 }
