@@ -38,7 +38,7 @@ export function sampleTerrainImage(im:TerrainImage,p:TerrainPixel):number {
   if(!Number.isFinite(p.x)||!Number.isFinite(p.y)||p.x<0||p.y<0||p.x>im.width-1||p.y>im.height-1)return NaN;
   const x=Math.min(Math.floor(p.x),im.width-2),y=Math.min(Math.floor(p.y),im.height-2),f=p.x-x,g=p.y-y,i=y*im.width+x;
   let sum=0;
-  for(const [index,weight] of [[i,(1-f)*(1-g)],[i+1,f*(1-g)],[i+im.width,(1-f)*g],[i+im.width+1,f*g]]){
+  for(const [index,weight] of ([[i,(1-f)*(1-g)],[i+1,f*(1-g)],[i+im.width,(1-f)*g],[i+im.width+1,f*g]] as [number,number][])){
     if(weight<=1e-12)continue;
     const v=im.values[index]!;
     if(!Number.isFinite(v))return NaN;
@@ -169,7 +169,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     if(recovery&&(!Number.isFinite(l)||!Number.isFinite(u)||Math.abs(h-guide)>tolerance))continue;
     const q=Math.min(1,Math.max(0,m)*Math.min(1,(m-other)/0.2));
     values[i]=h;conf[i]=q;matchPass[i]=recovery?2:1;
-    const p=images[0]!.camera.project({...center,heightM:h});if(p)tex[i]=sample(images[0]!,p);
+    const p=images[0]!.camera.project({...center,heightM:h});if(p)tex[i]=sampleTerrainImage(images[0]!,p);
     const v=geodeticToEcef({...center,altitudeM:h});
     if(!cloud.length)origin=v;
     cloud.push(...v);quality.push(q);ecef.set(v,i*3);
