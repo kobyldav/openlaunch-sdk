@@ -66,3 +66,28 @@ Each S2P run exports `heights-vs-s2p.csv` **after reconstruction**. The A/B dash
 ### Separate measured and interpolated validation
 
 The per-method `reference.centeredRmseM` intentionally continues to use the same refined DSM as the historical benchmark. For the new common-support metric the CSV exports **measured stereo heights separately from filtered/interpolated heights**, and the common pixel set is restricted to finite *raw measured* heights from all compared algorithms. Interpolated / hole-filled pixels never count towards the new common-support RMSE or measured coverage.
+
+## External S2P reference timeouts and preserved 3D models
+
+The S2P imagery and **validation-only** DSM are downloaded through a bounded
+TIFF-checking transport with retries and a shared persistent
+\`s2p-cache\` directory inside the comparison output. The reference is never
+read during stereo reconstruction. An interrupted fetch does **not** count as
+a failed geometric reconstruction. The A/B dashboard (\`index.html\`) and
+\`comparison.json\` are created before processing and updated after each
+variant, even when the reference cannot be fetched. Such cases are labeled
+\`REFERENCE UNAVAILABLE\`, have no RMSE, and the overall command exits
+nonzero rather than claiming accuracy. Actual completed meshes still have
+links; if networking fails repeatedly, following runs skip additional
+reference requests but still compute image-only 3D outputs. Re-run with the
+same \`--out\` to reuse verified input TIFF assets and reference cache.
+
+Recommended first pass:
+\`\`\`cmd
+npm run example:terrain-sgm -- --size 48 --out test-results/terrain-sgm-next
+start "" "test-results\terrain-sgm-next\index.html"
+\`\`\`
+
+The 128×128 tiled run with halo and pyramid is substantially more expensive.
+The S2P reference is not independently surveyed ground truth; an unavailable
+reference cannot be called a quality PASS.
