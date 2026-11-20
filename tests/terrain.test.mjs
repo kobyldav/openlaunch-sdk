@@ -108,3 +108,11 @@ test("image bilinear interpolation retains valid edge pixels but never invents m
  assert.equal(sampleTerrainImage(full,{x:.5,y:.5}),2.5);
  assert.ok(Number.isNaN(sampleTerrainImage(full,{x:1.01,y:0})));
 });
+
+test("stereo-pair consensus can only reject incoherent multiview correspondences",()=>{
+ const triple=[image(0,"a"),image(1,"b"),image(-1,"c")];
+ const plain=reconstructTerrain({...opts,images:triple});
+ const strict=reconstructTerrain({...opts,images:triple,pairConsensusToleranceM:10});
+ assert.ok(strict.validPixels<=plain.validPixels);
+ assert.throws(()=>reconstructTerrain({...opts,pairConsensusToleranceM:0}),/consensus/);
+});

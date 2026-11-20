@@ -29,10 +29,10 @@ const grid={width:size,height:size,crs:"EPSG:4326",transform:[lon-size*dx/2,dx,0
 const started=Date.now(),step=Math.max(.5,(hi-lo)/800);
 const pilot=estimateTerrainHeightBand({images,grid,minHeightM:lo,maxHeightM:hi,heightStepM:step},{pilotStepM:Math.max(1,step),clusterRadiusM:20,marginM:25});
 const minHeightM=pilot.minHeightM,maxHeightM=pilot.maxHeightM,heightStepM=Math.max(.5,(maxHeightM-minHeightM)/120);
-const matcher={source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,peakRefinement:"parabolic",recoverMissing:true,maxWork:250_000_000};
+const matcher={source,grid,minHeightM,maxHeightM,heightStepM,pairConsensusToleranceM:dataset==="triplet"&&size>64?8:undefined,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,peakRefinement:"parabolic",recoverMissing:true,maxWork:250_000_000};
 const result=size>64?reconstructTerrainTiled({...matcher,tileSize:32,maxAdjacentRiseM:30,onTile:p=>{if(p.completed%4===0||p.completed===p.total)console.log("Tile "+p.completed+"/"+p.total);}}):reconstructTerrainFromSource(matcher);
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:8,fillRadius:1}),vals=Array.from(refined.grid.values).filter(Number.isFinite);
-const report={sourceKind:"satellite",synthetic:false,source:base+"input_"+dataset,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:vals.length?[Math.min(...vals),Math.max(...vals)]:null,elapsedMs:Date.now()-started,pilot};
+const report={pairConsensusToleranceM:matcher.pairConsensusToleranceM??null,sourceKind:"satellite",synthetic:false,source:base+"input_"+dataset,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:vals.length?[Math.min(...vals),Math.max(...vals)]:null,elapsedMs:Date.now()-started,pilot};
 // Only after reconstruction: compare against s2p expected output, not independent ground truth.
 try{
  const dem=await decodeGeoTiff(await download("expected_output/"+dataset+"/dsm.tif","reference-s2p.tif"));
@@ -41,7 +41,12 @@ try{
  if(errors.length<10)throw Error("Insufficient reference overlap");
  const mean=errors.reduce((s,x)=>s+x,0)/errors.length;
  report.reference={source:"S2P expected-output DSM (algorithm comparison, NOT independent truth)",sourceCrs:dem.crs,targetCrs:result.elevationMap.crs,verticalDatum:"not independently verified",count:errors.length,meanDifferenceM:mean,centeredRmseM:Math.sqrt(errors.reduce((s,x)=>s+(x-mean)**2,0)/errors.length),note:"CRS transformed; no vertical datum correction. Centered RMSE removes a constant offset, not distortion."};
- report.referencePassed=report.reference.centeredRmseM<=15&&Math.abs(mean)<=50;
+ // A computationally successful run is NOT an acceptable high-resolution model.
+ // Strict comparison gate, with no assumption of absolute geodetic accuracy.
+ const minCoverage=size>64?.85:.8,maxCenteredRmseM=size>64?5:4;
+ report.qualityGate={kind:"relative S2P comparison only",minCoverage,maxCenteredRmseM,independentGroundTruth:false};
+ report.referencePassed=report.coverage>=minCoverage&&report.reference.centeredRmseM<=maxCenteredRmseM&&Math.abs(mean)<=10;
+ report.qualityGate.passed=report.referencePassed;
 }catch(e){report.referenceError=String(e);report.referencePassed=false;}
  await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));await writeRealTerrainViewer(out,{result,refined,report});console.log(JSON.stringify(report,null,2));
- if(report.coverage<.3||!report.referencePassed)throw Error("S2P case quality / reference gate failed");
+ if(!report.referencePassed)throw Error("S2P comparison quality gate failed; output is diagnostic, not production-ready");

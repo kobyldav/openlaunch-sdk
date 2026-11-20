@@ -19,6 +19,8 @@ export interface TerrainReconstructionOptions {
   recoverMissing?:boolean;
   /** Refine a winning height against the actual images (rather than a parabola through sweep samples). */
   peakRefinement?:"parabolic"|"image-evidence";
+  /** If >=3 views, reject heights whose individual stereo pairs disagree (metres). */
+  pairConsensusToleranceM?:number;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
@@ -64,6 +66,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   const r=o.patchRadius??2,minCorr=o.minCorrelation??0.75,minGap=o.minPeakGap??0.03,minParallax=o.minParallaxPx??0.5,patchSpacing=o.patchSpacingScale??1;
   if(!Number.isFinite(patchSpacing)||patchSpacing<.25||patchSpacing>8)throw new RangeError("patchSpacingScale must be 0.25..8");
   if(o.peakRefinement!==undefined&&o.peakRefinement!=="parabolic"&&o.peakRefinement!=="image-evidence")throw new RangeError("Unknown peak refinement method");
+  if(o.pairConsensusToleranceM!==undefined&&(!Number.isFinite(o.pairConsensusToleranceM)||o.pairConsensusToleranceM<=0))throw new RangeError("Invalid stereo pair consensus tolerance");
   if(!Number.isInteger(r)||r<1||r>5||!Number.isFinite(minCorr)||minCorr<0||minCorr>1||!Number.isFinite(minGap)||minGap<0||minGap>1||!Number.isFinite(minParallax)||minParallax<=0)throw new RangeError("Invalid matching parameters");
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
   const steps=Math.ceil((o.maxHeightM-o.minHeightM)/o.heightStepM)+1,n=grid.width*grid.height;
@@ -106,21 +109,37 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     const endpoints=images.map(im=>[im.camera.project({...center,heightM:hs[0]!}),im.camera.project({...center,heightM:hs[steps-1]!})] as const);
     const [a,b]=endpoints[0]!;
     if(!a||!b||!endpoints.slice(1).some(([c,d])=>c&&d&&Math.hypot((d.x-c.x)-(b.x-a.x),(d.y-c.y)-(b.y-a.y))>=minParallax))continue;
-    const scoreAt=(h:number):number=>{
+    const pairCurves=images.length>=3&&o.pairConsensusToleranceM!==undefined?images.slice(1).map(()=>new Float64Array(steps).fill(NaN)):null;
+    const scoreAt=(h:number,k?:number):number=>{
       const samples=images.map(im=>ground.map(g=>{
         const p=im.camera.project({...g,heightM:h});
         return p?sampleTerrainImage(im,p):NaN;
       }));
       const pairScores=samples.slice(1).map(v=>ncc(samples[0]!,v));
+      if(k!==undefined&&pairCurves)pairScores.forEach((s,j)=>pairCurves[j]![k]=s);
       return pairScores.every(Number.isFinite)?pairScores.reduce((sum,v)=>sum+v,0)/pairScores.length:NaN;
     };
     scores.fill(NaN);
     for(let k=0;k<steps;k++){
-      const h=hs[k]!;if(h>=lower&&h<=upper)scores[k]=scoreAt(h);
+      const h=hs[k]!;if(h>=lower&&h<=upper)scores[k]=scoreAt(h,k);
     }
     let best=-1;
     for(let k=0;k<steps;k++)if(Number.isFinite(scores[k])&&(best<0||scores[k]!>scores[best]!))best=k;
     if(best<=0||best>=steps-1||scores[best]!<(recovery?Math.max(.65,minCorr-.05):minCorr))continue; // boundary peaks are not bounded
+    if(pairCurves){
+      // Consensus uses *independently searched* height peaks for each extra image.
+      // A good average correlation cannot mask an inconsistent stereo pair.
+      const tolerance=o.pairConsensusToleranceM!;
+      let consistent=true;
+      for(const curve of pairCurves){
+        let pairBest=-1;
+        for(let k=0;k<steps;k++)if(Number.isFinite(curve[k])&&(pairBest<0||curve[k]!>curve[pairBest]!))pairBest=k;
+        if(pairBest<0||curve[pairBest]!<(recovery?Math.max(.6,minCorr-.1):Math.max(.65,minCorr-.05))||Math.abs(hs[pairBest]!-hs[best]!)>tolerance){
+          consistent=false;break;
+        }
+      }
+      if(!consistent)continue;
+    }
     let other=-Infinity;
     for(let k=0;k<steps;k++)if(Math.abs(k-best)>1&&Math.abs(hs[k]!-hs[best]!)>=exclusion&&Number.isFinite(scores[k]))other=Math.max(other,scores[k]!);
     if(!Number.isFinite(other)||scores[best]!-other<(recovery?Math.max(.015,minGap*.7):minGap))continue;

@@ -26,3 +26,7 @@ The S2P reference DSM is projected onto the OpenLaunch WGS84 grid with `reprojec
 ## Extended real sensor mosaic
 
 `npm run example:terrain-benchmark -- --case s2p-triplet-large --out test-results/terrain-large` reconstructs a 128×128 grid at 2 m pitch from original S2P triplet images, using the OpenLaunch tiled engine. A reference algorithm's DSM is opened only after reconstruction. This case is opt-in because its runtime and memory requirements are higher. The explicit `--out` path prevents overwriting the standard benchmark dashboard. The high-resolution satellite image scene is not a fully calibrated independent aerial photograph benchmark.
+
+### Honest real-data acceptance
+
+A 128×128 satellite model with roughly 70% coverage and ~11 m centered RMSE is **not an acceptable detailed 3D reconstruction**. The S2P test now enforces a stronger relative comparison (small AOI: coverage ≥80%, centered RMSE ≤4 m; large AOI: coverage ≥85%, centered RMSE ≤5 m, mean offset within 10 m). Large triplets optionally require `pairConsensusToleranceM:8` so incompatible view pairs cannot create apparently confident height measurements. A failed gate leaves diagnostic outputs but fails CI. These are algorithm-comparison thresholds, not certified surveying tolerances; no independent ground control points are supplied.
