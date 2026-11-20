@@ -42,6 +42,7 @@ const rejectionCounts=Object.fromEntries(rejectionReasonNames.map((name,reason)=
 const report={matcher:method,sgmPyramidLevels:matcher.sgmPyramidLevels,tileHaloPixels:size>64?tileHaloPixels:0,rejectionCounts,recoveryExpansionRounds:matcher.recoveryExpansionRounds,minMatchingPairs:matcher.minMatchingPairs??source.images.length-1,pairConsensusToleranceM:matcher.pairConsensusToleranceM??null,pilotTiles:result.pilotTiles??null,pilotFallbacks:result.pilotFallbacks??null,sourceKind:"satellite",synthetic:false,source:base+"input_"+dataset,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:vals.length?[Math.min(...vals),Math.max(...vals)]:null,elapsedMs:Date.now()-started,pilot};
 // Only after reconstruction: compare against s2p expected output, not independent ground truth.
 try{
+ if(args.includes("--skip-reference-download"))throw Error("Reference check deliberately skipped following an earlier download failure");
  const dem=await decodeGeoTiff(await download("expected_output/"+dataset+"/dsm.tif","reference-s2p.tif"));
  const aligned=reprojectRasterTo(dem,result.elevationMap,"nearest");
  // Write post-reconstruction per-pixel evidence; NEVER read during stereo matching.
