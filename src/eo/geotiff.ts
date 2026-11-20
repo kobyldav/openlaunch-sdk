@@ -277,7 +277,7 @@ export class TiffDirectory {
 
 /** TIFF floating-point predictor 3: undo byte differences, then unshuffle MSB-first planes.
  * Single-band IEEE 32/64-bit only; reconstruct bytes in the declared TIFF byte order. */
-export function undoFloatPredictor(bytes:Uint8Array,width:number,height:number,bits:number,little:boolean):void {
+export export function undoFloatPredictor(bytes:Uint8Array,width:number,height:number,bits:number,little:boolean):void {
   if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||![32,64].includes(bits)||bytes.length!==width*height*(bits/8))throw new RangeError("Invalid floating-point predictor block");
   const bps=bits/8,stride=width*bps,planes=new Uint8Array(stride);
   for(let y=0;y<height;y++){
