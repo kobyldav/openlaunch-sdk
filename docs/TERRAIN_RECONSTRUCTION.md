@@ -75,3 +75,7 @@ For multi-tile areas with strongly varying ground and roofs, enable `localHeight
 ### Optional multiview occlusion handling
 
 `minMatchingPairs` defaults to `images.length - 1`. A calibrated three-view scene may explicitly set `minMatchingPairs:1` to allow a pixel supported by only one valid stereo pair if another view is masked/occluded. The stereo matcher still computes the height from source images, applies uniqueness and photometric tests, and `pairConsensusToleranceM` rejects contradictory strong pairs. This trades some redundancy for coverage and may produce incorrect heights in repeated textures; never use without a reference quality gate. The 128×128 benchmark tests this mode experimentally. No fabricated DEM heights or reference values are used in reconstruction.
+
+### Iterative image-only gap recovery
+
+Set `recoveryExpansionRounds: 2..4` together with `recoverMissing:true` to expand the measured stereo seed set over successive image-matching passes. Previously accepted heights are never altered; each newly accepted output requires a fresh stereo correlation and height uniqueness test against calibrated images. No missing pixel is assigned a neighbor's height directly, and any remaining gaps stay NaN. Because iterative propagation can increase false matches at roof boundaries, use it only with quality controls and independent reference comparisons. The 128×128 real scene tests three rounds; the default remains one round for compatibility.

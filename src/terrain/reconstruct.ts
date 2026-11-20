@@ -17,6 +17,9 @@ export interface TerrainReconstructionOptions {
   peakExclusionM?:number;
   /** Retry missing cells using image matches and a local search band from first-pass heights. */
   recoverMissing?:boolean;
+  /** Optional repeated image-only recovery from newly verified stereo neighbours (1..4).
+   * The default 1 preserves the original two-pass behavior. */
+  recoveryExpansionRounds?:number;
   /** Refine a winning height against the actual images (rather than a parabola through sweep samples). */
   peakRefinement?:"parabolic"|"image-evidence";
   /** If >=3 views, reject heights whose individual stereo pairs disagree (metres). */
@@ -82,7 +85,8 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
   const steps=Math.ceil((o.maxHeightM-o.minHeightM)/o.heightStepM)+1,n=grid.width*grid.height;
   if(!Number.isSafeInteger(grid.width)||!Number.isSafeInteger(grid.height)||grid.width<1||grid.height<1||n>500_000||!Number.isSafeInteger(steps)||steps<3||steps>1024)throw new RangeError("Invalid terrain grid or height count");
-  const stride=o.sampleStride??1,exclusion=o.peakExclusionM??0;
+  const stride=o.sampleStride??1,exclusion=o.peakExclusionM??0,rounds=o.recoveryExpansionRounds??1;
+  if(!Number.isInteger(rounds)||rounds<1||rounds>4)throw new RangeError("recoveryExpansionRounds must be 1..4");
   if(!Number.isInteger(stride)||stride<1||stride>100||!Number.isFinite(exclusion)||exclusion<0)throw new RangeError("Invalid pilot options");
   const budget=o.maxWork??20_000_000,work=Math.ceil(grid.width/stride)*Math.ceil(grid.height/stride)*steps*((2*r+1)**2+(o.recoverMissing?25+81:0))*images.length;
   if(!Number.isSafeInteger(budget)||budget<1||budget>500_000_000||work>budget)throw new RangeError("Terrain search exceeds work budget; tile the AOI or reduce hypotheses");
@@ -197,7 +201,20 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   }
   };
   pass(r,false);
-  if(o.recoverMissing&&stride===1){const seed=values.slice();pass(2,true,seed);pass(4,true,seed);}
+  if(o.recoverMissing&&stride===1){
+    // Round 1 is unchanged for backwards compatibility. Subsequent rounds use
+    // only previously photometrically verified stereo measurements as seeds.
+    const seed=values.slice();
+    pass(2,true,seed);pass(4,true,seed);
+    for(let round=1;round<rounds;round++){
+      const before=matchPass.reduce((a,b)=>a+(b>0?1:0),0);
+      const updated=values.slice();
+      pass(2,true,updated);
+      const newer=values.slice();
+      pass(4,true,newer);
+      if(matchPass.reduce((a,b)=>a+(b>0?1:0),0)===before)break;
+    }
+  }
   const recoveredPixels=matchPass.reduce((sum,v)=>sum+(v===2?1:0),0);
   const positions=new Float32Array(n*3).fill(NaN),triangles:number[]=[];
   for(let i=0;i<n;i++)if(Number.isFinite(values[i]))for(let k=0;k<3;k++)positions[3*i+k]=ecef[3*i+k]!-origin[k]!;

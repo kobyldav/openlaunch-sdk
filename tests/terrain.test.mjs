@@ -143,3 +143,15 @@ test("adaptive multiview can accept an occluded third image without changing ori
  const strict=reconstructTerrain({...opts,images:[...opts.images,masked]});
  assert.equal(strict.validPixels,0);
 });
+
+test("measured-only iterative recovery never changes accepted stereo heights",()=>{
+ const base=reconstructTerrain({...opts,recoverMissing:true});
+ const extended=reconstructTerrain({...opts,recoverMissing:true,recoveryExpansionRounds:3});
+ assert.ok(extended.validPixels>=base.validPixels);
+ assert.equal(extended.validPixels,extended.matchPass.reduce((n,x)=>n+(x>0?1:0),0));
+ for(let i=0;i<base.totalPixels;i++)if(base.matchPass[i]){
+   assert.equal(extended.elevationMap.values[i],base.elevationMap.values[i]);
+   assert.equal(extended.matchPass[i],base.matchPass[i]);
+ }
+ assert.throws(()=>reconstructTerrain({...opts,recoveryExpansionRounds:0}),/recoveryExpansionRounds/);
+});
