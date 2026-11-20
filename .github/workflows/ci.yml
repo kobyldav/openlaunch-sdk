@@ -195,3 +195,25 @@ jobs:
             test-results/terrain-sgm-halo/index.html
             test-results/terrain-sgm-halo/comparison.json
             test-results/terrain-sgm-halo/*/report.json
+
+  terrain-sgm-pyramid-windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Compare two-resolution native SGM with original SGM on 128x128 real triplet
+        run: node scripts/terrain-sgm-compare.mjs --dataset s2p-triplet --size 128 --sgm-pyramid-levels 2 --out test-results/terrain-sgm-pyramid
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain-sgm-pyramid-compare
+          path: |
+            test-results/terrain-sgm-pyramid/index.html
+            test-results/terrain-sgm-pyramid/comparison.json
+            test-results/terrain-sgm-pyramid/*/report.json
