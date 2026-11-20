@@ -7,6 +7,11 @@ import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
 const args=process.argv.slice(2),outIndex=args.indexOf("--out"),root=resolve(outIndex<0?"test-results/terrain-benchmark":args[outIndex+1]);
 if(outIndex>=0&&(!args[outIndex+1]||args[outIndex+1].startsWith("--")))throw Error("Missing --out directory");
 const mode=args.includes("--offline")?"offline":args.includes("--real-only")?"real":"all";
+const matcherIndex=args.indexOf("--matcher"),matcher=matcherIndex<0?"height-sweep":args[matcherIndex+1];
+const pyramidIndex=args.indexOf("--sgm-pyramid-levels");
+const sgmPyramidLevels=pyramidIndex<0?1:Number(args[pyramidIndex+1]);
+if(!["height-sweep","sgm"].includes(matcher)||![1,2].includes(sgmPyramidLevels))
+ throw Error("--matcher height-sweep|sgm and --sgm-pyramid-levels 1|2");
 const requested=args.includes("--case")?args[args.indexOf("--case")+1]:null;
 const manifests=args.flatMap((v,i)=>v==="--aerial-manifest"?[args[i+1]]:[]);
 if(manifests.some(v=>!v||v.startsWith("--")))throw Error("Missing --aerial-manifest path");
@@ -23,13 +28,13 @@ const allowed=id=>!requested||requested===id;
 async function synthetic(id){
  const out=join(root,id);await mkdir(out,{recursive:true});
  const o=makeTerrainBenchmarkScene(id),{reference,resolutionM,...options}=o,started=Date.now();
- const result=reconstructTerrainFromSource({...options,patchRadius:2,minCorrelation:.72,minPeakGap:.015,peakExclusionM:2,recoverMissing:true,maxWork:250_000_000});
+ const result=reconstructTerrainFromSource({...options,matcher,sgmPyramidLevels,patchRadius:2,minCorrelation:.72,minPeakGap:.015,peakExclusionM:2,recoverMissing:matcher==="height-sweep",maxWork:250_000_000});
  const refined=refineTerrainSurface(result.elevationMap,{outlierM:3.2,fillRadius:1});
  const validation=validateTerrainHeights(result.elevationMap,reference);
  const core=reference.filter(p=>p.zone!=="land"),coreMatches=core.filter(p=>Number.isFinite(result.elevationMap.values[p.row*o.grid.width+p.col])).length;
  const values=Array.from(refined.grid.values).filter(Number.isFinite);
  const sorted=[...values].sort((a,b)=>a-b);
- const report={sourceKind:"aerial",synthetic:true,source:"Synthetic "+id,scene:id,model:result.model,verticalDatum:result.verticalDatum,resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:values.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:values.length?[sorted[0],sorted.at(-1)]:null,validation,coreMatches,coreTotal:core.length,elapsedMs:Date.now()-started};
+ const report={matcher,sgmPyramidLevels,sourceKind:"aerial",synthetic:true,source:"Synthetic "+id,scene:id,model:result.model,verticalDatum:result.verticalDatum,resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:values.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:values.length?[sorted[0],sorted.at(-1)]:null,validation,coreMatches,coreTotal:core.length,elapsedMs:Date.now()-started};
  const thresholds={flat:[.85,1],hills:[.85,1.5],mountains:[.4,5],urban:[.4,5],industrial:[.5,4],forest:[.4,4],water:[.4,4],clouds:[.4,4]};
  let passed;
  if(id==="no-parallax")passed=result.validPixels===0;
@@ -69,15 +74,15 @@ if(mode!=="offline"){
  }
  for(const id of ["s2p-pair","s2p-triplet","s2p-triplet-large"])if(allowed(id)){
    if(id==="s2p-triplet-large"&& !requested)continue; // optional costly benchmark
-   await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id==="s2p-triplet-large"?"s2p-triplet":id,...(id==="s2p-triplet-large"?["--size","128"]:[])]);
+   await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--matcher",matcher,"--sgm-pyramid-levels",String(sgmPyramidLevels),"--dataset",id==="s2p-triplet-large"?"s2p-triplet":id,...(id==="s2p-triplet-large"?["--size","128"]:[])]);
  }
  if(allowed("real-aerial")){
-  if(manifests.length){for(let i=0;i<manifests.length;i++)await child(i===0?"real-aerial":"real-aerial-"+(i+1),"real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--manifest",resolve(manifests[i])]);}
+  if(manifests.length){for(let i=0;i<manifests.length;i++)await child(i===0?"real-aerial":"real-aerial-"+(i+1),"real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--matcher",matcher,"--sgm-pyramid-levels",String(sgmPyramidLevels),"--manifest",resolve(manifests[i])]);}
   else record("real-aerial","real aerial",null,"NOT RUN","Supply --aerial-manifest with calibrated images. ISPRS Avenches / Höngg not automatically ingested.");
  }
 }
 if(!rows.length)throw Error("No benchmark cases selected");
-await writeFile(join(root,"summary.json"),JSON.stringify({mode,cases:rows},null,2));
+await writeFile(join(root,"summary.json"),JSON.stringify({mode,matcher,sgmPyramidLevels,cases:rows},null,2));
 const table=["case,kind,status,coverage,filteredCoverage,rmseM,metric,elapsedMs,note",...rows.map(r=>[r.id,r.kind,r.status,r.coverage,r.filteredCoverage,r.rmseM,r.metric,r.elapsedMs,r.note].map(v=>'"'+String(v??"").replaceAll('"','""')+'"').join(","))];
 await writeFile(join(root,"summary.csv"),table.join("\n")+"\n");
 const trs=await Promise.all(rows.map(async r=>{const has=await stat(join(root,r.id,"terrain.html")).then(()=>true).catch(()=>false);return "<tr><td>"+escape(r.id)+"</td><td>"+escape(r.kind)+"</td><td class='"+r.status.toLowerCase().replaceAll(" ","-")+"'>"+r.status+"</td><td>"+pct(r.coverage)+"</td><td>"+pct(r.filteredCoverage)+"</td><td>"+num(r.rmseM)+"</td><td>"+escape(r.metric)+"</td><td>"+num(r.elapsedMs===null?null:r.elapsedMs/1000)+"</td><td>"+(has?'<a href="'+r.id+'/terrain.html">3D model</a> · ':'')+escape(r.note)+"</td></tr>";}));

@@ -38,3 +38,7 @@ The matcher now emits `rejectionReasons` (codes 0–8) with every DSM, including
 ### Experimental recovery does not currently pass the large-scene quality gate
 
 At 128×128 on the S2P triplet, the strict three-view matcher with local pilot achieved ~67.3% coverage and 6.62 m centered RMSE against S2P, failing quality. Allowing an occluded view gave ~68.1% / 6.79 m, and three iterative measured-only recovery rounds ~68.2% / 7.05 m. These optional experiments **regressed accuracy** and therefore are **disabled by default** in the large benchmark. Use `--occlusion-fallback` and/or `--recovery-rounds 3` on the internal S2P benchmark script only for further controlled experimentation. Do not lower thresholds merely to make these variants pass. Significant improvement needs a dense matching/regularized cost-volume pipeline and real independent validation.
+
+## SGM against known synthetic city/landscape surfaces
+
+`npm run example:terrain-benchmark -- --offline --case urban --matcher sgm --out test-results/terrain-urban-sgm` evaluates the experimental SGM with urban rooftops and abrupt height transitions. `--sgm-pyramid-levels 2` enables coarse-to-fine image-only guidance. The same flags can select SGM in the S2P and user-supplied aerial benchmarks; the historical ASTER demo remains height-sweep. Real and synthetic quality metrics remain separate. Failed cases remain visible and return a failing process status.
