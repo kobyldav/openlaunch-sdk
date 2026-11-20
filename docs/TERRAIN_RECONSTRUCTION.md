@@ -71,3 +71,7 @@ Use `reconstructTerrainTiled({source,grid,minHeightM,maxHeightM,heightStepM,tile
 ### Local height-pilot for heterogeneous large mosaics
 
 For multi-tile areas with strongly varying ground and roofs, enable `localHeightPilot:true` on `reconstructTerrainTiled`. Each tile independently compares original sensor views at a sparse set of heights to estimate a locally plausible search band; no reference DEM is read. Weak-consensus tiles fall back to the original global height range and increment `pilotFallbacks`. The per-tile pilot is a **heuristic** and can omit high rooftops if the image matches are ambiguous. Keep the raw diagnostic data, compare against independent control data, and do not assume a tile pilot guarantees accuracy.
+
+### Optional multiview occlusion handling
+
+`minMatchingPairs` defaults to `images.length - 1`. A calibrated three-view scene may explicitly set `minMatchingPairs:1` to allow a pixel supported by only one valid stereo pair if another view is masked/occluded. The stereo matcher still computes the height from source images, applies uniqueness and photometric tests, and `pairConsensusToleranceM` rejects contradictory strong pairs. This trades some redundancy for coverage and may produce incorrect heights in repeated textures; never use without a reference quality gate. The 128×128 benchmark tests this mode experimentally. No fabricated DEM heights or reference values are used in reconstruction.

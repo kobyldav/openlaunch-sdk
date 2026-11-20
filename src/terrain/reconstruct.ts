@@ -21,6 +21,9 @@ export interface TerrainReconstructionOptions {
   peakRefinement?:"parabolic"|"image-evidence";
   /** If >=3 views, reject heights whose individual stereo pairs disagree (metres). */
   pairConsensusToleranceM?:number;
+  /** Number of independently usable matches against the reference image.
+   * Defaults to all other images. Lowering permits occluded third views. */
+  minMatchingPairs?:number;
 }
 export interface TerrainReconstruction {
   elevationMap:RasterGrid; confidenceMap:RasterGrid; texture:RasterGrid;
@@ -73,6 +76,8 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   if(!Number.isFinite(patchSpacing)||patchSpacing<.25||patchSpacing>8)throw new RangeError("patchSpacingScale must be 0.25..8");
   if(o.peakRefinement!==undefined&&o.peakRefinement!=="parabolic"&&o.peakRefinement!=="image-evidence")throw new RangeError("Unknown peak refinement method");
   if(o.pairConsensusToleranceM!==undefined&&(!Number.isFinite(o.pairConsensusToleranceM)||o.pairConsensusToleranceM<=0))throw new RangeError("Invalid stereo pair consensus tolerance");
+  const minPairs=o.minMatchingPairs??images.length-1;
+  if(!Number.isInteger(minPairs)||minPairs<1||minPairs>=images.length)throw new RangeError("Invalid minMatchingPairs");
   if(!Number.isInteger(r)||r<1||r>5||!Number.isFinite(minCorr)||minCorr<0||minCorr>1||!Number.isFinite(minGap)||minGap<0||minGap>1||!Number.isFinite(minParallax)||minParallax<=0)throw new RangeError("Invalid matching parameters");
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
   const steps=Math.ceil((o.maxHeightM-o.minHeightM)/o.heightStepM)+1,n=grid.width*grid.height;
@@ -123,7 +128,8 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
       }));
       const pairScores=samples.slice(1).map(v=>ncc(samples[0]!,v));
       if(k!==undefined&&pairCurves)pairScores.forEach((s,j)=>pairCurves[j]![k]=s);
-      return pairScores.every(Number.isFinite)?pairScores.reduce((sum,v)=>sum+v,0)/pairScores.length:NaN;
+      const matched=pairScores.filter(Number.isFinite);
+      return matched.length>=minPairs?matched.reduce((sum,v)=>sum+v,0)/matched.length:NaN;
     };
     scores.fill(NaN);
     for(let k=0;k<steps;k++){
@@ -138,14 +144,21 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
       // Consensus uses *independently searched* height peaks for each extra image.
       // A good average correlation cannot mask an inconsistent stereo pair.
       const tolerance=o.pairConsensusToleranceM!;
-      let consistent=true;
+      let consistent=true,usable=0;
       for(const curve of pairCurves){
         let pairBest=-1;
         for(let k=0;k<steps;k++)if(Number.isFinite(curve[k])&&(pairBest<0||curve[k]!>curve[pairBest]!))pairBest=k;
-        if(pairBest<0||curve[pairBest]!<(recovery?Math.max(.6,minCorr-.1):Math.max(.65,minCorr-.05))||Math.abs(hs[pairBest]!-hs[best]!)>tolerance){
-          consistent=false;break;
+        const pairMin=recovery?Math.max(.6,minCorr-.1):Math.max(.65,minCorr-.05);
+        // Ignore truly invalid or weak secondary views when the user explicitly
+        // allows an occluded stereo partner. Still reject contradictory strong pairs.
+        if(pairBest<0||curve[pairBest]!<pairMin){
+          if(minPairs===images.length-1){consistent=false;break;}
+          continue;
         }
+        usable++;
+        if(Math.abs(hs[pairBest]!-hs[best]!)>tolerance){consistent=false;break;}
       }
+      if(usable<minPairs)consistent=false;
       if(!consistent){rejectionReasons[i]=5;continue;}
     }
     let other=-Infinity;

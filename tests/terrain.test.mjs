@@ -133,3 +133,13 @@ test("stereo rejection reasons distinguish untextured pixels and measured output
  assert.equal(flat.validPixels,0);
  assert.ok(Array.from(flat.rejectionReasons).every(c=>c>0));
 });
+
+test("adaptive multiview can accept an occluded third image without changing original pair geometry",()=>{
+ const masked=image(2,"masked",true);
+ const pair=reconstructTerrain(opts);
+ const loose=reconstructTerrain({...opts,images:[...opts.images,masked],minMatchingPairs:1});
+ assert.equal(loose.validPixels,pair.validPixels);
+ assert.throws(()=>reconstructTerrain({...opts,minMatchingPairs:0}),/minMatchingPairs/);
+ const strict=reconstructTerrain({...opts,images:[...opts.images,masked]});
+ assert.equal(strict.validPixels,0);
+});
