@@ -9,6 +9,8 @@ export interface TerrainTileProgress {
 }
 export interface TiledTerrainOptions extends TerrainSourceOptions {
   tileSize?:number;
+  /** Halo context (in output pixels) used for regularization across tile boundaries. */
+  tileHaloPixels?:number;
   onTile?:(progress:TerrainTileProgress)=>void;
   /** Exclude implausibly steep mesh edges; does NOT remove measured samples. */
   maxAdjacentRiseM?:number;
@@ -21,9 +23,10 @@ export interface TiledTerrainOptions extends TerrainSourceOptions {
  * Synchronous by design. Use a worker for browser UI or split calls yourself.
  */
 export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruction&{sourceKind:"satellite"|"aerial";tiles:number;pilotTiles:number;pilotFallbacks:number}{
-  const {source,tileSize=64,onTile,maxAdjacentRiseM=Infinity,localHeightPilot=false,...options}=o,{grid}=options;
+  const {source,tileSize=64,tileHaloPixels=0,onTile,maxAdjacentRiseM=Infinity,localHeightPilot=false,...options}=o,{grid}=options;
   if(!Number.isInteger(tileSize)||tileSize<2||tileSize>256)throw new RangeError("Tile size must be 2..256");
   if(!(maxAdjacentRiseM>0))throw new RangeError("maxAdjacentRiseM must be positive");
+  if(!Number.isInteger(tileHaloPixels)||tileHaloPixels<0||tileHaloPixels>32||tileSize+2*tileHaloPixels>256)throw new RangeError("Invalid tile halo size");
   const n=grid.width*grid.height;
   if(!Number.isSafeInteger(grid.width)||!Number.isSafeInteger(grid.height)||grid.width<2||grid.height<2||!Number.isSafeInteger(n)||n>1_000_000)throw new RangeError("Tiled grid must contain 4..1,000,000 pixels");
   const countX=Math.ceil(grid.width/tileSize),countY=Math.ceil(grid.height/tileSize),total=countX*countY;
@@ -37,8 +40,11 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
   for(let ty=0;ty<countY;ty++)for(let tx=0;tx<countX;tx++){
     if(options.signal?.aborted)throw new Error("Terrain reconstruction aborted");
     const col=tx*tileSize,row=ty*tileSize,width=Math.min(tileSize,grid.width-col),height=Math.min(tileSize,grid.height-row);
-    const [x,y]=pixelToWorld(grid.transform,col,row);
-    const subgrid:TerrainGrid={width,height,crs:grid.crs,transform:[x,grid.transform[1],grid.transform[2],y,grid.transform[4],grid.transform[5]]};
+    const haloCol=Math.max(0,col-tileHaloPixels),haloRow=Math.max(0,row-tileHaloPixels);
+    const haloRight=Math.min(grid.width,col+width+tileHaloPixels),haloBottom=Math.min(grid.height,row+height+tileHaloPixels);
+    const haloWidth=haloRight-haloCol,haloHeight=haloBottom-haloRow;
+    const [x,y]=pixelToWorld(grid.transform,haloCol,haloRow);
+    const subgrid:TerrainGrid={width:haloWidth,height:haloHeight,crs:grid.crs,transform:[x,grid.transform[1],grid.transform[2],y,grid.transform[4],grid.transform[5]]};
     let minHeightM=options.minHeightM,maxHeightM=options.maxHeightM;
     if(localHeightPilot&&maxHeightM-minHeightM>30){
       try{
@@ -53,7 +59,8 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
     }
     const tile=reconstructTerrain({...options,minHeightM,maxHeightM,grid:subgrid,images});
     for(let ry=0;ry<height;ry++)for(let rx=0;rx<width;rx++){
-      const i=(row+ry)*grid.width+col+rx,j=ry*width+rx;
+      const i=(row+ry)*grid.width+col+rx;
+      const j=(row+ry-haloRow)*haloWidth+(col+rx-haloCol);
       values[i]=tile.elevationMap.values[j]!;
       conf[i]=tile.confidenceMap.values[j]!;
       texture[i]=tile.texture.values[j]!;

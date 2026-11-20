@@ -167,3 +167,20 @@ test("native SGM reconstructs a calibrated synthetic stereo plane without refere
  assert.equal(rejected.validPixels,0);
  assert.ok(Array.from(rejected.rejectionReasons).every(reason=>reason>0));
 });
+
+test("SGM halos on tiled reconstruction retain identical global evidence at tile seams",()=>{
+ const toRpc=shift=>({longitudeOffset:14,latitudeOffset:50,heightOffset:100,
+  longitudeScale:.01,latitudeScale:.01,heightScale:100,sampleOffset:48,lineOffset:48,
+  sampleScale:40,lineScale:40,sampleNumerator:poly([1,1],[3,shift]),
+  sampleDenominator:poly([0,1]),lineNumerator:poly([2,1]),lineDenominator:poly([0,1])});
+ const source={kind:"satellite",images:opts.images.map((im,i)=>({...im,calibration:{kind:"rpc",rpc:toRpc(i)}}))};
+ const o={...opts,images:undefined,source,matcher:"sgm",maxWork:5000000,minCorrelation:.5,minPeakGap:.003};
+ const full=reconstructTerrain({...opts,matcher:"sgm",maxWork:5000000,minCorrelation:.5,minPeakGap:.003});
+ const withHalo=reconstructTerrainTiled({...o,tileSize:3,tileHaloPixels:4});
+ assert.equal(withHalo.tiles,4);
+ assert.deepEqual(Array.from(withHalo.elevationMap.values),Array.from(full.elevationMap.values));
+ assert.deepEqual(Array.from(withHalo.matchPass),Array.from(full.matchPass));
+ assert.deepEqual(Array.from(withHalo.rejectionReasons),Array.from(full.rejectionReasons));
+ assert.throws(()=>reconstructTerrainTiled({...o,tileSize:3,tileHaloPixels:-1}),/halo/);
+ assert.throws(()=>reconstructTerrainTiled({...o,tileSize:250,tileHaloPixels:4}),/halo/);
+});
