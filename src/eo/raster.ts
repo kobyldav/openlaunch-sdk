@@ -111,6 +111,30 @@ export function alignRasterTo(source:RasterGrid,reference:RasterGrid,method:"nea
   return {...reference,values:output,...(source.source?{source:source.source}:{})};
 }
 
+/** Reproject and resample an observed raster onto a target grid.
+ * The target defines only geometry; its pixel values are never used.
+ * No datum/vertical adjustment is performed. Invalid samples remain NaN.
+ * WGS84 geographic, Web Mercator and WGS84 UTM only.
+ */
+export function reprojectRasterTo(source:RasterGrid,target:RasterGrid,method:"nearest"|"bilinear"="nearest"):RasterGrid {
+  validateRaster(source);validateRaster(target);
+  if(method!=="nearest"&&method!=="bilinear")throw new RangeError("Invalid resampling method");
+  const values=new Float64Array(target.width*target.height);
+  values.fill(NaN);
+  for(let row=0;row<target.height;row++)for(let col=0;col<target.width;col++){
+    const [tx,ty]=pixelToWorld(target.transform,col+0.5,row+0.5);
+    try{
+      const [lon,lat]=gridCrsToLonLat(tx,ty,target.crs);
+      const [sx,sy]=lonLatToGridCrs(lon,lat,source.crs);
+      values[row*target.width+col]=sampleRaster(source,sx,sy,method);
+    }catch(e){
+      if(e instanceof RangeError)continue; // outside a source CRS's valid domain
+      throw e;
+    }
+  }
+  return {...target,values,...(source.source?{source:source.source}:{}),...(source.unit?{unit:source.unit}:{})};
+}
+
 /** AOI clipping: exact bbox crop, with additional centre-point polygon masking. */
 export function clipRasterToAoi(grid:RasterGrid,area:AreaOfInterest):RasterGrid {
   validateRaster(grid);

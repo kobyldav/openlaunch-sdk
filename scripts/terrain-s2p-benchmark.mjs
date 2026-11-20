@@ -2,7 +2,7 @@ import {mkdir,writeFile,readFile,stat} from "node:fs/promises";
 import {resolve,join} from "node:path";
 import {loadTerrainRpcImage,reconstructTerrainFromSource,refineTerrainSurface,estimateTerrainHeightBand,terrainPointCloudPly} from "../dist/terrain/index.js";
 import {decodeGeoTiff} from "../dist/eo/geotiff.js";
-import {alignRasterTo} from "../dist/eo/raster.js";
+import {reprojectRasterTo} from "../dist/eo/raster.js";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
 const args=process.argv.slice(2),opt=name=>args[args.indexOf("--"+name)+1],id=opt("dataset"),out=resolve(opt("out"));
 if(!["s2p-pair","s2p-triplet"].includes(id))throw Error("Invalid s2p case");
@@ -33,11 +33,11 @@ const report={sourceKind:"satellite",synthetic:false,source:base+"input_"+datase
 // Only after reconstruction: compare against s2p expected output, not independent ground truth.
 try{
  const dem=await decodeGeoTiff(await download("expected_output/"+dataset+"/dsm.tif","reference-s2p.tif"));
- const aligned=alignRasterTo(dem,result.elevationMap,"nearest");
+ const aligned=reprojectRasterTo(dem,result.elevationMap,"nearest");
  const errors=[];for(let i=0;i<aligned.values.length;i++){const a=refined.grid.values[i],b=aligned.values[i];if(Number.isFinite(a)&&Number.isFinite(b))errors.push(a-b);}
  if(errors.length<10)throw Error("Insufficient reference overlap");
  const mean=errors.reduce((s,x)=>s+x,0)/errors.length;
- report.reference={source:"S2P expected-output DSM (algorithm comparison, NOT independent truth)",count:errors.length,meanDifferenceM:mean,centeredRmseM:Math.sqrt(errors.reduce((s,x)=>s+(x-mean)**2,0)/errors.length)};
+ report.reference={source:"S2P expected-output DSM (algorithm comparison, NOT independent truth)",sourceCrs:dem.crs,targetCrs:result.elevationMap.crs,verticalDatum:"not independently verified",count:errors.length,meanDifferenceM:mean,centeredRmseM:Math.sqrt(errors.reduce((s,x)=>s+(x-mean)**2,0)/errors.length),note:"CRS transformed; no vertical datum correction. Centered RMSE removes a constant offset, not distortion."};
  report.referencePassed=report.reference.centeredRmseM<=15&&Math.abs(mean)<=50;
 }catch(e){report.referenceError=String(e);report.referencePassed=false;}
  await writeFile(join(out,"report.json"),JSON.stringify(report,null,2));await writeFile(join(out,"point-cloud.ply"),terrainPointCloudPly(result));await writeRealTerrainViewer(out,{result,refined,report});console.log(JSON.stringify(report,null,2));

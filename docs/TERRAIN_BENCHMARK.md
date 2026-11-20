@@ -18,3 +18,7 @@ Real aerial cases can be run via `--aerial-manifest path/to/aerial.json` using t
 Coverage, accepted and interpolated cells, RMSE, comparison type and elapsed time are recorded in summary.json, summary.csv and individual reports. Synthetic thresholds are smoke-test thresholds, not surveying specifications. Keep failed cases visible.
 
 Multiple real aerial datasets may be evaluated in one run by repeating `--aerial-manifest`. The optional manifest field `referenceCheckpoints` is a relative path to JSON of the form `{"verticalDatum":"WGS84 ellipsoid","points":[{"col":0,"row":0,"heightM":220}]}` (at least 10 points). Pixel indices are zero-based grid centre indices. The reference file is only opened after reconstruction and is never an input to the matcher. Without checkpoints a successful real aerial run is marked UNVALIDATED, not PASS. Supplied checkpoint provenance and accuracy are the user's responsibility. The example gate is 3 m RMSE and 65% coverage, not a surveying certification.
+
+## CRS-safe reference checking
+
+The S2P reference DSM is projected onto the OpenLaunch WGS84 grid with `reprojectRasterTo` before comparison. This uses the reference for **validation only**, never as the reconstruction input. Source and target CRS are recorded, and vertical datum discrepancies are explicitly marked as unknown; centered RMSE is not absolute accuracy. Invalid cells and non-overlap are not silently treated as successes.

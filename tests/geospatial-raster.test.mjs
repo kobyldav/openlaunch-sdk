@@ -326,3 +326,17 @@ test("True tiled COG requests only selected bottom-right TIFF tile",async()=>{
   const full=await decodeGeoTiff(bytes);
   assert.deepEqual([...full.values],[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16]);
 });
+
+test("reprojectRasterTo matches WGS84 and UTM pixel centres and preserves nodata",async()=>{
+ const {reprojectRasterTo,lonLatToGridCrs,gridCrsToLonLat}=await import("../dist/eo/raster.js");
+ const [x,y]=lonLatToGridCrs(14.4208,50.088,"EPSG:32633");
+ const utm={width:3,height:3,crs:"EPSG:32633",transform:[x-15,10,0,y+15,0,-10],values:Float64Array.from([10,20,30,40,50,60,70,80,90])};
+ const [lon,lat]=gridCrsToLonLat(x,y,utm.crs);
+ const target={width:1,height:1,crs:"EPSG:4326",transform:[lon-0.000005,0.00001,0,lat+0.000005,0,-0.00001],values:Float64Array.of(999)};
+ const out=reprojectRasterTo(utm,target,"nearest");
+ assert.equal(out.values[0],50);
+ assert.equal(target.values[0],999);
+ const none={...target,transform:[30,.00001,0,55,0,-.00001]};
+ assert.ok(Number.isNaN(reprojectRasterTo(utm,none).values[0]));
+ assert.throws(()=>reprojectRasterTo(utm,target,"nonsense"),/resampling/);
+});
