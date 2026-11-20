@@ -71,7 +71,7 @@ test("DEM one-degree boundaries request distinct source tiles",async()=>{
     area,rgbLoader:async()=>scene,
     demReader:async (url,window,opts)=>{
       urls.push(url);
-      return {raster:raster(250),requestedTiles:1,metadataBytesRead:1024,
+      return {raster:{...raster(250),transform:[14.99,0.001,0,50.02,0,-0.001]},requestedTiles:1,metadataBytesRead:1024,
         tileBytesRead:1024,totalSourceBytes:100000,transferStrategy:"http-byte-ranges",warnings:[]};
     }
   }).catch(error=>error);
