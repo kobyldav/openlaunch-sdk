@@ -32,8 +32,8 @@ for(const matcher of variants){
       (r.error?.message??r.status));
   const compared=await readFile(join(dir,"heights-vs-s2p.csv"),"utf8");
   const pixels=compared.trim().split("\n").slice(1).map(line=>{
-    const [idx,method,reference]=line.split(",");
-    return {idx:Number(idx),height:method===""?NaN:Number(method),reference:reference===""?NaN:Number(reference)};
+    const [idx,method,refined,reference]=line.split(",");
+    return {idx:Number(idx),height:method===""?NaN:Number(method),refinedHeight:refined===""?NaN:Number(refined),reference:reference===""?NaN:Number(reference)};
   });
   if(pixels.length!==report.totalPixels||pixels.some((p,i)=>p.idx!==i))
     throw Error("Invalid per-pixel A/B source alignment for "+matcher);
@@ -66,7 +66,7 @@ await writeFile(join(out,"index.html"),
   '<!doctype html><meta charset="utf-8"><title>OpenLaunch SGM comparison</title>'+
   '<style>body{background:#101b28;color:#eef4fa;font:16px system-ui;margin:28px}th,td{text-align:left;padding:14px;border-bottom:1px solid #455}a{color:#8ac7ff}</style>'+
   '<h1>OpenLaunch | SGM vs height-sweep</h1>'+
-  '<p>Both algorithms use identical calibrated real sensor imagery. S2P reference is opened only AFTER reconstruction. Centered RMSE does not measure absolute height accuracy. The common-points column uses identical valid reference pixels across all methods, to avoid selection bias from differing coverage.</p>'+
+  '<p>Both algorithms use identical calibrated real sensor imagery. S2P reference is opened only AFTER reconstruction. Centered RMSE does not measure absolute height accuracy. The common-points column uses only ACTUALLY MEASURED heights on identical reference pixels for all methods, excluding interpolated/fill pixels.</p>'+
   '<table><tr><th>Method</th><th>Coverage</th><th>Centered RMSE</th><th>RMSE on common points</th><th>Time</th><th>Strict gate</th><th>3D</th></tr>'+
   rows.map(r=>'<tr><td>'+esc(r.matcher)+'</td><td>'+(r.coverage*100).toFixed(1)+'%</td><td>'+
   r.centeredRmseM.toFixed(2)+' m</td><td>'+r.commonSupportCenteredRmseM.toFixed(2)+' m</td><td>'+(r.elapsedMs/1000).toFixed(1)+' s</td><td>'+

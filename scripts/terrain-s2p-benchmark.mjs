@@ -44,16 +44,16 @@ try{
  const dem=await decodeGeoTiff(await download("expected_output/"+dataset+"/dsm.tif","reference-s2p.tif"));
  const aligned=reprojectRasterTo(dem,result.elevationMap,"nearest");
  // Write post-reconstruction per-pixel evidence; NEVER read during stereo matching.
- const rows=["pixel_index,method_height_m,reference_height_m"];
+ const rows=["pixel_index,measured_height_m,refined_height_m,reference_height_m"];
  for(let i=0;i<aligned.values.length;i++){
-   const h=refined.grid.values[i],r=aligned.values[i];
-   rows.push([i,Number.isFinite(h)?h:"",Number.isFinite(r)?r:""].join(","));
+   const measured=result.elevationMap.values[i],h=refined.grid.values[i],r=aligned.values[i];
+   rows.push([i,Number.isFinite(measured)?measured:"",Number.isFinite(h)?h:"",Number.isFinite(r)?r:""].join(","));
  }
  await writeFile(join(out,"heights-vs-s2p.csv"),rows.join("\n")+"\n");
  const errors=[];for(let i=0;i<aligned.values.length;i++){const a=refined.grid.values[i],b=aligned.values[i];if(Number.isFinite(a)&&Number.isFinite(b))errors.push(a-b);}
  if(errors.length<10)throw Error("Insufficient reference overlap");
  const mean=errors.reduce((s,x)=>s+x,0)/errors.length;
- report.reference={source:"S2P expected-output DSM (algorithm comparison, NOT independent truth)",sourceCrs:dem.crs,targetCrs:result.elevationMap.crs,verticalDatum:"not independently verified",count:errors.length,meanDifferenceM:mean,centeredRmseM:Math.sqrt(errors.reduce((s,x)=>s+(x-mean)**2,0)/errors.length),note:"CRS transformed; no vertical datum correction. Centered RMSE removes a constant offset, not distortion."};
+ report.reference={source:"S2P expected-output DSM (algorithm comparison, NOT independent truth)",sourceCrs:dem.crs,targetCrs:result.elevationMap.crs,verticalDatum:"not independently verified",count:errors.length,meanDifferenceM:mean,centeredRmseM:Math.sqrt(errors.reduce((s,x)=>s+(x-mean)**2,0)/errors.length),note:"CRS transformed; comparison RMSE uses refined DSM; no vertical datum correction. Centered RMSE removes a constant offset, not distortion."};
  // A computationally successful run is NOT an acceptable high-resolution model.
  // Strict comparison gate, with no assumption of absolute geodetic accuracy.
  const minCoverage=size>64?.85:.8,maxCenteredRmseM=size>64?5:4;

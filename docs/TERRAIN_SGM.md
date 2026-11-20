@@ -62,3 +62,7 @@ is not a production-acceptance claim.
 ## Comparable accuracy on the same geographic pixels
 
 Each S2P run exports `heights-vs-s2p.csv` **after reconstruction**. The A/B dashboard adds `commonSupportCenteredRmseM`, calculated on the shared intersection of valid image-based terrain pixels from every method. Comparing RMSE on different subsets can be misleading if a method rejects difficult regions; this common-support comparison avoids that selection bias. Original per-method RMSE and coverage are retained. The S2P output is another algorithm's reference, not independent survey truth, and never enters matching.
+
+### Separate measured and interpolated validation
+
+The per-method `reference.centeredRmseM` intentionally continues to use the same refined DSM as the historical benchmark. For the new common-support metric the CSV exports **measured stereo heights separately from filtered/interpolated heights**, and the common pixel set is restricted to finite *raw measured* heights from all compared algorithms. Interpolated / hole-filled pixels never count towards the new common-support RMSE or measured coverage.
