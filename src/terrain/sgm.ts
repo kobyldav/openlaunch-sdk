@@ -141,7 +141,7 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
       const h=coarse.elevationMap.values[p]!;
       if(!coarse.matchPass[p]||!Number.isFinite(h)||coarse.confidenceMap.values[p]!<.2)continue;
       let support=0;
-      for(const [dx,dy] of [[-1,0],[1,0],[0,-1],[0,1]]){
+      for(const [dx,dy] of ([[ -1,0],[1,0],[0,-1],[0,1]] as [number,number][])){
         const nx=cx+dx,ny=cy+dy;
         if(nx<0||ny<0||nx>=coarseWidth||ny>=coarseHeight)continue;
         const ni=ny*coarseWidth+nx,z=coarse.elevationMap.values[ni]!;
