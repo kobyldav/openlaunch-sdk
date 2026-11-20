@@ -12,3 +12,4 @@ export * from "./utm.js";
 export * from "./tiff-lzw.js";
 export * from "./jp2.js";
 export * from "../terrain/index.js";
+export * from "./sentinel2-rgb.js";
