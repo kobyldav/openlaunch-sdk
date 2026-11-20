@@ -76,7 +76,7 @@ export function chooseSentinel2RgbScenes(items:readonly StacItem[],maxCloudPerce
    (typeof item.properties["eo:cloud_cover"]!=="number"||
     (Number.isFinite(item.properties["eo:cloud_cover"])&&item.properties["eo:cloud_cover"]<=maxCloudPercent))
  ).sort((a,b)=>{
-   const cloud=item=>typeof item.properties["eo:cloud_cover"]==="number"?
+   const cloud=(item:StacItem):number=>typeof item.properties["eo:cloud_cover"]==="number"?
      item.properties["eo:cloud_cover"] as number:101;
    return cloud(a)-cloud(b)||String(b.properties.datetime).localeCompare(String(a.properties.datetime));
  });
@@ -119,6 +119,7 @@ export async function fetchSentinel2RgbTile(o:Sentinel2RgbTileOptions):Promise<S
      read(red,area,options),read(green,area,options),read(blue,area,options)
    ]);
    validateRaster(r.raster);validateRaster(g.raster);validateRaster(b.raster);
+   if(!r||!g||!b)throw new Error("Missing RGB COG window");
    const rr=r.raster,gg=reprojectRasterTo(g.raster,rr,"nearest"),bb=reprojectRasterTo(b.raster,rr,"nearest");
    const valid=[rr,gg,bb].reduce((n,grid)=>n+Array.from(grid.values).filter(Number.isFinite).length,0);
    if(valid===0)throw new Error("Selected scene has no usable RGB samples in AOI");
