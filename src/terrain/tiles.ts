@@ -32,7 +32,7 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
   validateRaster({...grid,values:new Float64Array(n)});
   const images=terrainSourceImages(source);
   const values=new Float64Array(n).fill(NaN),conf=new Float64Array(n).fill(NaN),
-    texture=new Float64Array(n).fill(NaN),passes=new Uint8Array(n);
+    texture=new Float64Array(n).fill(NaN),passes=new Uint8Array(n),rejections=new Uint8Array(n);
   let completed=0,pilotTiles=0,pilotFallbacks=0;
   for(let ty=0;ty<countY;ty++)for(let tx=0;tx<countX;tx++){
     if(options.signal?.aborted)throw new Error("Terrain reconstruction aborted");
@@ -58,6 +58,7 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
       conf[i]=tile.confidenceMap.values[j]!;
       texture[i]=tile.texture.values[j]!;
       passes[i]=tile.matchPass[j]!;
+      rejections[i]=tile.rejectionReasons[j]!;
     }
     completed++;
     onTile?.({completed,total,col,row,width,height});
@@ -91,7 +92,7 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
     texture:{...grid,values:texture,source:images[0]!.source,unit:"input intensity"},
     pointCloud:{positionsEcefM:new Float64Array(points),confidence:new Float32Array(qualities)},
     mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},
-    validPixels,totalPixels:n,matchPass:passes,recoveredPixels,
+    validPixels,totalPixels:n,matchPass:passes,recoveredPixels,rejectionReasons:rejections,
     sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep",sourceKind:source.kind,tiles:completed,pilotTiles,pilotFallbacks
   };
 }

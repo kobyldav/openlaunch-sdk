@@ -124,3 +124,12 @@ test("optional tiled local-height pilot reports its origin and keeps camera geom
  assert.equal(m.pilotTiles+m.pilotFallbacks,m.tiles);
  assert.ok(m.validPixels>=0);
 });
+
+test("stereo rejection reasons distinguish untextured pixels and measured output",()=>{
+ const result=reconstructTerrain(opts);
+ assert.equal(result.rejectionReasons.length,result.totalPixels);
+ for(let i=0;i<result.totalPixels;i++)if(result.matchPass[i])assert.equal(result.rejectionReasons[i],0);
+ const flat=reconstructTerrain({...opts,images:[image(0,"a",true),image(1,"b",true)]});
+ assert.equal(flat.validPixels,0);
+ assert.ok(Array.from(flat.rejectionReasons).every(c=>c>0));
+});

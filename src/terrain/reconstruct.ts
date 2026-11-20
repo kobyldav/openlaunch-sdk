@@ -29,6 +29,12 @@ export interface TerrainReconstruction {
   validPixels:number;totalPixels:number;sources:string[];
   /** 0=unmatched, 1=initial stereo, 2=local stereo recovery. No interpolated samples. */
   matchPass:Uint8Array; recoveredPixels:number;
+  /** Per-output pixel reason for a rejected match. 0=valid, 1=parallax,
+   * 2=no finite photometric hypotheses, 3=boundary peak,
+   * 4=weak correlation, 5=multiview disagreement, 6=ambiguous peak,
+   * 7=insufficient seed neighbors, 8=inconsistent recovery.
+   * Diagnostic reason codes are NOT probabilities or ground truth. */
+  rejectionReasons:Uint8Array;
   verticalDatum:"WGS84 ellipsoid";model:"stereo-height-sweep";
 }
 /** Bilinear sensor-image sampling. Zero-weight missing neighbours do not
@@ -80,7 +86,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   validateRaster(elevationMap);
   const scores=new Float64Array(steps);
   const makePatch=(radius:number)=>Array.from({length:(2*radius+1)**2},(_,i)=>[i%(2*radius+1)-radius,Math.floor(i/(2*radius+1))-radius] as const);
-  const matchPass=new Uint8Array(n);
+  const matchPass=new Uint8Array(n),rejectionReasons=new Uint8Array(n);
   const hs=Array.from({length:steps},(_,i)=>o.minHeightM+(o.maxHeightM-o.minHeightM)*i/(steps-1));
   const cloud:number[]=[],quality:number[]=[],ecef=new Float64Array(n*3).fill(NaN);
   let origin:readonly [number,number,number]=[0,0,0];
@@ -97,7 +103,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
         const x=col+dx,y=row+dy;if(x<0||x>=grid.width||y<0||y>=grid.height||(!dx&&!dy))continue;
         const v=seed![y*grid.width+x]!;if(Number.isFinite(v))neighbors.push(v);
       }
-      if(neighbors.length<5)continue;
+      if(neighbors.length<5){rejectionReasons[i]=7;continue;}
       neighbors.sort((a,b)=>a-b);
       guide=neighbors[Math.floor(neighbors.length/2)]!;
       const spread=neighbors[Math.floor(neighbors.length*.85)]!-neighbors[Math.floor(neighbors.length*.15)]!;
@@ -108,7 +114,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     const center=ground[Math.floor(ground.length/2)]!;
     const endpoints=images.map(im=>[im.camera.project({...center,heightM:hs[0]!}),im.camera.project({...center,heightM:hs[steps-1]!})] as const);
     const [a,b]=endpoints[0]!;
-    if(!a||!b||!endpoints.slice(1).some(([c,d])=>c&&d&&Math.hypot((d.x-c.x)-(b.x-a.x),(d.y-c.y)-(b.y-a.y))>=minParallax))continue;
+    if(!a||!b||!endpoints.slice(1).some(([c,d])=>c&&d&&Math.hypot((d.x-c.x)-(b.x-a.x),(d.y-c.y)-(b.y-a.y))>=minParallax)){rejectionReasons[i]=1;continue;}
     const pairCurves=images.length>=3&&o.pairConsensusToleranceM!==undefined?images.slice(1).map(()=>new Float64Array(steps).fill(NaN)):null;
     const scoreAt=(h:number,k?:number):number=>{
       const samples=images.map(im=>ground.map(g=>{
@@ -125,7 +131,9 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     }
     let best=-1;
     for(let k=0;k<steps;k++)if(Number.isFinite(scores[k])&&(best<0||scores[k]!>scores[best]!))best=k;
-    if(best<=0||best>=steps-1||scores[best]!<(recovery?Math.max(.65,minCorr-.05):minCorr))continue; // boundary peaks are not bounded
+    if(best<0){rejectionReasons[i]=2;continue;}
+    if(best===0||best===steps-1){rejectionReasons[i]=3;continue;} // boundary peaks are not bounded
+    if(scores[best]!<(recovery?Math.max(.65,minCorr-.05):minCorr)){rejectionReasons[i]=4;continue;}
     if(pairCurves){
       // Consensus uses *independently searched* height peaks for each extra image.
       // A good average correlation cannot mask an inconsistent stereo pair.
@@ -138,11 +146,11 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
           consistent=false;break;
         }
       }
-      if(!consistent)continue;
+      if(!consistent){rejectionReasons[i]=5;continue;}
     }
     let other=-Infinity;
     for(let k=0;k<steps;k++)if(Math.abs(k-best)>1&&Math.abs(hs[k]!-hs[best]!)>=exclusion&&Number.isFinite(scores[k]))other=Math.max(other,scores[k]!);
-    if(!Number.isFinite(other)||scores[best]!-other<(recovery?Math.max(.015,minGap*.7):minGap))continue;
+    if(!Number.isFinite(other)||scores[best]!-other<(recovery?Math.max(.015,minGap*.7):minGap)){rejectionReasons[i]=6;continue;}
     const l=scores[best-1]!,m=scores[best]!,u=scores[best+1]!,den=l-2*m+u;
     const delta=Number.isFinite(den)&&den< -1e-12?Math.max(-0.5,Math.min(0.5,0.5*(l-u)/den)):0;
     let h=hs[best]!+delta*(hs[1]!-hs[0]!);
@@ -166,9 +174,9 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
         if(bestEvidence)h=bestEvidence.h;
       }
     }
-    if(recovery&&(!Number.isFinite(l)||!Number.isFinite(u)||Math.abs(h-guide)>tolerance))continue;
+    if(recovery&&(!Number.isFinite(l)||!Number.isFinite(u)||Math.abs(h-guide)>tolerance)){rejectionReasons[i]=8;continue;}
     const q=Math.min(1,Math.max(0,m)*Math.min(1,(m-other)/0.2));
-    values[i]=h;conf[i]=q;matchPass[i]=recovery?2:1;
+    values[i]=h;conf[i]=q;matchPass[i]=recovery?2:1;rejectionReasons[i]=0;
     const p=images[0]!.camera.project({...center,heightM:h});if(p)tex[i]=sampleTerrainImage(images[0]!,p);
     const v=geodeticToEcef({...center,altitudeM:h});
     if(!cloud.length)origin=v;
@@ -185,7 +193,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
     if([a,b,c].every(i=>Number.isFinite(values[i])))triangles.push(a,c,b);
     if([b,c,d].every(i=>Number.isFinite(values[i])))triangles.push(b,c,d);
   }
-  return {elevationMap,confidenceMap:{...grid,values:conf,source:"matching heuristic",unit:"1"},texture:{...grid,values:tex,source:images[0]!.source,unit:"input intensity"},pointCloud:{positionsEcefM:new Float64Array(cloud),confidence:new Float32Array(quality)},mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},validPixels:quality.length,totalPixels:n,matchPass,recoveredPixels,sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep"};
+  return {elevationMap,confidenceMap:{...grid,values:conf,source:"matching heuristic",unit:"1"},texture:{...grid,values:tex,source:images[0]!.source,unit:"input intensity"},pointCloud:{positionsEcefM:new Float64Array(cloud),confidence:new Float32Array(quality)},mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},validPixels:quality.length,totalPixels:n,matchPass,recoveredPixels,rejectionReasons,sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep"};
 }
 /** Compare against independent ellipsoidal checkpoints; nearest grid pixel, no interpolation. */
 export function validateTerrainHeights(dem:RasterGrid,points:readonly {col:number;row:number;heightM:number}[]):{count:number;ignored:number;biasM:number|null;rmseM:number|null;maeM:number|null}{

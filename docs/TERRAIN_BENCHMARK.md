@@ -30,3 +30,7 @@ The S2P reference DSM is projected onto the OpenLaunch WGS84 grid with `reprojec
 ### Honest real-data acceptance
 
 A 128×128 satellite model with roughly 70% coverage and ~11 m centered RMSE is **not an acceptable detailed 3D reconstruction**. The S2P test now enforces a stronger relative comparison (small AOI: coverage ≥80%, centered RMSE ≤4 m; large AOI: coverage ≥85%, centered RMSE ≤5 m, mean offset within 10 m). Large triplets optionally require `pairConsensusToleranceM:8` so incompatible view pairs cannot create apparently confident height measurements. A failed gate leaves diagnostic outputs but fails CI. These are algorithm-comparison thresholds, not certified surveying tolerances; no independent ground control points are supplied.
+
+## Rejection diagnostics for every pixel
+
+The matcher now emits `rejectionReasons` (codes 0–8) with every DSM, including tiled DSMs. `scripts/terrain-s2p-benchmark.mjs` exports a per-reason histogram `rejectionCounts`. It distinguishes insufficient viewing parallax, missing valid image hypotheses, boundary maxima, weak correlation, contradictory stereo pairs, ambiguous maxima, missing seed neighbours, and inconsistency with recovered matches. Reasons are diagnostic only and may reflect the final recovery attempt, not every rejection in the first pass. Always inspect this histogram before relaxing thresholds or filling holes.
