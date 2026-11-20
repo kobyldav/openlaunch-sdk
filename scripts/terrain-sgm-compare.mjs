@@ -6,6 +6,8 @@ import {resolve,join} from "node:path";
 const args=process.argv.slice(2);
 const opt=(name,fallback)=>{const i=args.indexOf("--"+name);return i<0?fallback:args[i+1];};
 const dataset=opt("dataset","s2p-triplet"),out=resolve(opt("out","test-results/terrain-sgm"));
+const size=Number(opt("size","48"));
+if(!Number.isInteger(size)||size<16||size>256)throw Error("size must be 16..256");
 if(!["s2p-triplet","s2p-pair"].includes(dataset))throw Error("Unknown dataset");
 await mkdir(out,{recursive:true});
 const rows=[];
@@ -13,8 +15,8 @@ for(const matcher of ["height-sweep","sgm"]){
   const dir=join(out,matcher);
   console.log("Comparing "+matcher+" on "+dataset);
   const r=spawnSync(process.execPath,["scripts/terrain-s2p-benchmark.mjs",
-    "--dataset",dataset,"--matcher",matcher,"--out",dir,"--diagnostic-only"],{
-    stdio:"inherit",timeout:180_000
+    "--dataset",dataset,"--size",String(size),"--matcher",matcher,"--out",dir,"--diagnostic-only"],{
+    stdio:"inherit",timeout:600_000
   });
   const report=await readFile(join(dir,"report.json"),"utf8").then(JSON.parse).catch(()=>null);
   if(r.error||r.status!==0||!report?.reference||!Number.isFinite(report.reference.centeredRmseM))
@@ -29,7 +31,7 @@ for(const matcher of ["height-sweep","sgm"]){
 const [base,sgm]=rows;
 const betterAccuracy=sgm.centeredRmseM<base.centeredRmseM;
 const betterCoverage=sgm.coverage>base.coverage;
-const comparison={dataset,reference:"Published S2P pipeline output, NOT independent ground truth",
+const comparison={dataset,size,reference:"Published S2P pipeline output, NOT independent ground truth",
   qualityGatesNotBypassed:true,comparisonOnly:true,betterAccuracy,betterCoverage,rows};
 await writeFile(join(out,"comparison.json"),JSON.stringify(comparison,null,2));
 const esc=v=>String(v).replaceAll("&","&amp;").replaceAll("<","&lt;");

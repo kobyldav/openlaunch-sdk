@@ -151,3 +151,25 @@ jobs:
             test-results/terrain-sgm/comparison.json
             test-results/terrain-sgm/*/report.json
             test-results/terrain-sgm/*/terrain.html
+
+  terrain-sgm-large-windows:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Compare native SGM to previous matcher on 128x128 actual satellite stereo
+        run: node scripts/terrain-sgm-compare.mjs --dataset s2p-triplet --size 128 --out test-results/terrain-sgm-large
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: terrain-sgm-large-comparison
+          path: |
+            test-results/terrain-sgm-large/index.html
+            test-results/terrain-sgm-large/comparison.json
+            test-results/terrain-sgm-large/*/report.json
