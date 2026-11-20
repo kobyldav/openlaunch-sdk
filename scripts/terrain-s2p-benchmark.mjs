@@ -4,14 +4,15 @@ import {loadTerrainRpcImage,reconstructTerrainFromSource,refineTerrainSurface,es
 import {decodeGeoTiff} from "../dist/eo/geotiff.js";
 import {reprojectRasterTo} from "../dist/eo/raster.js";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
+import {downloadS2pAsset} from "./terrain-s2p-download.mjs";
 const args=process.argv.slice(2),opt=name=>args[args.indexOf("--"+name)+1],id=opt("dataset"),out=resolve(opt("out"));
 if(!["s2p-pair","s2p-triplet"].includes(id))throw Error("Invalid s2p case");
 await mkdir(out,{recursive:true});
 const dataset=id.split("-")[1],base="https://raw.githubusercontent.com/centreborelli/s2p/75ea354dc7de658bf696eabf11944e92c65412c5/tests/data/";
-async function download(path,name){
- const file=join(out,name);let data=await readFile(file).catch(()=>null);
- if(!data){const r=await fetch(base+path,{signal:AbortSignal.timeout(60000)});if(!r.ok)throw Error("Download "+path+" HTTP "+r.status);data=Buffer.from(await r.arrayBuffer());if(data.length>15_000_000)throw Error("Unexpected file size");await writeFile(file,data);}
- return data;
+const cacheDir=args.includes("--cache-dir")?resolve(opt("cache-dir")):join(out,"asset-cache");
+async function download(sourcePath,name){
+ return downloadS2pAsset({base,sourcePath,name,out,cacheDir,
+   attempts:3,timeoutMs:120_000,retryDelayMs:300});
 }
 const data=await Promise.all(Array.from({length:dataset==="pair"?2:3},(_,i)=>i+1).map(async i=>{const name="img_0"+i+".tif";return loadTerrainRpcImage(await download("input_"+dataset+"/"+name,name),name);}));
 const images=data.map(d=>d.image),rpcs=data.map(d=>d.rpc),first=rpcs[0];
