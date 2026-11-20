@@ -1,6 +1,7 @@
 import {pixelToWorld,gridCrsToLonLat,validateRaster,type RasterGrid} from "../eo/raster.js";
 import {geodeticToEcef} from "../geo/ellipsoid.js";
 import {reconstructTerrain,type TerrainGrid,type TerrainReconstruction} from "./reconstruct.js";
+import {estimateTerrainHeightBand} from "./pilot.js";
 import {terrainSourceImages,type TerrainSourceOptions} from "./source.js";
 
 export interface TerrainTileProgress {
@@ -11,14 +12,16 @@ export interface TiledTerrainOptions extends TerrainSourceOptions {
   onTile?:(progress:TerrainTileProgress)=>void;
   /** Exclude implausibly steep mesh edges; does NOT remove measured samples. */
   maxAdjacentRiseM?:number;
+  /** Derive per-tile image-only search bands; never use a reference DEM. */
+  localHeightPilot?:boolean;
 }
 /** Reconstruct a larger AOI in bounded native tiles and join its measured values
  * without interpolation at tile seams. Camera models and sensor images are reused;
  * each tile has the original global affine pixel geometry.
  * Synchronous by design. Use a worker for browser UI or split calls yourself.
  */
-export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruction&{sourceKind:"satellite"|"aerial";tiles:number}{
-  const {source,tileSize=64,onTile,maxAdjacentRiseM=Infinity,...options}=o,{grid}=options;
+export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruction&{sourceKind:"satellite"|"aerial";tiles:number;pilotTiles:number;pilotFallbacks:number}{
+  const {source,tileSize=64,onTile,maxAdjacentRiseM=Infinity,localHeightPilot=false,...options}=o,{grid}=options;
   if(!Number.isInteger(tileSize)||tileSize<2||tileSize>256)throw new RangeError("Tile size must be 2..256");
   if(!(maxAdjacentRiseM>0))throw new RangeError("maxAdjacentRiseM must be positive");
   const n=grid.width*grid.height;
@@ -30,13 +33,25 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
   const images=terrainSourceImages(source);
   const values=new Float64Array(n).fill(NaN),conf=new Float64Array(n).fill(NaN),
     texture=new Float64Array(n).fill(NaN),passes=new Uint8Array(n);
-  let completed=0;
+  let completed=0,pilotTiles=0,pilotFallbacks=0;
   for(let ty=0;ty<countY;ty++)for(let tx=0;tx<countX;tx++){
     if(options.signal?.aborted)throw new Error("Terrain reconstruction aborted");
     const col=tx*tileSize,row=ty*tileSize,width=Math.min(tileSize,grid.width-col),height=Math.min(tileSize,grid.height-row);
     const [x,y]=pixelToWorld(grid.transform,col,row);
     const subgrid:TerrainGrid={width,height,crs:grid.crs,transform:[x,grid.transform[1],grid.transform[2],y,grid.transform[4],grid.transform[5]]};
-    const tile=reconstructTerrain({...options,grid:subgrid,images});
+    let minHeightM=options.minHeightM,maxHeightM=options.maxHeightM;
+    if(localHeightPilot&&maxHeightM-minHeightM>30){
+      try{
+        const band=estimateTerrainHeightBand({...options,grid:subgrid,images},{
+          pilotStepM:Math.max(1,options.heightStepM*2),clusterRadiusM:18,marginM:30
+        });
+        // A low-consensus tile is not allowed to silently shift the search band.
+        if(band.clusterShare>=.55&&band.maxHeightM-band.minHeightM>=options.heightStepM*3){
+          minHeightM=band.minHeightM;maxHeightM=band.maxHeightM;pilotTiles++;
+        }else pilotFallbacks++;
+      }catch{pilotFallbacks++;} // retain the original image-only global search
+    }
+    const tile=reconstructTerrain({...options,minHeightM,maxHeightM,grid:subgrid,images});
     for(let ry=0;ry<height;ry++)for(let rx=0;rx<width;rx++){
       const i=(row+ry)*grid.width+col+rx,j=ry*width+rx;
       values[i]=tile.elevationMap.values[j]!;
@@ -77,6 +92,6 @@ export function reconstructTerrainTiled(o:TiledTerrainOptions):TerrainReconstruc
     pointCloud:{positionsEcefM:new Float64Array(points),confidence:new Float32Array(qualities)},
     mesh:{originEcefM:origin,positions,triangles:new Uint32Array(triangles)},
     validPixels,totalPixels:n,matchPass:passes,recoveredPixels,
-    sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep",sourceKind:source.kind,tiles:completed
+    sources:images.map(i=>i.source),verticalDatum:"WGS84 ellipsoid",model:"stereo-height-sweep",sourceKind:source.kind,tiles:completed,pilotTiles,pilotFallbacks
   };
 }

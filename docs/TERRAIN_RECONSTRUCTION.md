@@ -67,3 +67,7 @@ Use `reconstructTerrainTiled({source,grid,minHeightM,maxHeightM,heightStepM,tile
 ### Physical support of image matching
 
 `patchSpacingScale` decouples how far apart input **image matching samples** are taken from how densely output DSM pixels are placed. At 15 m terrain output resolution a `patchSpacingScale: 2` spans a 30 m ground-grid step in the NCC patch, matching the 30 m output configuration's photometric support. This does not invent sensor resolution. The ASTER demo uses `Math.max(1,30/resolutionM)` unless `--patch-spacing-scale` is supplied. The continuous `--image-evidence` optimization remains optional: in the first real benchmark it did not improve RMSE and increased runtime, so the default stays parabolic until comparative tests justify changing it.
+
+### Local height-pilot for heterogeneous large mosaics
+
+For multi-tile areas with strongly varying ground and roofs, enable `localHeightPilot:true` on `reconstructTerrainTiled`. Each tile independently compares original sensor views at a sparse set of heights to estimate a locally plausible search band; no reference DEM is read. Weak-consensus tiles fall back to the original global height range and increment `pilotFallbacks`. The per-tile pilot is a **heuristic** and can omit high rooftops if the image matches are ambiguous. Keep the raw diagnostic data, compare against independent control data, and do not assume a tile pilot guarantees accuracy.

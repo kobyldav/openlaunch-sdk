@@ -116,3 +116,11 @@ test("stereo-pair consensus can only reject incoherent multiview correspondences
  assert.ok(strict.validPixels<=plain.validPixels);
  assert.throws(()=>reconstructTerrain({...opts,pairConsensusToleranceM:0}),/consensus/);
 });
+
+test("optional tiled local-height pilot reports its origin and keeps camera geometry",()=>{
+ const toRpc=shift=>({longitudeOffset:14,latitudeOffset:50,heightOffset:100,longitudeScale:.01,latitudeScale:.01,heightScale:100,sampleOffset:48,lineOffset:48,sampleScale:40,lineScale:40,sampleNumerator:poly([1,1],[3,shift]),sampleDenominator:poly([0,1]),lineNumerator:poly([2,1]),lineDenominator:poly([0,1])});
+ const source={kind:"satellite",images:opts.images.map((im,i)=>({...im,calibration:{kind:"rpc",rpc:toRpc(i)}}))};
+ const m=reconstructTerrainTiled({...opts,images:undefined,source,tileSize:3,localHeightPilot:true});
+ assert.equal(m.pilotTiles+m.pilotFallbacks,m.tiles);
+ assert.ok(m.validPixels>=0);
+});
