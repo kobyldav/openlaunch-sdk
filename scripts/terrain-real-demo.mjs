@@ -64,10 +64,11 @@ if(!opt("min-height")&&!opt("max-height")){
  pilot=estimateTerrainHeightBand({images,grid,minHeightM,maxHeightM,heightStepM});
  ({minHeightM,maxHeightM}=pilot);console.log("Image-only height pilot",pilot);
 }
-console.log("Reconstructing actual stereo images, no DEM", {lon,lat,size,res,minHeightM,maxHeightM,heightStepM});
-const result=reconstructTerrainFromSource({source:{kind:"satellite",images:data.map(d=>({...d.image,calibration:{kind:"rpc",rpc:d.rpc}}))},grid,minHeightM,maxHeightM,heightStepM,patchRadius:3,minCorrelation:.72,minPeakGap:.025,peakExclusionM:40,peakRefinement:args.includes("--parabolic")?"parabolic":"image-evidence",recoverMissing:!args.includes("--no-recovery"),maxWork:250_000_000});
+const patchSpacingScale=numeric("patch-spacing-scale",Math.max(1,30/res));
+console.log("Reconstructing actual stereo images, no DEM", {lon,lat,size,res,minHeightM,maxHeightM,heightStepM,patchSpacingScale});
+const result=reconstructTerrainFromSource({source:{kind:"satellite",images:data.map(d=>({...d.image,calibration:{kind:"rpc",rpc:d.rpc}}))},grid,minHeightM,maxHeightM,heightStepM,patchRadius:3,patchSpacingScale,minCorrelation:.72,minPeakGap:.025,peakExclusionM:40,peakRefinement:args.includes("--image-evidence")?"image-evidence":"parabolic",recoverMissing:!args.includes("--no-recovery"),maxWork:250_000_000});
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:Math.max(35,heightStepM*2),fillRadius:1});
-const report={sourceKind:"satellite",synthetic:false,source:local?"user-supplied calibrated stereo":archiveUrl,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM:res,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,elapsedMs:Date.now()-started,accuracy:"not independently validated"};
+const report={patchSpacingScale,peakRefinement:args.includes("--image-evidence")?"image-evidence":"parabolic",sourceKind:"satellite",synthetic:false,source:local?"user-supplied calibrated stereo":archiveUrl,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM:res,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,elapsedMs:Date.now()-started,accuracy:"not independently validated"};
 report.pilot=pilot;
 report.recoveredPixels=result.recoveredPixels;
 report.initialMatches=result.validPixels-result.recoveredPixels;

@@ -88,3 +88,11 @@ test("tiled reconstruction conserves stereo measurements across rotated global p
  }
  assert.throws(()=>reconstructTerrainTiled({...base,source,tileSize:1}),/Tile size/);
 });
+
+test("match patch footprint is independent of output grid sampling",()=>{
+ const s=reconstructTerrain({...opts,patchSpacingScale:1});
+ const same=reconstructTerrain({...opts,patchSpacingScale:1.0});
+ assert.deepEqual(Array.from(s.elevationMap.values),Array.from(same.elevationMap.values));
+ assert.throws(()=>reconstructTerrain({...opts,patchSpacingScale:0}),/patchSpacingScale/);
+ assert.throws(()=>reconstructTerrain({...opts,patchSpacingScale:9}),/patchSpacingScale/);
+});

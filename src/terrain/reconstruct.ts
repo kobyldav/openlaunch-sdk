@@ -8,6 +8,8 @@ export interface TerrainReconstructionOptions {
   images:readonly TerrainImage[]; grid:TerrainGrid;
   minHeightM:number;maxHeightM:number;heightStepM:number;
   patchRadius?:number;minCorrelation?:number;minPeakGap?:number;
+  /** Horizontal patch sample spacing, in multiples of output-grid pixel spacing. */
+  patchSpacingScale?:number;
   minParallaxPx?:number;maxWork?:number;signal?:AbortSignal;
   /** Sparse pilot sampling; full grid geometry and patch spacing are preserved. */
   sampleStride?:number;
@@ -50,7 +52,8 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
   if(images.length<2||images.length>8)throw new RangeError("Require 2–8 calibrated images");
   images.forEach(checkImage);
   if(new Set(images.map(i=>i.source)).size!==images.length)throw new RangeError("Image source IDs must be distinct");
-  const r=o.patchRadius??2,minCorr=o.minCorrelation??0.75,minGap=o.minPeakGap??0.03,minParallax=o.minParallaxPx??0.5;
+  const r=o.patchRadius??2,minCorr=o.minCorrelation??0.75,minGap=o.minPeakGap??0.03,minParallax=o.minParallaxPx??0.5,patchSpacing=o.patchSpacingScale??1;
+  if(!Number.isFinite(patchSpacing)||patchSpacing<.25||patchSpacing>8)throw new RangeError("patchSpacingScale must be 0.25..8");
   if(o.peakRefinement!==undefined&&o.peakRefinement!=="parabolic"&&o.peakRefinement!=="image-evidence")throw new RangeError("Unknown peak refinement method");
   if(!Number.isInteger(r)||r<1||r>5||!Number.isFinite(minCorr)||minCorr<0||minCorr>1||!Number.isFinite(minGap)||minGap<0||minGap>1||!Number.isFinite(minParallax)||minParallax<=0)throw new RangeError("Invalid matching parameters");
   if(![o.minHeightM,o.maxHeightM,o.heightStepM].every(Number.isFinite)||o.minHeightM>=o.maxHeightM||o.heightStepM<=0)throw new RangeError("Invalid height search");
@@ -89,7 +92,7 @@ export function reconstructTerrain(o:TerrainReconstructionOptions):TerrainRecons
       tolerance=Math.min(160,Math.max(45,spread+20));
       lower=Math.max(lower,guide-tolerance-30);upper=Math.min(upper,guide+tolerance+30);
     }
-    const ground=patch.map(([dx,dy])=>{const [x,y]=pixelToWorld(grid.transform,col+0.5+dx,row+0.5+dy);const [longitudeDeg,latitudeDeg]=gridCrsToLonLat(x,y,grid.crs);return {longitudeDeg,latitudeDeg};});
+    const ground=patch.map(([dx,dy])=>{const [x,y]=pixelToWorld(grid.transform,col+0.5+dx*patchSpacing,row+0.5+dy*patchSpacing);const [longitudeDeg,latitudeDeg]=gridCrsToLonLat(x,y,grid.crs);return {longitudeDeg,latitudeDeg};});
     const center=ground[Math.floor(ground.length/2)]!;
     const endpoints=images.map(im=>[im.camera.project({...center,heightM:hs[0]!}),im.camera.project({...center,heightM:hs[steps-1]!})] as const);
     const [a,b]=endpoints[0]!;
