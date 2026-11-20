@@ -59,3 +59,7 @@ See [AERIAL_TERRAIN.md](AERIAL_TERRAIN.md) for switching satellite/aerial inputs
 ### Image-evidence peak refinement
 
 `peakRefinement: "image-evidence"` optionally refines the best discrete height using nine bounded one-dimensional golden-section iterations, each time reprojecting the actual input pixels and recomputing normalized cross-correlation. This is **not** a resampling of any reference DEM or interpolation of heights from nearby points. It cannot fix wrong coarse matches, calibration drift, or occlusion. The real ASTER/S2P examples now use it; pass `--parabolic` to the ASTER example for A/B comparison. Subpixel numerical optimization does not guarantee subpixel or sub-metre physical accuracy.
+
+### Large AOIs via tiled reconstruction
+
+Use `reconstructTerrainTiled({source,grid,minHeightM,maxHeightM,heightStepM,tileSize:32,onTile})` for mosaics up to 1 million output points. Each tile uses the same original sensor images, independent NCC matching and globally offset affine geometry; no predicted heights or DEM are passed between tiles. Assembled output contains full-sized DSM, confidence, texture, point cloud and mesh. `maxAdjacentRiseM` excludes unusually steep triangles but retains the original measurements. Tile-progress callbacks are available; the method is synchronous and should run inside a worker in a browser. `npm run example:terrain-benchmark -- --case s2p-city-large` provides an **optional**, more expensive 128x128 real-satellite test; it may fail, which is useful validation rather than a hidden fallback.

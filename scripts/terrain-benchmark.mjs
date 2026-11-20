@@ -9,7 +9,7 @@ const mode=args.includes("--offline")?"offline":args.includes("--real-only")?"re
 const requested=args.includes("--case")?args[args.indexOf("--case")+1]:null;
 const manifests=args.flatMap((v,i)=>v==="--aerial-manifest"?[args[i+1]]:[]);
 if(manifests.some(v=>!v||v.startsWith("--")))throw Error("Missing --aerial-manifest path");
-if(requested&&!sceneIds.includes(requested)&&!["aster-baseline","aster-detail","aster-north","aster-east","s2p-pair","s2p-triplet","real-aerial"].includes(requested))throw Error("Unknown benchmark case");
+if(requested&&!sceneIds.includes(requested)&&!["aster-baseline","aster-detail","aster-north","aster-east","s2p-pair","s2p-triplet","s2p-city-large","real-aerial"].includes(requested))throw Error("Unknown benchmark case");
 await mkdir(root,{recursive:true});
 const rows=[];
 const escape=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
@@ -66,7 +66,10 @@ if(mode!=="offline"){
  for(const [id,opts] of [["aster-baseline",["--size","32"]],["aster-detail",["--size","64","--resolution","15"]],["aster-north",["--size","32","--lon","25.691194","--lat","23.942235"]],["aster-east",["--size","32","--lon","25.701194","--lat","23.932235"]]]){
    if(allowed(id))await child(id,"real ASTER satellite","scripts/terrain-real-demo.mjs",["--cache",cache,...opts]);
  }
- for(const id of ["s2p-pair","s2p-triplet"])if(allowed(id))await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id]);
+ for(const id of ["s2p-pair","s2p-triplet","s2p-city-large"])if(allowed(id)){
+   if(id==="s2p-city-large"&& !requested)continue; // optional costly benchmark
+   await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id==="s2p-city-large"?"s2p-triplet":id,...(id==="s2p-city-large"?["--size","128"]:[])]);
+ }
  if(allowed("real-aerial")){
   if(manifests.length){for(let i=0;i<manifests.length;i++)await child(i===0?"real-aerial":"real-aerial-"+(i+1),"real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--manifest",resolve(manifests[i])]);}
   else record("real-aerial","real aerial",null,"NOT RUN","Supply --aerial-manifest with calibrated images. ISPRS Avenches / Höngg not automatically ingested.");

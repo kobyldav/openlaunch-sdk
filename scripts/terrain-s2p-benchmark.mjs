@@ -1,6 +1,6 @@
 import {mkdir,writeFile,readFile,stat} from "node:fs/promises";
 import {resolve,join} from "node:path";
-import {loadTerrainRpcImage,reconstructTerrainFromSource,refineTerrainSurface,estimateTerrainHeightBand,terrainPointCloudPly} from "../dist/terrain/index.js";
+import {loadTerrainRpcImage,reconstructTerrainFromSource,refineTerrainSurface,estimateTerrainHeightBand,terrainPointCloudPly,reconstructTerrainTiled} from "../dist/terrain/index.js";
 import {decodeGeoTiff} from "../dist/eo/geotiff.js";
 import {reprojectRasterTo} from "../dist/eo/raster.js";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
@@ -22,12 +22,15 @@ if(hi<=lo)throw Error("No shared calibrated height domain");
 let lon=first.longitudeOffset,lat=first.latitudeOffset;const h=(lo+hi)/2;
 const targetX=(images[0].width-1)/2,targetY=(images[0].height-1)/2,project=(x,y)=>images[0].camera.project({longitudeDeg:x,latitudeDeg:y,heightM:h});
 for(let j=0;j<16;j++){const p=project(lon,lat),a=project(lon+1e-6,lat),b=project(lon,lat+1e-6);if(!p||!a||!b)throw Error("Image center outside RPC");const ex=targetX-p.x,ey=targetY-p.y;if(Math.hypot(ex,ey)<.01)break;const ax=a.x-p.x,ay=a.y-p.y,bx=b.x-p.x,by=b.y-p.y,det=ax*by-bx*ay;if(Math.abs(det)<1e-15)throw Error("Degenerate RPC center");lon+=1e-6*(ex*by-ey*bx)/det;lat+=1e-6*(ax*ey-ay*ex)/det;}
-const size=48,resolutionM=2,dy=resolutionM/111320,dx=dy/Math.cos(lat*Math.PI/180);
+const size=args.includes("--size")?Number(opt("size")):48,resolutionM=2;
+if(!Number.isInteger(size)||size<16||size>256)throw Error("Invalid --size: 16..256");
+const dy=resolutionM/111320,dx=dy/Math.cos(lat*Math.PI/180);
 const grid={width:size,height:size,crs:"EPSG:4326",transform:[lon-size*dx/2,dx,0,lat+size*dy/2,0,-dy]};
 const started=Date.now(),step=Math.max(.5,(hi-lo)/800);
 const pilot=estimateTerrainHeightBand({images,grid,minHeightM:lo,maxHeightM:hi,heightStepM:step},{pilotStepM:Math.max(1,step),clusterRadiusM:20,marginM:25});
 const minHeightM=pilot.minHeightM,maxHeightM=pilot.maxHeightM,heightStepM=Math.max(.5,(maxHeightM-minHeightM)/120);
-const result=reconstructTerrainFromSource({source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,peakRefinement:"image-evidence",recoverMissing:true,maxWork:250_000_000});
+const matcher={source,grid,minHeightM,maxHeightM,heightStepM,patchRadius:2,minCorrelation:.7,minPeakGap:.02,peakExclusionM:3,peakRefinement:"image-evidence",recoverMissing:true,maxWork:250_000_000};
+const result=size>64?reconstructTerrainTiled({...matcher,tileSize:32,maxAdjacentRiseM:30,onTile:p=>{if(p.completed%4===0||p.completed===p.total)console.log("Tile "+p.completed+"/"+p.total);}}):reconstructTerrainFromSource(matcher);
 const refined=refineTerrainSurface(result.elevationMap,{outlierM:8,fillRadius:1}),vals=Array.from(refined.grid.values).filter(Number.isFinite);
 const report={sourceKind:"satellite",synthetic:false,source:base+"input_"+dataset,model:result.model,verticalDatum:result.verticalDatum,center:{longitudeDeg:lon,latitudeDeg:lat},resolutionM,validPixels:result.validPixels,totalPixels:result.totalPixels,coverage:result.validPixels/result.totalPixels,filteredCoverage:vals.length/result.totalPixels,rejected:refined.rejected,interpolated:refined.filled,recoveredPixels:result.recoveredPixels,heightRangeM:vals.length?[Math.min(...vals),Math.max(...vals)]:null,elapsedMs:Date.now()-started,pilot};
 // Only after reconstruction: compare against s2p expected output, not independent ground truth.

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {reconstructTerrain,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,validateTerrainGeodetic,terrainPointCloudPly,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
+import {reconstructTerrain,reconstructTerrainTiled,createTerrainRpcCamera,createTerrainPinholeCamera,createTerrainPushbroomCamera,validateTerrainHeights,validateTerrainGeodetic,terrainPointCloudPly,discoverAsterStereo,TerrainReconstructionEngine} from "../dist/terrain/index.js";
 const poly=(...pairs)=>{const a=Array(20).fill(0);for(const [i,v] of pairs)a[i]=v;return a;};
 const rpc=(shift)=>createTerrainRpcCamera({
  longitudeOffset:14,latitudeOffset:50,heightOffset:100,longitudeScale:.01,latitudeScale:.01,heightScale:100,
@@ -62,4 +62,29 @@ test("image-evidence peak refinement uses real image correlation and preserves g
  const failed=reconstructTerrain({...opts,images:[image(0,"a",true),image(1,"b",true)],peakRefinement:"image-evidence"});
  assert.equal(failed.validPixels,0);
  assert.throws(()=>reconstructTerrain({...opts,peakRefinement:"unknown"}),/peak refinement/);
+});
+
+test("tiled reconstruction conserves stereo measurements across rotated global pixel transforms",()=>{
+ const ref=reconstructTerrain(opts);
+ const {images,...base}=opts;
+ // The existing test images use RPC calibration, not a DOM or a data service.
+ const toRpc=shift=>({
+  longitudeOffset:14,latitudeOffset:50,heightOffset:100,
+  longitudeScale:.01,latitudeScale:.01,heightScale:100,
+  sampleOffset:48,lineOffset:48,sampleScale:40,lineScale:40,
+  sampleNumerator:poly([1,1],[3,shift]),sampleDenominator:poly([0,1]),
+  lineNumerator:poly([2,1]),lineDenominator:poly([0,1])
+ });
+ const source={kind:"satellite",images:images.map((im,i)=>({...im,calibration:{kind:"rpc",rpc:toRpc(i)}}))};
+ const progress=[];
+ const tiled=reconstructTerrainTiled({...base,source,tileSize:3,onTile:p=>progress.push(p)});
+ assert.equal(tiled.tiles,4);assert.equal(tiled.totalPixels,25);
+ assert.equal(progress.at(-1).completed,4);
+ assert.equal(tiled.validPixels,ref.validPixels);
+ assert.equal(tiled.mesh.positions.length,25*3);
+ for(let i=0;i<25;i++){
+  if(!Number.isFinite(ref.elevationMap.values[i]))assert.ok(Number.isNaN(tiled.elevationMap.values[i]));
+  else assert.ok(Math.abs(ref.elevationMap.values[i]-tiled.elevationMap.values[i])<1e-6);
+ }
+ assert.throws(()=>reconstructTerrainTiled({...base,source,tileSize:1}),/Tile size/);
 });

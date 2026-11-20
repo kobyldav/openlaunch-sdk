@@ -15,3 +15,4 @@ export * from "./rpc-input.js";
 export * from "./quality.js";
 export * from "./pilot.js";
 export * from "./source.js";
+export * from "./tiles.js";
