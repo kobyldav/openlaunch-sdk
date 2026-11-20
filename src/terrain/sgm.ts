@@ -70,6 +70,9 @@ export function aggregateTerrainCostVolume(volume:TerrainCostVolume,o:TerrainSgm
       }
     }
   }
+  // A path never supplies evidence for a masked or unobserved height label.
+  // Keep the mask explicit in the returned aggregate as well as each path.
+  for(let i=0;i<costs.length;i++)if(!Number.isFinite(costs[i]))sum[i]=Infinity;
   return sum;
 }
 function correlation(a:number[],b:number[]):number {
