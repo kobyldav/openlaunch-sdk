@@ -167,7 +167,7 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
         "Copernicus DEM GLO-30 is a surface model with approximate 30m native spacing; output resampling adds no detail.",
         "GLO-30 elevations are referenced to EGM2008, not WGS84 ellipsoid. No vertical datum conversion was applied.",
         "Sentinel-2 scene cloud percentage does not guarantee every pixel is cloud free.",
-        ...rgb.warnings
+        ...rgb.warnings.filter(w=>!/^No DEM,/.test(w))
       ]
     }
   };

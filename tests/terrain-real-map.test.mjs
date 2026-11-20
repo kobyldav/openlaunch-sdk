@@ -50,6 +50,7 @@ test("real map loads two independent data sources, preserves elevation and emits
   assert.ok(result.metadata.sampledColors>0);
   assert.equal(result.vertexRgb.length,result.elevation.values.length*3);
   assert.equal(result.metadata.verticalDatum,"EGM2008 geoid");
+  assert.ok(result.metadata.warnings.every(w=>!w.startsWith("No DEM,")));
   assert.equal(result.metadata.sceneId,scene.sceneId);
   assert.ok(result.metadata.heightMinM>=195);
   assert.equal(result.mesh.positions[2],Math.fround(result.elevation.values[0]));
