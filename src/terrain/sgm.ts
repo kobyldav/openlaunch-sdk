@@ -164,7 +164,7 @@ export function reconstructTerrainSgm(o:TerrainReconstructionOptions):TerrainRec
   }
   const aggregated=aggregateTerrainCostVolume({width:grid.width,height:grid.height,levels,costs,intensity:brightness},{
     paths:o.sgmPaths??8,p1:o.sgmP1??.035,p2:o.sgmP2??.30,
-    contrastScale:o.sgmContrastScale??Infinity,signal:o.signal
+    contrastScale:o.sgmContrastScale??Infinity,...(o.signal?{signal:o.signal}:{})
   });
   const ecef=new Float64Array(n*3).fill(NaN),cloud:number[]=[],quality:number[]=[];
   let origin:readonly [number,number,number]=[0,0,0];
