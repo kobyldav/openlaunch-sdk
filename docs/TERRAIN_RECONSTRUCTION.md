@@ -62,7 +62,7 @@ See [AERIAL_TERRAIN.md](AERIAL_TERRAIN.md) for switching satellite/aerial inputs
 
 ### Large AOIs via tiled reconstruction
 
-Use `reconstructTerrainTiled({source,grid,minHeightM,maxHeightM,heightStepM,tileSize:32,onTile})` for mosaics up to 1 million output points. Each tile uses the same original sensor images, independent NCC matching and globally offset affine geometry; no predicted heights or DEM are passed between tiles. Assembled output contains full-sized DSM, confidence, texture, point cloud and mesh. `maxAdjacentRiseM` excludes unusually steep triangles but retains the original measurements. Tile-progress callbacks are available; the method is synchronous and should run inside a worker in a browser. `npm run example:terrain-benchmark -- --case s2p-city-large` provides an **optional**, more expensive 128x128 real-satellite test; it may fail, which is useful validation rather than a hidden fallback.
+Use `reconstructTerrainTiled({source,grid,minHeightM,maxHeightM,heightStepM,tileSize:32,onTile})` for mosaics up to 1 million output points. Each tile uses the same original sensor images, independent NCC matching and globally offset affine geometry; no predicted heights or DEM are passed between tiles. Assembled output contains full-sized DSM, confidence, texture, point cloud and mesh. `maxAdjacentRiseM` excludes unusually steep triangles but retains the original measurements. Tile-progress callbacks are available; the method is synchronous and should run inside a worker in a browser. `npm run example:terrain-benchmark -- --case s2p-triplet-large` provides an **optional**, more expensive 128x128 real-satellite test; it may fail, which is useful validation rather than a hidden fallback.
 
 ### Physical support of image matching
 

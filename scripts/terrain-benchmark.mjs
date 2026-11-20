@@ -4,12 +4,13 @@ import {spawnSync} from "node:child_process";
 import {makeTerrainBenchmarkScene,sceneIds} from "./terrain-benchmark-scenes.mjs";
 import {reconstructTerrainFromSource,refineTerrainSurface,validateTerrainHeights,terrainPointCloudPly} from "../dist/terrain/index.js";
 import {writeRealTerrainViewer} from "./terrain-real-viewer.mjs";
-const args=process.argv.slice(2),root=resolve("test-results/terrain-benchmark");
+const args=process.argv.slice(2),outIndex=args.indexOf("--out"),root=resolve(outIndex<0?"test-results/terrain-benchmark":args[outIndex+1]);
+if(outIndex>=0&&(!args[outIndex+1]||args[outIndex+1].startsWith("--")))throw Error("Missing --out directory");
 const mode=args.includes("--offline")?"offline":args.includes("--real-only")?"real":"all";
 const requested=args.includes("--case")?args[args.indexOf("--case")+1]:null;
 const manifests=args.flatMap((v,i)=>v==="--aerial-manifest"?[args[i+1]]:[]);
 if(manifests.some(v=>!v||v.startsWith("--")))throw Error("Missing --aerial-manifest path");
-if(requested&&!sceneIds.includes(requested)&&!["aster-baseline","aster-detail","aster-north","aster-east","s2p-pair","s2p-triplet","s2p-city-large","real-aerial"].includes(requested))throw Error("Unknown benchmark case");
+if(requested&&!sceneIds.includes(requested)&&!["aster-baseline","aster-detail","aster-north","aster-east","s2p-pair","s2p-triplet","s2p-triplet-large","real-aerial"].includes(requested))throw Error("Unknown benchmark case");
 await mkdir(root,{recursive:true});
 const rows=[];
 const escape=s=>String(s??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;");
@@ -66,9 +67,9 @@ if(mode!=="offline"){
  for(const [id,opts] of [["aster-baseline",["--size","32"]],["aster-detail",["--size","64","--resolution","15"]],["aster-north",["--size","32","--lon","25.691194","--lat","23.942235"]],["aster-east",["--size","32","--lon","25.701194","--lat","23.932235"]]]){
    if(allowed(id))await child(id,"real ASTER satellite","scripts/terrain-real-demo.mjs",["--cache",cache,...opts]);
  }
- for(const id of ["s2p-pair","s2p-triplet","s2p-city-large"])if(allowed(id)){
-   if(id==="s2p-city-large"&& !requested)continue; // optional costly benchmark
-   await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id==="s2p-city-large"?"s2p-triplet":id,...(id==="s2p-city-large"?["--size","128"]:[])]);
+ for(const id of ["s2p-pair","s2p-triplet","s2p-triplet-large"])if(allowed(id)){
+   if(id==="s2p-triplet-large"&& !requested)continue; // optional costly benchmark
+   await child(id,"real high-resolution satellite","scripts/terrain-s2p-benchmark.mjs",["--dataset",id==="s2p-triplet-large"?"s2p-triplet":id,...(id==="s2p-triplet-large"?["--size","128"]:[])]);
  }
  if(allowed("real-aerial")){
   if(manifests.length){for(let i=0;i<manifests.length;i++)await child(i===0?"real-aerial":"real-aerial-"+(i+1),"real aerial (user supplied)","scripts/terrain-aerial-demo.mjs",["--manifest",resolve(manifests[i])]);}

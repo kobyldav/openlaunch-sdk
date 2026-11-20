@@ -22,3 +22,7 @@ Multiple real aerial datasets may be evaluated in one run by repeating `--aerial
 ## CRS-safe reference checking
 
 The S2P reference DSM is projected onto the OpenLaunch WGS84 grid with `reprojectRasterTo` before comparison. This uses the reference for **validation only**, never as the reconstruction input. Source and target CRS are recorded, and vertical datum discrepancies are explicitly marked as unknown; centered RMSE is not absolute accuracy. Invalid cells and non-overlap are not silently treated as successes.
+
+## Extended real sensor mosaic
+
+`npm run example:terrain-benchmark -- --case s2p-triplet-large --out test-results/terrain-large` reconstructs a 128×128 grid at 2 m pitch from original S2P triplet images, using the OpenLaunch tiled engine. A reference algorithm's DSM is opened only after reconstruction. This case is opt-in because its runtime and memory requirements are higher. The explicit `--out` path prevents overwriting the standard benchmark dashboard. The high-resolution satellite image scene is not a fully calibrated independent aerial photograph benchmark.
