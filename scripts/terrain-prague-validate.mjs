@@ -62,7 +62,15 @@ for(let y=0;y<height;y++) {
   for(let x=0;x<width;x++)if(raw[row+1+x*4+3]===255)actual++;
 }
 assert.equal(actual,validPixels,"PNG RGB validity agrees with SDK report");
-assert.ok(validPixels>report.mesh.vertices,"native RGB texture must preserve more pixels than DEM vertices");
+if(report.metadata.elevationProvider==="cuzk-dmpok"){
+  assert.equal(report.kind,"satellite-rgb-on-cuzk-dmpok");
+  assert.equal(report.metadata.verticalDatum,"Bpv (Baltic 1957)");
+  assert.equal(report.metadata.demNativeResolutionM,0.5);
+  assert.ok(report.metadata.groundResolutionM<=5);
+  assert.ok(report.mesh.vertices>validPixels,"fine surface geometry resolves more cells than 10m RGB");
+}else{
+  assert.ok(validPixels>report.mesh.vertices,"legacy native RGB texture should preserve more pixels than coarse DEM");
+}
 console.log("PASS real terrain package: "+report.mesh.vertices+
   " vertices, "+report.mesh.triangles+" faces, "+width+"x"+height+
   " PNG, "+actual+" observed RGB pixels, OBJ UVs and MTL");
