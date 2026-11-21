@@ -146,9 +146,12 @@ function startWebgl(gl) {
   if(n>=65536)throw Error("Too many vertices for WebGL1 index buffer");
   const vertexSrc=[
     "attribute vec3 aPosition; attribute vec2 aUv;",
-    "uniform float uMin,uVertical,uAspect,uTanHalf,uDistance,uNear,uFar;",
+    // WebGL 1 requires a shared uniform to use the SAME precision in both shaders.
+    // The vertex default is highp; the fragment default below is mediump.
+    "uniform mediump float uMin;",
+    "uniform highp float uVertical,uAspect,uTanHalf,uDistance,uNear,uFar;",
     "uniform vec3 uForward,uRight,uUp,uTarget;",
-    "varying vec2 vUv; varying float vElevation;",
+    "varying mediump vec2 vUv; varying mediump float vElevation;",
     "void main(){",
     "  vec3 world=vec3(aPosition.x,(aPosition.z-uMin)*uVertical,-aPosition.y);",
     "  vec3 rel=world-uTarget;",
@@ -162,9 +165,9 @@ function startWebgl(gl) {
   const fragmentSrc=[
     "precision mediump float;",
     "uniform sampler2D uTexture;",
-    "uniform float uMin,uMax;",
+    "uniform mediump float uMin,uMax;",
     "uniform int uMode;",
-    "varying vec2 vUv; varying float vElevation;",
+    "varying mediump vec2 vUv; varying mediump float vElevation;",
     "void main(){",
     " if(uMode==2){gl_FragColor=vec4(0.05,0.10,0.17,1.0);return;}",
     " float z=clamp((vElevation-uMin)/max(0.01,uMax-uMin),0.0,1.0);",
