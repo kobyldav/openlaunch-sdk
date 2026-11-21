@@ -202,7 +202,9 @@
     "example:terrain-prague": "npm run build && node scripts/terrain-prague-sentinel2.mjs",
     "example:terrain-prague-3d": "npm run build && node scripts/terrain-prague-3d.mjs",
     "example:terrain-prague-detail": "npm run build && node scripts/terrain-prague-3d.mjs --dem cuzk-dmpok --bounds 14.416 50.086 14.422 50.090 --resolution 2 --out test-results/terrain-prague-detail",
-    "example:terrain-prague-ortho": "npm run build && node scripts/terrain-prague-3d.mjs --dem cuzk-dmpok --imagery cuzk-ortofoto --texture-resolution 0.5 --bounds 14.416 50.086 14.422 50.090 --resolution 2 --out test-results/terrain-prague-ortho"
+    "example:terrain-prague-ortho": "npm run build && node scripts/terrain-prague-3d.mjs --dem cuzk-dmpok --imagery cuzk-ortofoto --texture-resolution 0.5 --bounds 14.416 50.086 14.422 50.090 --resolution 2 --out test-results/terrain-prague-ortho",
+    "example:terrain-prague-stream": "npm run build && node scripts/terrain-prague-stream.mjs",
+    "test:terrain-prague-stream": "npm run build && node --test tests/terrain-prague-stream.test.mjs"
   },
   "engines": {
     "node": ">=18"

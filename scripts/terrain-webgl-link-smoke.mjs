@@ -8,7 +8,7 @@ import {pathToFileURL} from "node:url";
 import {runInNewContext} from "node:vm";
 import {spawnSync} from "node:child_process";
 
-const viewer=await readFile(new URL("./terrain-prague-viewer.html",import.meta.url),"utf8");
+const viewer=await readFile(process.argv[2]??new URL("./terrain-prague-viewer.html",import.meta.url),"utf8");
 const block=viewer.match(/const vertexSrc=\[[\s\S]*?\]\.join\("\\n"\);\s*const fragmentSrc=\[[\s\S]*?\]\.join\("\\n"\);/)?.[0];
 assert.ok(block,"Cannot extract actual GLSL strings from terrain viewer");
 const {vertexSrc,fragmentSrc}=runInNewContext(block+"\n({vertexSrc,fragmentSrc})");
