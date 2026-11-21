@@ -5,6 +5,7 @@
 (function(root){
 "use strict";
 const EARTH_R=6378137,TAN_HALF=Math.tan(Math.PI/8),EPS=1e-8;
+const cachedBounds=new WeakMap(),cachedCellMasks=new WeakMap();
 const dot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
 const cross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
 const sub=(a,b)=>[a[0]-b[0],a[1]-b[1],a[2]-b[2]];
@@ -74,6 +75,66 @@ function boundsForTile(tile,vertical=1,baseHeight=180){
  return {min:[x0,(z0-baseHeight)*vertical,-n1],
    max:[x1,(z1-baseHeight)*vertical,-n0]};
 }
+function tileBounds(tile,vertical,baseHeight){
+ const cached=cachedBounds.get(tile);
+ if(cached?.vertical===vertical&&cached.baseHeight===baseHeight)return cached.bounds;
+ const bounds=boundsForTile(tile,vertical,baseHeight);
+ cachedBounds.set(tile,{vertical,baseHeight,bounds});
+ return bounds;
+}
+function gridMask(tile){
+ if(cachedCellMasks.has(tile))return cachedCellMasks.get(tile);
+ const {width:w,height:h,indices,positions:p,measuredTriangles}=tile;
+ if(!Number.isInteger(w)||!Number.isInteger(h)||w<2||h<2||
+   p.length<w*h*3||indices.length<measuredTriangles*3){
+   cachedCellMasks.set(tile,null);return null;
+ }
+ const dx=p[3]-p[0],dy=p[w*3+1]-p[1];
+ if(!Number.isFinite(dx)||!Number.isFinite(dy)||dx===0||dy===0){
+   cachedCellMasks.set(tile,null);return null;
+ }
+ const masks=new Uint8Array((w-1)*(h-1));
+ let recognized=0;
+ for(let i=0;i<measuredTriangles*3;i+=3){
+   const [a,b,c]=[indices[i],indices[i+1],indices[i+2]];
+   let cell=-1,bit=0;
+   if(b===a+1&&c===a+w){cell=a;bit=1;}
+   else if(b===a+w&&c===a+w-1){cell=a-1;bit=2;}
+   if(cell<0||cell>=w*h||cell%w>=w-1||Math.floor(cell/w)>=h-1){
+     cachedCellMasks.set(tile,null);return null;
+   }
+   masks[Math.floor(cell/w)*(w-1)+cell%w]|=bit;
+   recognized++;
+ }
+ if(recognized!==measuredTriangles){cachedCellMasks.set(tile,null);return null;}
+ const result={masks,width:w,height:h,dx,dy,x0:p[0],y0:p[1]};
+ cachedCellMasks.set(tile,result);
+ return result;
+}
+function verticalFaces(tile,ray){
+ // Exact O(1) candidate selection for a vertical profile ray on the SDK
+ // row-major DEM grid; mask was built from the actual measured face list.
+ if(Math.abs(ray.direction[0])>EPS||Math.abs(ray.direction[2])>EPS)return null;
+ const grid=gridMask(tile);
+ if(!grid)return null;
+ const {width:w,height:h,dx,dy,x0,y0,masks}=grid;
+ const col=(ray.origin[0]-x0)/dx;
+ const row=(-ray.origin[2]-y0)/dy;
+ if(col < -1e-4||row < -1e-4||col>w-1+1e-4||row>h-1+1e-4)
+   return [];
+ const hits=[];
+ const c0=Math.min(w-2,Math.max(0,Math.floor(col)));
+ const r0=Math.min(h-2,Math.max(0,Math.floor(row)));
+ // On grid edges, check the immediately adjacent cell as well.
+ for(let r=Math.max(0,r0-1);r<=Math.min(h-2,r0+1);r++)
+   for(let c=Math.max(0,c0-1);c<=Math.min(w-2,c0+1);c++){
+     const mask=masks[r*(w-1)+c],a=r*w+c;
+     if(mask&1)hits.push([a,a+1,a+w]);
+     if(mask&2)hits.push([a+1,a+w+1,a+w]);
+   }
+ return hits;
+}
+
 function pickMeasured(tiles,ray,{vertical=1,baseHeight=180,maxDistance=25000}={}){
  if(!Number.isFinite(vertical)||vertical<=0||
     !Number.isFinite(baseHeight)||!Number.isFinite(maxDistance)||maxDistance<=0)
@@ -82,21 +143,23 @@ function pickMeasured(tiles,ray,{vertical=1,baseHeight=180,maxDistance=25000}={}
  for(const tile of tiles){
    const positions=tile.positions,indices=tile.indices;
    if(!positions||!indices||!Number.isInteger(tile.measuredTriangles))continue;
-   const bounds=tile.bounds??boundsForTile(tile,vertical,baseHeight);
+   const bounds=tileBounds(tile,vertical,baseHeight);
    if(!bounds||!boxHit(ray,bounds,bestT))continue;
-   // First part of index list is the original SDK mesh. Never pick skirts.
+   // Only the original SDK triangles are pickable; visual-only seam
+   // appendices are excluded. Profiles use a row-major cell mask to avoid
+   // scanning ~100,000 triangles 32 times for a single A/B measurement.
    const count=Math.min(tile.measuredTriangles*3,indices.length);
+   const candidates=verticalFaces(tile,ray);
    const at=i=>{
      const j=i*3;
      return [positions[j],(positions[j+2]-baseHeight)*vertical,-positions[j+1]];
    };
-   for(let i=0;i<count;i+=3){
-     const ia=indices[i],ib=indices[i+1],ic=indices[i+2];
-     if([ia,ib,ic].some(k=>k*3+2>=positions.length))continue;
+   const visit=(ia,ib,ic)=>{
+     if([ia,ib,ic].some(k=>k*3+2>=positions.length))return;
      const h0=positions[ia*3+2],h1=positions[ib*3+2],h2=positions[ic*3+2];
-     if(![h0,h1,h2].every(Number.isFinite))continue;
+     if(![h0,h1,h2].every(Number.isFinite))return;
      const hit=intersect(ray,at(ia),at(ib),at(ic));
-     if(!hit||hit.along>=bestT)continue;
+     if(!hit||hit.along>=bestT)return;
      const w=1-hit.u-hit.v;
      const east=w*positions[ia*3]+hit.u*positions[ib*3]+hit.v*positions[ic*3];
      const north=w*positions[ia*3+1]+hit.u*positions[ib*3+1]+hit.v*positions[ic*3+1];
@@ -104,7 +167,11 @@ function pickMeasured(tiles,ray,{vertical=1,baseHeight=180,maxDistance=25000}={}
      bestT=hit.along;
      best={id:tile.id,east,north,elevationM,distanceAlongRay:hit.along,
        horizontalCoordinates:"approximate local metres",verticalDatum:"Bpv (Baltic 1957)"};
-   }
+   };
+   if(candidates!==null){
+     for(const ids of candidates)visit(ids[0],ids[1],ids[2]);
+   }else for(let i=0;i<count;i+=3)
+     visit(indices[i],indices[i+1],indices[i+2]);
  }
  return best;
 }
