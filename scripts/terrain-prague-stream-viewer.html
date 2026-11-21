@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenLaunch SDK · Praha 3D · streamované ČÚZK dlaždice</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0d1a29;color:#eaf3fa;font:14px system-ui,Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:#112b40;border-bottom:1px solid #365570;flex-wrap:wrap}
+h1{font-size:18px;margin:0}main{max-width:1600px;margin:auto;padding:12px}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:10px}
+button{background:#204764;border:1px solid #5b7890;color:white;border-radius:7px;padding:8px 12px;cursor:pointer}
+button:hover{background:#346382}
+input[type=range]{accent-color:#66b3ec;vertical-align:middle}
+label{white-space:nowrap}
+#map{width:100%;height:min(77vh,850px);min-height:380px;display:block;border-radius:12px;background:#112a43;touch-action:none;cursor:grab}
+#map:active{cursor:grabbing}
+.small{font-size:12px;line-height:1.5;color:#b2c9dc}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:10px}
+.stats>div{background:#142c41;border:1px solid #31506a;padding:12px;border-radius:9px}
+.stats strong{display:block;font-size:18px;color:#a8e1d5;font-variant-numeric:tabular-nums}
+#error{color:#ffae9e;min-height:1.4em}
+a{color:#9cd1fc}
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenLaunch SDK · Praha 3D <small style="color:#91d5be">streamované reálné dlaždice</small></h1>
+  <span class="small">© ČÚZK · DMP OK + Ortofoto ČR · CC BY 4.0</span>
+</header>
+<main>
+ <div class="toolbar">
+  <button id="reset">Střed Prahy</button>
+  <button id="detail">Detail: automaticky</button>
+  <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="5" step=".25" value="1"> <b id="verticalValue">1×</b></label>
+  <span id="status" class="small">Připravuji mapu…</span>
+ </div>
+ <canvas id="map" aria-label="3D interaktivní mapa Prahy načítaná po dlaždicích"></canvas>
+ <div class="stats">
+  <div>Viditelné dlaždice<strong id="visible">0</strong></div>
+  <div>Načtené v paměti<strong id="resident">0</strong></div>
+  <div>Rozpracované požadavky<strong id="pending">0</strong></div>
+  <div>Zobrazené trojúhelníky<strong id="faces">0</strong></div>
+  <div>Vzdálenost kamery<strong id="distance">—</strong></div>
+ </div>
+ <p class="small">Levé tlačítko / jeden prst: otáčení · pravé tlačítko nebo Shift + tah: posunutí mapy · kolečko / dva prsty: přiblížení · šipky / WASD: posun. Při přiblížení se automaticky stahuje skutečný jemnější výškový model, vzdálené dlaždice se vykreslují hruběji. Server uchovává stažené dlaždice na disku; GPU paměť má omezenou LRU cache.</p>
+ <p class="small" id="source">Výšky: ČÚZK DMP OK, Bpv. Barvy: ČÚZK Ortofoto ČR. Nejpodrobnější geometrie 2 m, textura 0,5 m. Žádné rekonstruované fasády.</p>
+ <p id="error" aria-live="polite"></p>
+</main>
+<script>
+"use strict";
+const $=id=>document.getElementById(id),canvas=$("map");
+let config,gl,program,attrs,uni,revision=0,needsDraw=false;
+let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
+const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set();
+const MAX_REQUESTS=3,MAX_GPU_TILES=32,MAX_COARSE_VISIBLE=12,MAX_FINE_GROUPS=2;
+let active=0,lastStatus="",frameStamp=0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const vlen=v=>Math.hypot(...v)||1;
+const vnorm=v=>v.map(x=>x/vlen(v));
+const vcross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const vdot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+function merc(lon,lat){
+ const r=6378137;return [r*lon*Math.PI/180,r*Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))];
+}
+function boundsFor(z,x,y){
+ const r=config.bounds,lv=config.levels[z],n=lv.cols,m=lv.rows;
+ return [r[0]+(r[2]-r[0])*x/n,r[3]-(r[3]-r[1])*(y+1)/m,
+   r[0]+(r[2]-r[0])*(x+1)/n,r[3]-(r[3]-r[1])*y/m];
+}
+function worldFor(lon,lat){
+ const c=merc(config.center[0],config.center[1]),p=merc(lon,lat);
+ const factor=Math.cos(config.centerLatitudeDeg*Math.PI/180);
+ return [(p[0]-c[0])*factor,(p[1]-c[1])*factor];
+}
+function tileCenter(z,x,y){
+ const b=boundsFor(z,x,y);return worldFor((b[0]+b[2])/2,(b[1]+b[3])/2);
+}
+function nearTile(z,x,y){
+ const p=tileCenter(z,x,y);return Math.hypot(p[0]-panX,p[1]-panNorth);
+}
+function tileKey(z,x,y){return z+"-"+x+"-"+y;}
+function choose(){
+ const coarse=[],finer=[];
+ const rad=clamp(distance*.7+380,570,1800);
+ for(let y=0;y<config.levels[0].rows;y++)for(let x=0;x<config.levels[0].cols;x++){
+   const d=nearTile(0,x,y);
+   if(d<rad+500)coarse.push({z:0,x,y,d,key:tileKey(0,x,y)});
+ }
+ coarse.sort((a,b)=>a.d-b.d);
+ coarse.length=Math.min(coarse.length,MAX_COARSE_VISIBLE);
+ if(enableDetail&&distance<1500){
+   const groups=coarse.filter(t=>t.d<Math.min(900,distance*.78+200))
+     .slice(0,MAX_FINE_GROUPS);
+   for(const g of groups){
+     for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
+       const x=g.x*2+dx,y=g.y*2+dy;
+       finer.push({z:1,x,y,d:nearTile(1,x,y),key:tileKey(1,x,y),parent:g.key});
+     }
+   }
+ }
+ return {coarse,finer};
+}
+function scheduleFetch(tile){
+ if(cache.has(tile.key)||pending.has(tile.key)||queue.some(q=>q.key===tile.key))return;
+ queue.push(tile);
+}
+function pump(){
+ while(active<MAX_REQUESTS&&queue.length){
+   const tile=queue.shift();
+   if(cache.has(tile.key)||pending.has(tile.key))continue;
+   active++;pending.add(tile.key);
+   const meshUrl="/api/tiles/"+tile.z+"/"+tile.x+"/"+tile.y+".json";
+   (async()=>{
+     const reply=await fetch(meshUrl);
+     if(!reply.ok)throw Error((await reply.text()).slice(0,350));
+     const data=await reply.json();
+     if(data.status!=="real-data"||data.key!==tile.key||
+        data.verticalDatum!=="Bpv (Baltic 1957)")throw Error("Invalid real tile provenance: "+tile.key);
+     const textureReply=await fetch(data.texture.file);
+     if(!textureReply.ok)throw Error("Orthophoto unavailable for "+tile.key);
+     const blob=await textureReply.blob();
+     const bitmap=await createImageBitmap(blob);
+     try{const gpu=createGpuTile(data,bitmap);
+       cache.set(tile.key,{...gpu,meta:data,lastUsed:Date.now()});
+     }finally{bitmap.close?.();}
+     $("error").textContent="";
+   })().catch(err=>{
+     console.error(tile.key,err);
+     $("error").textContent="Dlaždice "+tile.key+": "+String(err.message||err)+
+       " · Dříve načtené dlaždice zůstávají viditelné.";
+     // Failed tiles remain eligible for explicit movement/reload rather than inventing a replacement.
+   }).finally(()=>{active--;pending.delete(tile.key);update();pump();});
+ }
+ $("pending").textContent=String(active+queue.length);
+}
+function binary(base64,Type){
+ const raw=atob(base64),bytes=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ if(bytes.byteLength%Type.BYTES_PER_ELEMENT)throw Error("Corrupt tile binary");
+ return new Type(bytes.buffer);
+}
+function makeBuffer(data,target){
+ const buf=gl.createBuffer();gl.bindBuffer(target,buf);gl.bufferData(target,data,gl.STATIC_DRAW);return buf;
+}
+function createGpuTile(d,bitmap){
+ if(d.validVertices<=0||d.width*d.height>50000||d.texture.width>1024||
+    bitmap.width!==d.texture.width||bitmap.height!==d.texture.height)throw Error("Invalid tile dimensions");
+ const local=binary(d.positionsF32LE,Float32Array),indices=binary(d.trianglesU16LE,Uint16Array);
+ if(local.length!==d.width*d.height*3||indices.length!==d.triangles*3)
+   throw Error("Malformed tile geometry");
+ const pos=new Float32Array(local.length),uv=new Float32Array(d.width*d.height*2);
+ for(let i=0;i<local.length/3;i++){
+   const j=i*3,row=Math.floor(i/d.width),col=i%d.width;
+   pos[j]=local[j]+d.originMeters[0];
+   pos[j+1]=local[j+1]+d.originMeters[1];
+   pos[j+2]=Number.isFinite(local[j+2])?local[j+2]:BASE_HEIGHT;
+   uv[i*2]=(col+.5)/d.width;
+   uv[i*2+1]=(row+.5)/d.height;
+ }
+ // All triangle indices originate in the measured SDK mesh; NoData is never drawn.
+ if(indices.some(i=>i>=local.length/3))throw Error("Tile triangle index out of range");
+ const positions=makeBuffer(pos,gl.ARRAY_BUFFER),uvs=makeBuffer(uv,gl.ARRAY_BUFFER);
+ const faces=makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER);
+ const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ return {positions,uvs,faces,texture,count:indices.length};
+}
+function dispose(t){
+ gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
+ gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
+}
+function evict(keep){
+ if(cache.size<=MAX_GPU_TILES)return;
+ const old=[...cache].filter(([id])=>!keep.has(id))
+   .sort((a,b)=>a[1].lastUsed-b[1].lastUsed);
+ for(const [id,t] of old){
+   if(cache.size<=MAX_GPU_TILES)break;
+   dispose(t);cache.delete(id);
+ }
+}
+function update(){
+ if(!config||!gl)return;
+ const {coarse,finer}=choose();
+ const ids=new Set();
+ // Coarse first, then four fine children per nearby area (atomic LOD switch).
+ for(const t of coarse){ids.add(t.key);scheduleFetch(t);}
+ for(const t of finer){ids.add(t.key);scheduleFetch(t);}
+ // Drop stale requests that have not started. Disk-cached requests can be reused later.
+ const desired=new Set([...coarse,...finer].map(t=>t.key));
+ for(let i=queue.length-1;i>=0;i--)if(!desired.has(queue[i].key))queue.splice(i,1);
+ evict(ids);
+ pump();requestDraw();
+}
+function camera(){
+ const ray=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
+ const forward=ray.map(x=>-x),right=vnorm(vcross(forward,[0,1,0]));
+ const up=vnorm(vcross(right,forward));
+ return {forward,right,up,target:[panX,28*vertical,-panNorth]};
+}
+function makeShader(type,src){
+ const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
+ if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;
+}
+function startGpu(){
+ gl=canvas.getContext("webgl",{alpha:false,antialias:true,preserveDrawingBuffer:false});
+ if(!gl)throw Error("WebGL 1.0 nedostupné – vyžaduje grafický prohlížeč.");
+ const vertexSrc=[
+   "attribute vec3 aPosition; attribute vec2 aUv;",
+   "uniform highp vec3 uForward,uRight,uUp,uTarget;",
+   "uniform highp float uVertical,uAspect,uTanHalf,uDistance,uNear,uFar,uBase;",
+   "varying mediump vec2 vUv; varying mediump float vElevation;",
+   "void main(){",
+   " vec3 world=vec3(aPosition.x,(aPosition.z-uBase)*uVertical,-aPosition.y);",
+   " vec3 rel=world-uTarget;",
+   " float d=dot(rel,uForward)+uDistance;",
+   " gl_Position=vec4(dot(rel,uRight)/(uTanHalf*uAspect),dot(rel,uUp)/uTanHalf,",
+   "   (uFar+uNear)/(uFar-uNear)*d-2.0*uFar*uNear/(uFar-uNear),d);",
+   " vUv=aUv;vElevation=aPosition.z;",
+   "}"
+ ].join("\n");
+ const fragmentSrc=[
+   "precision mediump float;",
+   "uniform sampler2D uTexture;",
+   "varying mediump vec2 vUv; varying mediump float vElevation;",
+   "void main(){",
+   " vec4 rgba=texture2D(uTexture,vUv);",
+   " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
+   " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",
+   " gl_FragColor=vec4(colour,1.0);",
+   "}"
+ ].join("\n");
+ program=gl.createProgram();
+ gl.attachShader(program,makeShader(gl.VERTEX_SHADER,vertexSrc));
+ gl.attachShader(program,makeShader(gl.FRAGMENT_SHADER,fragmentSrc));
+ gl.linkProgram(program);
+ if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+ gl.useProgram(program);
+ attrs={pos:gl.getAttribLocation(program,"aPosition"),uv:gl.getAttribLocation(program,"aUv")};
+ uni=Object.fromEntries(["uForward","uRight","uUp","uTarget","uVertical","uAspect",
+   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture"]
+   .map(n=>[n,gl.getUniformLocation(program,n)]));
+ gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.055,.12,.19,1);
+ gl.uniform1f(uni.uBase,BASE_HEIGHT);
+ gl.uniform1i(uni.uTexture,0);
+}
+function bindAttr(buffer,location,size){
+ gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+ gl.enableVertexAttribArray(location);
+ gl.vertexAttribPointer(location,size,gl.FLOAT,false,0,0);
+}
+function requestDraw(){
+ if(needsDraw)return;needsDraw=true;
+ requestAnimationFrame(()=>{
+   needsDraw=false;draw();
+ });
+}
+function draw(){
+ if(!gl)return;
+ const ratio=Math.min(2,window.devicePixelRatio||1);
+ const width=Math.max(1,Math.round(canvas.clientWidth*ratio));
+ const height=Math.max(1,Math.round(canvas.clientHeight*ratio));
+ if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+ gl.viewport(0,0,width,height);
+ gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ gl.useProgram(program);
+ const c=camera();
+ gl.uniform3fv(uni.uForward,c.forward);
+ gl.uniform3fv(uni.uRight,c.right);
+ gl.uniform3fv(uni.uUp,c.up);
+ gl.uniform3fv(uni.uTarget,c.target);
+ gl.uniform1f(uni.uVertical,vertical);
+ gl.uniform1f(uni.uAspect,width/height);
+ gl.uniform1f(uni.uTanHalf,Math.tan(Math.PI/8));
+ gl.uniform1f(uni.uDistance,distance);
+ gl.uniform1f(uni.uNear,.1);
+ gl.uniform1f(uni.uFar,15000);
+ const {coarse,finer}=choose();
+ const finePerParent=new Map();
+ for(const f of finer){if(!finePerParent.has(f.parent))finePerParent.set(f.parent,[]);
+   finePerParent.get(f.parent).push(f);}
+ const render=[];
+ for(const t of coarse){
+   const children=finePerParent.get(t.key)||[];
+   if(children.length===4&&children.every(k=>cache.has(k.key))){
+     for(const kid of children)render.push(kid.key);
+   }else if(cache.has(t.key))render.push(t.key);
+ }
+ let faces=0;
+ for(const id of render){
+   const t=cache.get(id);
+   if(!t)continue;
+   t.lastUsed=Date.now();
+   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
+   bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
+   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
+   gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
+   faces+=t.count/3;
+ }
+ $("visible").textContent=String(render.length);
+ $("resident").textContent=String(cache.size);
+ $("pending").textContent=String(active+queue.length);
+ $("faces").textContent=faces.toLocaleString("cs-CZ");
+ $("distance").textContent=Math.round(distance)+" m";
+ $("status").textContent=enableDetail&&distance<1500?"Detailní 2m dlaždice podle pohledu":"Přehledová 12m síť";
+}
+function move(dx,dy){
+ // Horizontal local world pan. Clamp to published Prague coverage.
+ const bound=worldFor(config.bounds[2],config.bounds[3]);
+ panX=clamp(panX+dx,-Math.abs(bound[0]),Math.abs(bound[0]));
+ panNorth=clamp(panNorth+dy,-Math.abs(bound[1]),Math.abs(bound[1]));
+ update();
+}
+$("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
+$("detail").onclick=()=>{
+ enableDetail=!enableDetail;
+ $("detail").textContent="Detail: "+(enableDetail?"automaticky":"vypnuto");
+ update();
+};
+$("vertical").oninput=()=>{vertical=Number($("vertical").value);
+ $("verticalValue").textContent=vertical+"×";requestDraw();};
+canvas.oncontextmenu=e=>e.preventDefault();
+const pointers=new Map();
+let lastPinch=0,previous={x:0,y:0};
+canvas.addEventListener("pointerdown",e=>{
+ e.preventDefault();canvas.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,mode:e.button===2||e.shiftKey?"pan":"orbit"});
+ previous={x:e.clientX,y:e.clientY};lastPinch=0;
+});
+canvas.addEventListener("pointermove",e=>{
+ if(!pointers.has(e.pointerId))return;
+ const old=pointers.get(e.pointerId);
+ pointers.set(e.pointerId,{...old,x:e.clientX,y:e.clientY});
+ if(pointers.size===2){
+   const pair=[...pointers.values()],gap=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y);
+   if(lastPinch>0)distance=clamp(distance*lastPinch/Math.max(1,gap),100,4500);
+   lastPinch=gap;update();return;
+ }
+ const dx=e.clientX-old.x,dy=e.clientY-old.y;
+ if(old.mode==="pan"){
+   const amount=distance*.0013;
+   move(-dx*amount,dy*amount);
+ }else{
+   yaw-=dx*.006;pitch=clamp(pitch-dy*.006,.09,1.48);update();
+ }
+});
+for(const name of ["pointerup","pointercancel","lostpointercapture"]){
+ canvas.addEventListener(name,e=>{pointers.delete(e.pointerId);lastPinch=0;});
+}
+canvas.addEventListener("wheel",e=>{
+ e.preventDefault();
+ distance=clamp(distance*Math.exp(e.deltaY*.0012),100,4500);
+ update();
+},{passive:false});
+window.addEventListener("keydown",e=>{
+ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","w","a","s","d"].includes(e.key)){
+   if(e.target instanceof HTMLInputElement)return;
+   e.preventDefault();
+   const step=clamp(distance*.12,35,250);
+   if(e.key==="ArrowLeft"||e.key==="a")move(-step,0);
+   if(e.key==="ArrowRight"||e.key==="d")move(step,0);
+   if(e.key==="ArrowUp"||e.key==="w")move(0,step);
+   if(e.key==="ArrowDown"||e.key==="s")move(0,-step);
+ }
+});
+window.addEventListener("resize",requestDraw);
+(async()=>{
+ try{
+  const response=await fetch("/api/config");
+  if(!response.ok)throw Error("Server nenabídl konfiguraci");
+  config=await response.json();
+  if(config.status!=="real-remote-data"||config.levels.length!==2)
+    throw Error("Neplatná konfigurace skutečných dlaždic");
+  startGpu();
+  update();
+ }catch(err){
+  console.error(err);$("status").textContent="Nelze spustit prohlížeč";
+  $("error").textContent=String(err);
+ }
+})();
+</script>
+</body></html>
