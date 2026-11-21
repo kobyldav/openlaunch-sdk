@@ -250,7 +250,7 @@ function startGpu(){
    " float threshold=(lo*4.0+up+.5)/16.0;",
    " if(uPass==1 && uFade<threshold)discard;",
    " if(uPass==0 && uFade>=threshold)discard;",
-   " vec4 rgba=texture2D(uTexture,vUv);
+   " vec4 rgba=texture2D(uTexture,vUv);",
    " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
    " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",
    " gl_FragColor=vec4(colour,1.0);",
