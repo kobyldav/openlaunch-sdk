@@ -24,6 +24,16 @@ canvas:active{cursor:grabbing}
 .info p{margin:8px 0 0}
 .topline{display:flex;align-items:center;justify-content:space-between;gap:10px}
 #renderer{color:#8ad7bc}
+.viewport{position:relative}
+#overlay{position:absolute;left:0;top:0;width:100%;height:100%;min-height:0;background:transparent;pointer-events:none;cursor:inherit}
+#profile{height:205px;min-height:0;cursor:default;background:#10253a}
+.measurement{display:none;gap:12px;margin-top:14px;background:#15283b;border:1px solid #315775;border-radius:10px;padding:14px;flex-wrap:wrap}
+.measurement.active{display:flex}
+.measurement .summary{flex:1 1 245px;line-height:1.9}
+.measurement .chart-area{flex:2 1 370px;min-width:250px}
+.measurement strong{color:#d2eafa}
+.measurement .fine{margin-top:4px}
+#measurement-hint{color:#8dcaed;font-size:12px}
 </style>
 </head>
 <body>
@@ -33,6 +43,10 @@ canvas:active{cursor:grabbing}
   <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="6" step=".25" value="1"> <strong id="vertValue">1×</strong></label>
   <label><input id="image" type="checkbox" checked> Barvy Sentinel-2</label>
   <label><input id="wire" type="checkbox"> Síť</label>
+  <label><input id="measure" type="checkbox"> Měřit na mapě</label>
+  <button id="clear-measure" disabled>Vymazat měření</button>
+  <button id="download-profile" disabled>Profil CSV</button>
+  <button id="download-geojson" disabled>Profil GeoJSON</button>
   <button id="top">Pohled shora</button>
   <button id="reset">Výchozí pohled</button>
   <a class="action" href="terrain.obj">OBJ</a>
@@ -40,8 +54,26 @@ canvas:active{cursor:grabbing}
   <a class="action" href="terrain.mtl">Materiál MTL</a>
   <a class="action" href="report.json">Zdrojová data</a>
  </div>
- <canvas id="view" aria-label="Interaktivní 3D povrch s družicovou texturou"></canvas>
+ <div class="viewport">
+  <canvas id="view" aria-label="Interaktivní 3D povrch s družicovou texturou"></canvas>
+  <canvas id="overlay" aria-hidden="true"></canvas>
+ </div>
+ <section id="measurement" class="measurement" aria-live="polite">
+  <div class="summary">
+   <strong>Měření skutečného výškového modelu</strong>
+   <div id="point-a" class="fine">A: klikni na terén</div>
+   <div id="point-b" class="fine">B: vyber druhý bod</div>
+   <div id="distance" class="fine"></div>
+   <div id="measurement-hint">Přesnost výšek je omezena přibližně 30m DEM. Nejde o geodetické měření.</div>
+  </div>
+  <div class="chart-area">
+   <strong>Výškový profil (EGM2008)</strong>
+   <canvas id="profile" aria-label="Výškový profil mezi vybranými body"></canvas>
+  </div>
+ </section>
  <p class="fine">Táhni myší pro otáčení · kolečko přibližuje · na dotykové obrazovce lze přibližovat dvěma prsty.
+ Zapnutím <strong>Měřit na mapě</strong> klikni na body A a B; zobrazí se souřadnice, EGM2008 výšky,
+ vodorovná vzdálenost, převýšení a skutečným DEM omezený profil.
  <strong>1× = skutečné měřítko výšek.</strong>
  Výškový model je ~30m Copernicus DEM GLO-30; 10m Sentinel-2 textura zobrazí více obrazových detailů,
  ale nevytváří 10m přesnost výšek. Budovy ani fasády nejsou rekonstruovány.
@@ -249,6 +281,291 @@ function startFallback(){
     }
   };
 }
+
+// Terrain inspection and offline profile export. Measurements use source DEM
+// triangle interpolation, never a manufactured high-resolution surface.
+const overlay=$("overlay"),overlayCtx=overlay.getContext("2d");
+const chart=$("profile"),chartCtx=chart.getContext("2d");
+const picked=[];
+let profileSamples=[];
+const mouseStarts=new Map();
+let multiGesture=false;
+const earthR=6371008.8,mercatorR=6378137,geo= D.report.outputGrid.transform;
+const groundScale=Math.cos(m.centerLatitudeDeg*Math.PI/180);
+const centerMerc=[
+  geo[0]+.5*geo[1]+.5*geo[2],
+  geo[3]+.5*geo[4]+.5*geo[5]
+];
+function mercatorToLonLat(x,y){
+  return [x/mercatorR*180/Math.PI,(2*Math.atan(Math.exp(y/mercatorR))-Math.PI/2)*180/Math.PI];
+}
+function geographicDistance(a,b){
+  const rad=Math.PI/180;
+  const dLat=(b[1]-a[1])*rad,dLon=(b[0]-a[0])*rad;
+  const h=Math.sin(dLat/2)**2+Math.cos(a[1]*rad)*Math.cos(b[1]*rad)*Math.sin(dLon/2)**2;
+  return 2*earthR*Math.asin(Math.min(1,Math.sqrt(Math.max(0,h))));
+}
+function gridWorldForVertex(i){
+  const row=Math.floor(i/D.width),col=i%D.width;
+  return [geo[0]+geo[1]*(col+.5)+geo[2]*(row+.5),
+          geo[3]+geo[4]*(col+.5)+geo[5]*(row+.5)];
+}
+function gridAtMercator(x,y){
+  const determinant=geo[1]*geo[5]-geo[2]*geo[4];
+  if(Math.abs(determinant)<1e-15)return null;
+  const dx=x-geo[0],dy=y-geo[3];
+  const col=(dx*geo[5]-dy*geo[2])/determinant-.5;
+  const row=(dy*geo[1]-dx*geo[4])/determinant-.5;
+  if(col< -1e-9||row< -1e-9||col>D.width-1+1e-9||row>D.height-1+1e-9)return null;
+  const cc=Math.min(D.width-1,Math.max(0,col));
+  const rr=Math.min(D.height-1,Math.max(0,row));
+  const c0=Math.max(0,Math.min(D.width-2,Math.floor(cc)));
+  const r0=Math.max(0,Math.min(D.height-2,Math.floor(rr)));
+  const u=cc-c0,v=rr-r0;
+  const a=r0*D.width+c0,b=a+1,d=a+D.width+1,lower=a+D.width;
+  const terms=u+v<=1?
+    [[a,1-u-v],[b,u],[lower,v]]:
+    [[b,1-v],[d,u+v-1],[lower,1-u]];
+  let z=0;
+  for(const [i,w] of terms){
+    if(w<=1e-9)continue;
+    const sample=points[i*3+2];
+    if(sample===null||!Number.isFinite(sample))return null;
+    z+=sample*w;
+  }
+  return z;
+}
+function displayWorld(x,y,elevationM){
+  return [(x-centerMerc[0])*groundScale,
+    (elevationM-minH)*Number($("vertical").value),
+    -(y-centerMerc[1])*groundScale];
+}
+function rayForClient(x,y){
+  const c=cameraState(),rect=canvas.getBoundingClientRect();
+  const normalizedX=2*(x-rect.left)/rect.width-1;
+  const normalizedY=1-2*(y-rect.top)/rect.height;
+  if(Math.abs(normalizedX)>1||Math.abs(normalizedY)>1)return null;
+  const half=Math.tan(Math.PI/8);
+  const dir=norm([0,1,2].map(i=>
+    c.forward[i]+c.right[i]*normalizedX*half*rect.width/rect.height+
+    c.up[i]*normalizedY*half
+  ));
+  return {start:c.target.map((v,i)=>v-c.forward[i]*c.distance),dir};
+}
+function intersectTriangle(origin,dir,ia,ib,ic){
+  const vs=[ia,ib,ic].map(i=>{
+    const j=i*3;
+    return [vertices[j],(vertices[j+2]-minH)*Number($("vertical").value),-vertices[j+1]];
+  });
+  const a=vs[0],b=vs[1],c=vs[2];
+  const edge1=b.map((v,i)=>v-a[i]),edge2=c.map((v,i)=>v-a[i]);
+  const h=cross(dir,edge2),det=dot(edge1,h);
+  if(Math.abs(det)<1e-10)return null;
+  const inv=1/det,s=origin.map((v,i)=>v-a[i]);
+  const u=dot(s,h)*inv;
+  if(u< -1e-7||u>1+1e-7)return null;
+  const q=cross(s,edge1),v=dot(dir,q)*inv;
+  if(v< -1e-7||u+v>1+1e-7)return null;
+  const t=dot(edge2,q)*inv;
+  return t>.00001?{t,weights:[1-u-v,u,v]}:null;
+}
+function pickTerrain(clientX,clientY){
+  const ray=rayForClient(clientX,clientY);
+  if(!ray)return null;
+  let nearest=null;
+  for(let j=0;j<triangles.length;j+=3){
+    const ids=[triangles[j],triangles[j+1],triangles[j+2]];
+    if(ids.some(i=>points[3*i+2]===null))continue;
+    const hit=intersectTriangle(ray.start,ray.dir,...ids);
+    if(!hit||nearest&&hit.t>=nearest.t)continue;
+    const merc=ids.reduce((xy,i,k)=>{
+      const p=gridWorldForVertex(i);
+      xy[0]+=p[0]*hit.weights[k];
+      xy[1]+=p[1]*hit.weights[k];
+      return xy;
+    },[0,0]);
+    const coords=mercatorToLonLat(...merc);
+    const z=ids.reduce((val,i,k)=>val+points[3*i+2]*hit.weights[k],0);
+    nearest={t:hit.t,merc,coords,height:z};
+  }
+  return nearest;
+}
+function makeProfile(){
+  profileSamples=[];
+  if(picked.length!==2)return;
+  const a=picked[0],b=picked[1];
+  const ground=geographicDistance(a.coords,b.coords);
+  const count=Math.max(2,Math.min(512,Math.ceil(ground/Math.max(1,m.groundResolutionM)/2)+1));
+  for(let i=0;i<count;i++){
+    const t=i/(count-1);
+    const merc=[
+      a.merc[0]+(b.merc[0]-a.merc[0])*t,
+      a.merc[1]+(b.merc[1]-a.merc[1])*t
+    ];
+    const z=gridAtMercator(...merc);
+    profileSamples.push({fraction:t,distanceM:t*ground,merc,
+      coords:mercatorToLonLat(...merc),height:z});
+  }
+}
+function labelPoint(point,label){
+  return label+": "+point.coords[1].toFixed(6)+"° N, "+
+    point.coords[0].toFixed(6)+"° E · "+
+    point.height.toFixed(1)+" m n. m. (EGM2008)";
+}
+function updateMeasurement(){
+  $("measurement").classList.toggle("active",$("measure").checked||picked.length>0);
+  $("point-a").textContent=picked[0]?labelPoint(picked[0],"A"):"A: klikni na terén";
+  $("point-b").textContent=picked[1]?labelPoint(picked[1],"B"):"B: vyber druhý bod";
+  const ready=picked.length===2;
+  $("clear-measure").disabled=!picked.length;
+  $("download-profile").disabled=!ready;
+  $("download-geojson").disabled=!ready;
+  if(ready){
+    const ground=geographicDistance(picked[0].coords,picked[1].coords);
+    const diff=picked[1].height-picked[0].height;
+    const absGrade=ground>0?100*diff/ground:0;
+    const used=profileSamples.filter(s=>s.height!==null).length;
+    $("distance").textContent="Vodorovná vzdálenost: "+ground.toFixed(1)+" m · "+
+      "Převýšení B−A: "+diff.toFixed(1)+" m · "+
+      "Průměrný sklon: "+absGrade.toFixed(2)+" % · "+
+      "Platných vzorků profilu: "+used+"/"+profileSamples.length;
+  }else $("distance").textContent="Vyber dva body na povrchu pro výškový profil.";
+  drawProfile();
+}
+function drawProfile(){
+  if(!chartCtx)return;
+  const ratio=Math.min(2,devicePixelRatio||1);
+  const w=Math.max(1,Math.round(chart.clientWidth*ratio));
+  const h=Math.max(1,Math.round(chart.clientHeight*ratio));
+  if(chart.width!==w||chart.height!==h){chart.width=w;chart.height=h;}
+  chartCtx.clearRect(0,0,w,h);
+  chartCtx.fillStyle="#10253a";chartCtx.fillRect(0,0,w,h);
+  if(profileSamples.length<2)return;
+  const good=profileSamples.filter(x=>x.height!==null);
+  if(!good.length)return;
+  const lo=Math.min(...good.map(s=>s.height)),hi=Math.max(...good.map(s=>s.height));
+  const spanH=Math.max(1,hi-lo);
+  const left=54*ratio,right=w-15*ratio,top=20*ratio,bottom=h-35*ratio;
+  chartCtx.strokeStyle="#315671";
+  chartCtx.fillStyle="#a9cde4";
+  chartCtx.font=(11*ratio)+"px system-ui";
+  chartCtx.textAlign="right";
+  for(let j=0;j<=3;j++){
+    const y=top+(bottom-top)*j/3;
+    chartCtx.beginPath();chartCtx.moveTo(left,y);chartCtx.lineTo(right,y);chartCtx.stroke();
+    chartCtx.fillText((hi-spanH*j/3).toFixed(0)+" m",left-7*ratio,y+4*ratio);
+  }
+  chartCtx.textAlign="left";
+  chartCtx.fillText("A",left,bottom+19*ratio);
+  chartCtx.textAlign="right";
+  chartCtx.fillText("B",right,bottom+19*ratio);
+  chartCtx.strokeStyle="#7be3a6";chartCtx.lineWidth=2*ratio;
+  let drawn=false;
+  for(const s of profileSamples){
+    if(s.height===null){drawn=false;continue;}
+    const x=left+s.fraction*(right-left);
+    const y=bottom-(s.height-lo)/spanH*(bottom-top);
+    if(!drawn){chartCtx.beginPath();chartCtx.moveTo(x,y);drawn=true;}
+    else chartCtx.lineTo(x,y);
+    if(s===profileSamples[profileSamples.length-1]||profileSamples[profileSamples.indexOf(s)+1]?.height===null){
+      chartCtx.stroke();drawn=false;
+    }
+  }
+}
+function projectPoint(world){
+  const c=cameraState();
+  const rel=world.map((v,i)=>v-c.target[i]);
+  const depth=dot(rel,c.forward)+c.distance;
+  if(depth<=.1)return null;
+  const aspect=canvas.clientWidth/canvas.clientHeight,half=Math.tan(Math.PI/8);
+  return [
+    canvas.clientWidth/2+(dot(rel,c.right)/(depth*half*aspect))*canvas.clientWidth/2,
+    canvas.clientHeight/2-(dot(rel,c.up)/(depth*half))*canvas.clientHeight/2
+  ];
+}
+function drawMeasureOverlay(){
+  if(!overlayCtx)return;
+  const ratio=Math.min(2,devicePixelRatio||1);
+  const w=Math.max(1,Math.round(overlay.clientWidth*ratio));
+  const h=Math.max(1,Math.round(overlay.clientHeight*ratio));
+  if(overlay.width!==w||overlay.height!==h){overlay.width=w;overlay.height=h;}
+  overlayCtx.clearRect(0,0,w,h);
+  if(!picked.length)return;
+  if(profileSamples.length){
+    overlayCtx.strokeStyle="#a6f0cf";
+    overlayCtx.lineWidth=2*ratio;
+    let active=false;
+    for(const s of profileSamples){
+      if(s.height===null){if(active){overlayCtx.stroke();active=false;}continue;}
+      const screen=projectPoint(displayWorld(...s.merc,s.height));
+      if(!screen){if(active){overlayCtx.stroke();active=false;}continue;}
+      if(!active){overlayCtx.beginPath();overlayCtx.moveTo(screen[0]*ratio,screen[1]*ratio);active=true;}
+      else overlayCtx.lineTo(screen[0]*ratio,screen[1]*ratio);
+    }
+    if(active)overlayCtx.stroke();
+  }
+  picked.forEach((p,i)=>{
+    const screen=projectPoint(displayWorld(...p.merc,p.height));
+    if(!screen)return;
+    const x=screen[0]*ratio,y=screen[1]*ratio;
+    overlayCtx.beginPath();overlayCtx.arc(x,y,8*ratio,0,2*Math.PI);
+    overlayCtx.fillStyle=i===0?"#ffcd73":"#8be5b2";overlayCtx.fill();
+    overlayCtx.lineWidth=2*ratio;overlayCtx.strokeStyle="#173248";overlayCtx.stroke();
+    overlayCtx.fillStyle="#082039";overlayCtx.font="bold "+(12*ratio)+"px system-ui";
+    overlayCtx.textAlign="center";overlayCtx.textBaseline="middle";
+    overlayCtx.fillText(i===0?"A":"B",x,y);
+  });
+}
+function downloadText(filename,content,mime){
+  const url=URL.createObjectURL(new Blob([content],{type:mime}));
+  const link=document.createElement("a");
+  link.href=url;link.download=filename;
+  document.body.append(link);link.click();link.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+$("download-profile").onclick=()=>{
+  if(profileSamples.length<2)return;
+  const rows=["distance_m,longitude_deg,latitude_deg,elevation_m_egm2008"];
+  for(const s of profileSamples)rows.push([
+    s.distanceM.toFixed(3),s.coords[0].toFixed(9),s.coords[1].toFixed(9),
+    s.height===null?"":s.height.toFixed(4)
+  ].join(","));
+  downloadText("praha-elevation-profile.csv",rows.join("\r\n")+"\r\n","text/csv;charset=utf-8");
+};
+$("download-geojson").onclick=()=>{
+  if(picked.length!==2)return;
+  const pointsFeatures=picked.map((p,i)=>({
+    type:"Feature",properties:{name:i===0?"A":"B",elevation_m_egm2008:p.height,
+      source:"Copernicus GLO-30 DEM"},geometry:{type:"Point",coordinates:p.coords}
+  }));
+  const segment={
+    type:"Feature",properties:{name:"Measured profile",distance_m:
+      geographicDistance(picked[0].coords,picked[1].coords),verticalDatum:"EGM2008",
+      datumCaveat:"30m surface DEM; interpolation not a geodetic survey"},
+    geometry:{type:"LineString",coordinates:profileSamples.map(p=>[
+      p.coords[0],p.coords[1],p.height
+    ])}
+  };
+  // GeoJSON geometries cannot use null Z. Export LineString in WGS84 2D; heights
+  // are encoded separately, including null for NoData samples.
+  segment.geometry.coordinates=profileSamples.map(p=>[p.coords[0],p.coords[1]]);
+  segment.properties.elevation_m_egm2008=profileSamples.map(p=>p.height);
+  downloadText("praha-elevation-profile.geojson",JSON.stringify({
+    type:"FeatureCollection",features:[...pointsFeatures,segment]
+  },null,2),"application/geo+json");
+};
+$("clear-measure").onclick=()=>{picked.length=0;profileSamples=[];updateMeasurement();schedule();};
+$("measure").onchange=()=>{updateMeasurement();schedule();};
+function chooseTerrainPoint(clientX,clientY){
+  const p=pickTerrain(clientX,clientY);
+  if(!p){$("measurement-hint").textContent="Kliknutí mimo skutečně dostupný terén.";return;}
+  if(picked.length===2){picked.length=0;profileSamples=[];}
+  picked.push(p);
+  if(picked.length===2)makeProfile();
+  $("measurement-hint").textContent="Interpolace skutečné ~30m DEM sítě; ne geodetické zaměření.";
+  updateMeasurement();schedule();
+}
+
 let render;
 try{render=webgl?startWebgl(webgl):startFallback();}
 catch(error){$("renderer").textContent=" · Chyba WebGL: "+String(error);render=()=>{};}
@@ -256,7 +573,7 @@ function schedule(){
   $("vertValue").textContent=Number($("vertical").value)+"×";
   if(needsDraw)return;
   needsDraw=true;
-  requestAnimationFrame(()=>{needsDraw=false;render();});
+  requestAnimationFrame(()=>{needsDraw=false;render();drawMeasureOverlay();});
 }
 $("vertical").oninput=schedule;
 $("image").onchange=schedule;
@@ -264,6 +581,8 @@ $("wire").onchange=schedule;
 $("reset").onclick=()=>{yaw=-.7;pitch=.69;zoom=1;$("vertical").value=1;schedule();};
 $("top").onclick=()=>{pitch=1.51;zoom=1;schedule();};
 canvas.addEventListener("pointerdown",e=>{
+  mouseStarts.set(e.pointerId,[e.clientX,e.clientY]);
+  if(activePointers.size>0)multiGesture=true;
   canvas.setPointerCapture(e.pointerId);
   activePointers.set(e.pointerId,[e.clientX,e.clientY]);
   previousPinch=0;
@@ -283,7 +602,16 @@ canvas.addEventListener("pointermove",e=>{
   }
   schedule();
 });
-function release(e){activePointers.delete(e.pointerId);previousPinch=0;}
+function release(e){
+  const start=mouseStarts.get(e.pointerId);
+  mouseStarts.delete(e.pointerId);
+  const clicked=start&&Math.hypot(e.clientX-start[0],e.clientY-start[1])<5;
+  const single=activePointers.size===1&&!multiGesture;
+  activePointers.delete(e.pointerId);previousPinch=0;
+  if(!activePointers.size)multiGesture=false;
+  if(e.type==="pointerup"&&single&&clicked&&$("measure").checked)
+    chooseTerrainPoint(e.clientX,e.clientY);
+}
 canvas.addEventListener("pointerup",release);
 canvas.addEventListener("pointercancel",release);
 canvas.addEventListener("wheel",e=>{
@@ -291,7 +619,8 @@ canvas.addEventListener("wheel",e=>{
   zoom=Math.max(.15,Math.min(12,zoom*Math.exp(-e.deltaY*.001)));
   schedule();
 },{passive:false});
-window.addEventListener("resize",schedule);
+window.addEventListener("resize",()=>{schedule();drawProfile();});
+updateMeasurement();
 schedule();
 </script>
 </body>
