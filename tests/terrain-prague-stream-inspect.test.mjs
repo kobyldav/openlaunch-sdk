@@ -35,6 +35,9 @@ test("vertical ray returns true Bpv source-triangle elevation without extrapolat
  assert.ok(Math.abs(sample.north+2)<1e-6);
  assert.equal(sample.id,"test-source");
  assert.equal(sample.verticalDatum,"Bpv (Baltic 1957)");
+ const exaggerated=inspect.pickMeasured([testTile()],down(2,-2),{vertical:4});
+ assert.ok(Math.abs(exaggerated.elevationM-210)<1e-8,
+   "presentation vertical exaggeration must not alter the Bpv value");
  const outside=inspect.pickMeasured([testTile()],down(15,-2));
  assert.equal(outside,null);
  assert.equal(inspect.pickMeasured([],down(2,-2)),null);

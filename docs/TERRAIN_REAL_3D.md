@@ -316,3 +316,49 @@ camera-dependent visibility, hysteresis, shared boundaries and unchanged
 measured elevations. The Windows workflow also compiles both streamed and
 standalone GLSL shaders in Microsoft Edge and downloads a real v2 ČÚZK
 height/orthophoto tile through localhost.
+
+
+## Stage 8 — streamed real-terrain click inspection and Bpv A/B profile
+
+Start with `npm run example:terrain-prague-stream` in the existing feature branch.
+Enable **Měřit skutečný terén** in the toolbar, click a visible source-DSM
+triangle as point A, then point B. Drag still orbits the camera; two clicks
+without dragging add points. Clear them with **Vymazat body**.
+
+The panel reports approximate WGS84 location, interpolated elevation
+in **Bpv (Baltic 1957)** metres, local-metre A–B horizontal distance,
+vertical difference, slope and a 32-sample height profile. Use
+**Profil CSV** to export distance, longitude, latitude, and Bpv height
+columns. Missing samples are **blank**, never invented or replaced by zero.
+
+**Data meaning:** the actual Czech DMP OK source is native 0.5 m,
+but streamed overview and fine triangles are generated from output
+grids of 12 m or 2 m respectively. A picked value is an *exact
+barycentric interpolation of those measured-source output triangles*,
+not a directly surveyed observation at arbitrary clicked coordinates.
+The displayed 1–5x vertical exaggeration does not change the returned
+Bpv height. WGS84 positions are derived from a bounded Mercator local
+approximation and are not surveying-grade coordinates.
+
+Picking is restricted to the original **measuredTriangles** portion
+of each SDK output index array. Extra visual-only edge aprons and
+skirt triangles can never create fictitious measured point heights.
+For performance, vertical profile queries use a cached tile grid mask
+built from the actual measured triangle indices (near-constant work
+per sample) rather than rescan the entire 2m mesh 32 times.
+
+**Unloaded or NoData terrain:** no click result when actual triangles
+are absent; profiles over partially loaded or missing regions include
+null height samples and do not claim complete surface distance.
+Pan/zoom to load source tiles before inspecting long paths.
+
+**WebGL context loss:** the viewer handles browser context loss and
+restoration; old in-flight GPU work is rejected after loss and the
+shaders plus tiles are re-created from the locally cached real data.
+Hardware/browser-specific rendering remains a user-device test.
+
+Verification: `node --test tests/terrain-prague-stream-inspect.test.mjs`
+(perspective ray, measured barycentric Bpv altitude, NoData gaps,
+no picking on visual skirts, WGS84 orientation, nullable profile,
+height exaggeration invariance) and a live ČÚZK tile HTTP integration
+checking the original measured triangle's interpolated Bpv height.

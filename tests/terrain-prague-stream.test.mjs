@@ -71,6 +71,10 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/id="export-profile"/);
   assert.match(page,/inspector\.pickMeasured\(/);
   assert.match(page,/inspector\.profile\(/);
+  assert.match(page,/webglcontextlost/);
+  assert.match(page,/webglcontextrestored/);
+  assert.match(page,/graphicsEpoch/);
+  assert.match(page,/inspectorTiles\(/);
   assert.match(page,/elevationM===null/);
   assert.match(page,/d\.seam\?\.version!==2/);
   assert.match(page,/MAX_GPU_TILES=40/);
