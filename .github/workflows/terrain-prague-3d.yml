@@ -16,7 +16,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs tests/terrain-measure.test.mjs tests/terrain-cuzk-dmpok.test.mjs
+      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs tests/terrain-measure.test.mjs tests/terrain-cuzk-dmpok.test.mjs tests/terrain-cuzk-ortho.test.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
         run: node scripts/terrain-prague-3d.mjs
       - name: Verify texture, OBJ UVs, PNG alpha and HTML package
@@ -25,6 +25,10 @@ jobs:
         run: npm run example:terrain-prague-detail
       - name: Verify fine-resolution Czech DEM and distinct height datum
         run: node scripts/terrain-prague-validate.mjs test-results/terrain-prague-detail
+      - name: Generate genuine 0.5m Czech orthophoto on real 2m Prague DSM
+        run: npm run example:terrain-prague-ortho
+      - name: Validate integrated ČÚZK ortho plus Bpv surface
+        run: node scripts/terrain-prague-validate.mjs test-results/terrain-prague-ortho
       - name: Upload complete standalone 3D model and real-data provenance
         if: always()
         uses: actions/upload-artifact@v4
@@ -41,3 +45,8 @@ jobs:
             test-results/terrain-prague-detail/terrain.mtl
             test-results/terrain-prague-detail/terrain-texture.png
             test-results/terrain-prague-detail/report.json
+            test-results/terrain-prague-ortho/index.html
+            test-results/terrain-prague-ortho/terrain.obj
+            test-results/terrain-prague-ortho/terrain.mtl
+            test-results/terrain-prague-ortho/terrain-texture.png
+            test-results/terrain-prague-ortho/report.json

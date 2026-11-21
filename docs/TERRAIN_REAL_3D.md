@@ -145,3 +145,51 @@ small region at resolution >=0.5m. Service errors or NoData fail explicitly:
 no synthetic interpolation or undisclosed global-DEM fallback. The height
 sample grid is resampled from an actual 0.5m raster; this does not imply
 0.5m precision in the rendered 2m model. Facade meshes are not reconstructed.
+
+## Stage 5: actual Czech high-resolution ortho textured on real DMP OK
+
+ČÚZK publishes its Ortofoto ČR product at **native source 0.125 m**.
+We use the official `ORTOFOTO_WM/MapServer/export` Web Mercator map
+service in PNG32 mode, explicitly requesting a bounded **0.5m output
+texture**. Do not confuse output sampling with the native source grid.
+
+Source: https://ags.cuzk.gov.cz/arcgis1/rest/services/ORTOFOTO_WM/MapServer
+Product: https://geoportal.gov.cz/php/micka/record/basic/CZ-CUZK-ORTOFOTO-R
+Licence: **© ČÚZK, CC BY 4.0**. The orthophoto map service does not
+provide a per-pixel acquisition date, so the SDK records it as unknown
+instead of inventing a date.
+
+For Windows CMD run:
+
+```cmd
+cd /d "%USERPROFILE%\Desktop\openlaunch-terrain"
+git switch feature/terrain-prague-real-dem
+git pull --ff-only origin feature/terrain-prague-real-dem
+npm run example:terrain-prague-ortho
+start "" "test-results\terrain-prague-ortho\index.html"
+```
+
+The existing global Copernicus + Sentinel, or Czech DMP OK + Sentinel
+demos are **unchanged**. In TypeScript:
+
+```ts
+const map=await new OpenLaunch().terrain.load({
+  area:bbox(14.416,50.086,14.422,50.090),
+  elevationProvider:"cuzk-dmpok",resolutionM:2,
+  imageryProvider:"cuzk-ortofoto",orthophotoResolutionM:.5
+});
+console.log(map.metadata.imagerySource,map.metadata.verticalDatum);
+```
+
+Source 0.125m ortho is exported at 0.5m ground spacing to remain within
+1024x1024 texture pixels and 50k DEM mesh vertices. It retains actual
+colours and records both image and height attribution.
+The backend **fails closed** for HTTP errors, unknown PNG formats,
+invalid PNG checksums, unexpectedly small imagery, or a malformed
+spatial extent. No fabricated texture or height data are substituted.
+
+The 2m 2.5D surface still has roofs and foliage but does not recreate
+walls, actual facade geometry or sub-2m 3D detail. Orthophoto mosaics may
+have varied dates and building lean, meaning some pixels do not align
+perfectly to individual roof edges. This is not a certified surveying
+or photogrammetric reconstruction.
