@@ -15,4 +15,13 @@ test("embedded Prague WebGL viewer parses as standalone JavaScript",async()=>{
   assert.match(page,/startFallback/);
   assert.match(page,/terrain-texture\.png/);
   assert.match(page,/terrain\.mtl/);
+  assert.match(page,/id="measure"/);
+  assert.match(page,/id="overlay"/);
+  assert.match(page,/id="profile"/);
+  assert.match(page,/pickTerrain\(/);
+  assert.match(page,/gridAtMercator\(/);
+  assert.match(page,/drawMeasureOverlay\(/);
+  assert.match(page,/download-profile/);
+  assert.match(page,/download-geojson/);
+  assert.match(page,/verticalDatum:"EGM2008"/);
 });

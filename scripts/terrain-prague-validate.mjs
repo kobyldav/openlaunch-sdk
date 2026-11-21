@@ -15,6 +15,17 @@ assert.equal(report.status,"real-data");
 assert.equal(report.kind,"satellite-rgb-on-copernicus-dsm");
 assert.ok(index.includes("texture2D(uTexture,vUv)"),"HTML must implement true texture sampling");
 assert.ok(index.includes("terrain-texture.png"),"viewer must link to texture");
+assert.ok(index.includes('id="measure"')&&index.includes("pickTerrain("),
+  "viewer must support interactive georeferenced terrain picking");
+assert.ok(index.includes('id="profile"')&&index.includes("gridAtMercator("),
+  "viewer must support DEM-interpolated elevation profiles");
+assert.ok(index.includes("download-profile")&&index.includes("download-geojson"),
+  "viewer must provide CSV and GeoJSON profile exports");
+assert.ok(report.inspectionDemo?.center?.elevationM>=report.metadata.heightMinM &&
+  report.inspectionDemo.center.elevationM<=report.metadata.heightMaxM,
+  "real DEM center height must lie within actual observed heights");
+assert.equal(report.inspectionDemo?.eastWestProfile?.sampleCount,32);
+assert.ok(report.inspectionDemo?.eastWestProfile?.validSamples>=24);
 assert.match(obj,/^mtllib terrain.mtl$/m);
 assert.match(obj,/^usemtl satellite_rgb$/m);
 assert.match(mtl,/^map_Kd terrain-texture.png$/m);

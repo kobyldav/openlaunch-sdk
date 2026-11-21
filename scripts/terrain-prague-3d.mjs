@@ -2,7 +2,7 @@ import {mkdir,readFile,writeFile} from "node:fs/promises";
 import {join,resolve} from "node:path";
 import {deflateSync} from "node:zlib";
 import {bbox} from "../dist/geo/types.js";
-import {OpenLaunch} from "../dist/index.js";
+import {OpenLaunch,sampleRealTerrain,profileRealTerrain} from "../dist/index.js";
 
 const args=process.argv.slice(2);
 function option(name,defaultValue) {
@@ -100,8 +100,27 @@ try {
     resolutionM:numeric("resolution",30)
   });
   const {elevation,mesh,vertexRgb,rgbValid,imageryTexture,metadata}=map;
+  const [west,south,east,north]=coords;
+  const centerSample=sampleRealTerrain(map,(west+east)/2,(south+north)/2);
+  if(!centerSample)throw new Error("The loaded Prague DEM has no valid center elevation for measurement");
+  const demoProfile=profileRealTerrain(map,
+    [west+(east-west)*.2,(south+north)/2],
+    [west+(east-west)*.8,(south+north)/2],
+    {samples:32});
+  if(demoProfile.validSamples<24)throw new Error("The loaded Prague DEM has gaps in the central measured profile");
   const report={
     status:"real-data",kind:map.kind,metadata,
+    inspectionDemo:{
+      center: centerSample,
+      eastWestProfile:{
+        sampleCount:demoProfile.samples.length,validSamples:demoProfile.validSamples,
+        horizontalDistanceM:demoProfile.horizontalDistanceM,
+        surfaceDistanceM:demoProfile.surfaceDistanceM,
+        ascentM:demoProfile.ascentM,descentM:demoProfile.descentM,
+        minElevationM:demoProfile.minElevationM,maxElevationM:demoProfile.maxElevationM,
+        verticalDatum:demoProfile.verticalDatum
+      }
+    },
     outputGrid:{width:elevation.width,height:elevation.height,crs:elevation.crs,
       transform:elevation.transform},
     mesh:{vertices:mesh.validVertices,triangles:mesh.triangles.length/3,

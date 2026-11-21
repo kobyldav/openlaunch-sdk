@@ -16,7 +16,7 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs
+      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs tests/terrain-measure.test.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
         run: node scripts/terrain-prague-3d.mjs
       - name: Verify texture, OBJ UVs, PNG alpha and HTML package

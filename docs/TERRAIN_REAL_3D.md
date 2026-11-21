@@ -64,3 +64,36 @@ console.log(map.metadata.demTileUrls);
 - WebGL visualization is a browser capability; the Python/Node/CI process verifies
   data, geometry, embedded JavaScript syntax, texture PNG and UVs, but does not
   certify visual rendering in every GPU/browser combination.
+
+
+## Stage 3: 3D point inspection and terrain profiles
+
+Turn on **"Měřit na mapě"** in the standalone offline HTML viewer,
+then click A and B on the rendered real DEM surface. Use ordinary drag to
+orbit, and avoid dragging when selecting the measurement points.
+
+The viewer reports WGS84 longitude/latitude and EGM2008 surface elevations,
+approximate horizontal great-circle distance, difference B−A, average grade,
+and a profile chart. The profile is interpolated between source DEM mesh
+triangles, *not* independently surveyed or higher-resolution measurement.
+Missing DEM pixels appear as **gaps**, not fabricated elevations.
+
+Download:
+- `praha-elevation-profile.csv` with distance, WGS84 location, and EGM2008 elevation (blank for missing data).
+- `praha-elevation-profile.geojson` with selected endpoints and a 2D WGS84 LineString. Sample elevations including NoData are preserved in feature properties, rather than an invalid GeoJSON coordinate.
+
+API:
+
+```ts
+import {sampleRealTerrain,profileRealTerrain} from "openlaunch-sdk";
+const point=sampleRealTerrain(map,14.420,50.088); // null when no real DEM height
+const profile=profileRealTerrain(map,[14.416,50.088],[14.426,50.088],{samples:64});
+console.log(point?.elevationM,profile.horizontalDistanceM,profile.samples);
+```
+
+The demo output report includes a genuine center-point height and a
+32-sample east-west profile as integration diagnostics. Surface-distance
+estimates are approximate and only returned when the full profile has valid
+DEM samples. The displayed 1–6x exaggeration **does not change measured heights**.
+These are 30m Copernicus *surface* observations, not engineering-grade
+survey measurements.
