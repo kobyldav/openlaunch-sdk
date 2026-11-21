@@ -1,6 +1,7 @@
 import {areaKm2Approx,bbox,type AreaOfInterest} from "../geo/types.js";
 import {fetchSentinel2RgbTile,type Sentinel2RgbTile} from "../eo/sentinel2-rgb.js";
 import {readCogWindowUrl,type CogReadResult,type CogReadOptions} from "../eo/cog.js";
+import {fetchCuzkDmpOkRaster,CUZK_DMPOK_SERVICE,CUZK_DMPOK_DATUM,CUZK_DMPOK_NATIVE_RESOLUTION_M} from "./cuzk-dmpok.js";
 import {
   elevationToLocalMesh,lonLatToGridCrs,reprojectRasterTo,rasterStatistics,
   type RasterGrid,type TerrainMesh
@@ -20,13 +21,17 @@ export interface RealTerrainLoadOptions {
   maxCloudPercent?:number;
   /** Output mesh sample spacing, ground metres (20..60). Smaller is NOT higher source resolution. */
   resolutionM?:number;
+  /** Height source: 30m global Copernicus (default), or 0.5m-native Czech DMP OK. */
+  elevationProvider?:"copernicus-glo30"|"cuzk-dmpok";
+  /** Controlled test hook for the already sampled ČÚZK height raster. */
+  cuzkReader?:typeof fetchCuzkDmpOkRaster;
   /** Test-only transport hooks; default is real Sentinel-2 and public Copernicus DEM. */
   rgbLoader?:typeof fetchSentinel2RgbTile;
   demReader?:typeof readCogWindowUrl;
 }
 
 export interface RealTerrainMap {
-  kind:"satellite-rgb-on-copernicus-dsm";
+  kind:"satellite-rgb-on-copernicus-dsm"|"satellite-rgb-on-cuzk-dmpok";
   /** WGS84 / Pseudo-Mercator sampling grid; heights in Copernicus GLO-30 EGM2008 metres. */
   elevation:RasterGrid;
   /** Local metres: x=east, y=north, z=EGM2008 elevation; no vertical exaggeration. */
@@ -41,8 +46,10 @@ export interface RealTerrainMap {
     area:AreaOfInterest["bbox"]; centerLatitudeDeg:number; groundResolutionM:number;
     sceneId:string; acquiredAt:string; sceneCloudPercent:number|null;
     imagerySource:string; imageryNativeResolutionM:number|null;
-    demSource:"Copernicus DEM GLO-30 public AWS COG";
-    demTileUrls:string[]; verticalDatum:"EGM2008 geoid";
+    demSource:"Copernicus DEM GLO-30 public AWS COG"|"ČÚZK DMP OK ArcGIS ImageServer";
+    demTileUrls:string[]; verticalDatum:"EGM2008 geoid"|"Bpv (Baltic 1957)";
+    elevationProvider:"copernicus-glo30"|"cuzk-dmpok"; demNativeResolutionM:number;
+    demServiceUrl?:string;
     sampledHeights:number; totalHeights:number; sampledColors:number;
     textureGroundResolutionM:number; textureValidPixels:number;
     heightMinM:number; heightMaxM:number;
@@ -98,9 +105,13 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
   const expected=bbox(w,s,e,n);
   if(JSON.stringify(area.geometry.coordinates)!==JSON.stringify(expected.geometry.coordinates))
     throw new RangeError("Real 3D currently requires bbox() geometry (no masked polygons)");
-  const resolutionM=o.resolutionM??30;
-  if(!Number.isFinite(resolutionM)||resolutionM<20||resolutionM>60)
-    throw new RangeError("resolutionM must be between 20 and 60 ground metres");
+  const elevationProvider=o.elevationProvider??"copernicus-glo30";
+  if(!["copernicus-glo30","cuzk-dmpok"].includes(elevationProvider))
+    throw new RangeError("Unknown elevationProvider");
+  const resolutionM=o.resolutionM??(elevationProvider==="cuzk-dmpok"?2:30);
+  const minimum=elevationProvider==="cuzk-dmpok"?.5:20;
+  if(!Number.isFinite(resolutionM)||resolutionM<minimum||resolutionM>60)
+    throw new RangeError("resolutionM must be "+minimum+"..60 ground metres for "+elevationProvider);
   const grid=outputGrid(area,resolutionM);
   const rgbPromise=(o.rgbLoader??fetchSentinel2RgbTile)({
     area,startDate:o.startDate??DEFAULT_START,endDate:o.endDate??DEFAULT_END,
@@ -109,26 +120,38 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
   const options:CogReadOptions={allowedHosts:[COPERNICUS_GLO30_HOST],
     maxPixels:100_000,maxBlocks:64,maxBlockBytes:16*1024*1024,timeoutMs:90_000};
   const tiles:{url:string;window:AreaOfInterest}[]=[];
-  for(let lat=Math.floor(s);lat<Math.ceil(n);lat++)
-    for(let lon=Math.floor(w);lon<Math.ceil(e);lon++){
-      const west=Math.max(w,lon),east=Math.min(e,lon+1);
-      const south=Math.max(s,lat),north=Math.min(n,lat+1);
-      if(west>=east||south>=north)continue;
-      tiles.push({url:copernicusGlo30TileUrl(lat,lon),window:bbox(west,south,east,north)});
-    }
-  if(!tiles.length||tiles.length>4)throw new RangeError("Real 3D requires 1..4 DEM source tiles");
-  // Execute both independent providers without deriving terrain from RGB.
-  const [rgb,windows]:[Sentinel2RgbTile,CogReadResult[]]=await Promise.all([
-    rgbPromise,
-    Promise.all(tiles.map(t=>(o.demReader??readCogWindowUrl)(t.url,t.window,options)))
-  ]);
-  const heights=new Float64Array(grid.values.length).fill(NaN);
-  for(const window of windows){
-    if(window.raster.crs!=="EPSG:4326")throw new Error("Copernicus DEM source CRS is not EPSG:4326");
-    const aligned=reprojectRasterTo(window.raster,grid,"nearest");
-    for(let i=0;i<heights.length;i++)if(Number.isFinite(aligned.values[i]))heights[i]=aligned.values[i]!;
+  if(elevationProvider==="copernicus-glo30") {
+    for(let lat=Math.floor(s);lat<Math.ceil(n);lat++)
+      for(let lon=Math.floor(w);lon<Math.ceil(e);lon++){
+        const west=Math.max(w,lon),east=Math.min(e,lon+1);
+        const south=Math.max(s,lat),north=Math.min(n,lat+1);
+        if(west>=east||south>=north)continue;
+        tiles.push({url:copernicusGlo30TileUrl(lat,lon),window:bbox(west,south,east,north)});
+      }
+    if(!tiles.length||tiles.length>4)throw new RangeError("Real 3D requires 1..4 DEM source tiles");
   }
-  const elevation:RasterGrid={...grid,values:heights,source:"Copernicus DEM GLO-30",unit:"m EGM2008"};
+  const heights=new Float64Array(grid.values.length).fill(NaN);
+  if(elevationProvider==="cuzk-dmpok"){
+    const dem=await (o.cuzkReader??fetchCuzkDmpOkRaster)(area,grid);
+    if(dem.crs!=="EPSG:3857"||dem.width!==grid.width||dem.height!==grid.height ||
+       dem.values.length!==heights.length)
+      throw new Error("ČÚZK DMP OK must align exactly to the requested 3D sampling grid");
+    heights.set(dem.values);
+  }else{
+    const windows:CogReadResult[]=await Promise.all(
+      tiles.map(t=>(o.demReader??readCogWindowUrl)(t.url,t.window,options))
+    );
+    for(const window of windows){
+      if(window.raster.crs!=="EPSG:4326")throw new Error("Copernicus DEM source CRS is not EPSG:4326");
+      const aligned=reprojectRasterTo(window.raster,grid,"nearest");
+      for(let i=0;i<heights.length;i++)
+        if(Number.isFinite(aligned.values[i]))heights[i]=aligned.values[i]!;
+    }
+  }
+  const verticalDatum=elevationProvider==="cuzk-dmpok"?CUZK_DMPOK_DATUM:"EGM2008 geoid";
+  const demSource=elevationProvider==="cuzk-dmpok"?"ČÚZK DMP OK ArcGIS ImageServer":"Copernicus DEM GLO-30 public AWS COG";
+  const demNativeResolutionM=elevationProvider==="cuzk-dmpok"?CUZK_DMPOK_NATIVE_RESOLUTION_M:30;
+  const elevation:RasterGrid={...grid,values:heights,source:demSource,unit:"m "+verticalDatum};
   const statistics=rasterStatistics(elevation);
   if(statistics.valid<4)throw new Error("Copernicus DEM did not provide enough real elevation samples");
   const mesh=elevationToLocalMesh(elevation,{maxVertices:50_000});
@@ -139,6 +162,7 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
     mesh.positions[3*i+1]=mesh.positions[3*i+1]!*localScale;
   }
   if(!mesh.triangles.length)throw new Error("DEM samples do not form a connected 3D surface");
+  const rgb=await rgbPromise;
   const bands=[rgb.bands.red,rgb.bands.green,rgb.bands.blue];
   const ranges=bands.map(contrastRange);
   const aligned=bands.map(b=>reprojectRasterTo(b,grid,"nearest"));
@@ -176,21 +200,23 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
   const imageryTexture={width:textureGrid.width,height:textureGrid.height,
     rgba,validPixels:textureValidPixels,groundResolutionM:textureGroundResolutionM};
   return {
-    kind:"satellite-rgb-on-copernicus-dsm",elevation,mesh,vertexRgb,rgbValid,imageryTexture,
+    kind:elevationProvider==="cuzk-dmpok"?"satellite-rgb-on-cuzk-dmpok":"satellite-rgb-on-copernicus-dsm",
+    elevation,mesh,vertexRgb,rgbValid,imageryTexture,
     metadata:{
       area:area.bbox,centerLatitudeDeg:latitude,groundResolutionM:resolutionM,
       sceneId:rgb.sceneId,acquiredAt:rgb.acquiredAt,sceneCloudPercent:rgb.sceneCloudPercent,
       imagerySource:rgb.provider,imageryNativeResolutionM:rgb.nativeResolutionM,
-      demSource:"Copernicus DEM GLO-30 public AWS COG",
-      demTileUrls:tiles.map(t=>t.url),verticalDatum:"EGM2008 geoid",
+      demSource,demTileUrls:tiles.map(t=>t.url),verticalDatum,
+      elevationProvider,demNativeResolutionM,
+      ...(elevationProvider==="cuzk-dmpok"?{demServiceUrl:CUZK_DMPOK_SERVICE}:{}),
       sampledHeights:statistics.valid,totalHeights:heights.length,sampledColors:colored,
       textureGroundResolutionM,textureValidPixels,
       heightMinM:statistics.min!,heightMaxM:statistics.max!,
       warnings:[
-        "This is real DEM-based 2.5D: no photogrammetric building facades or measured sub-30m detail.",
+        elevationProvider==="cuzk-dmpok" ? "Actual ČÚZK DMP OK F32 surface measurements sampled at requested grid; the source is photogrammetric, not a facade mesh." : "This is real DEM-based 2.5D: no photogrammetric building facades or measured sub-30m detail.",
         "Mesh colors are a legacy vertex sample; the independently sampled Sentinel-2 RGBA texture preserves native imaging detail.",
-        "Copernicus DEM GLO-30 is a surface model with approximate 30m native spacing; output resampling adds no detail.",
-        "GLO-30 elevations are referenced to EGM2008, not WGS84 ellipsoid. No vertical datum conversion was applied.",
+        elevationProvider==="cuzk-dmpok" ? "ČÚZK DMP OK is a 0.5m native raster; requested mesh spacing may be coarser. It includes roofs and vegetation but not walls." : "Copernicus DEM GLO-30 is a surface model with approximate 30m native spacing; output resampling adds no detail.",
+        elevationProvider==="cuzk-dmpok" ? "ČÚZK DMP OK heights use Czech Bpv / Baltic 1957, NOT EGM2008. Never mix these datasets as equivalent heights." : "GLO-30 elevations are referenced to EGM2008, not WGS84 ellipsoid. No vertical datum conversion was applied.",
         "Sentinel-2 scene cloud percentage does not guarantee every pixel is cloud free.",
         ...rgb.warnings.filter(w=>!/^No DEM,/.test(w))
       ]
