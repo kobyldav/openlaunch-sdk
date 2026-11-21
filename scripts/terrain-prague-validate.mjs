@@ -63,7 +63,6 @@ for(let y=0;y<height;y++) {
 }
 assert.equal(actual,validPixels,"PNG RGB validity agrees with SDK report");
 if(report.metadata.elevationProvider==="cuzk-dmpok"){
-  assert.equal(report.kind,"satellite-rgb-on-cuzk-dmpok");
   assert.equal(report.metadata.verticalDatum,"Bpv (Baltic 1957)");
   assert.equal(report.metadata.demNativeResolutionM,0.5);
   assert.ok(report.metadata.groundResolutionM<=5);
@@ -74,6 +73,7 @@ if(report.metadata.elevationProvider==="cuzk-dmpok"){
     assert.ok(validPixels>report.mesh.vertices,"fine ortho has more image samples than 2m height mesh");
     assert.match(report.metadata.imageryAttribution,/ČÚZK.*CC BY 4/);
   }else{
+    assert.equal(report.kind,"satellite-rgb-on-cuzk-dmpok");
     assert.ok(report.mesh.vertices>validPixels,"fine surface geometry resolves more cells than 10m Sentinel-2 RGB");
   }
 }else{
