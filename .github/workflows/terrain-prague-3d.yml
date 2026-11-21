@@ -21,6 +21,8 @@ jobs:
         run: node scripts/terrain-webgl-link-smoke.mjs
       - name: Validate streamed Prague grid and local server without remote downloads
         run: node --test tests/terrain-prague-stream.test.mjs
+      - name: Verify measured ray picking, NoData, Bpv profiles and geolocation
+        run: node --test tests/terrain-prague-stream-inspect.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
@@ -58,5 +60,5 @@ jobs:
             test-results/terrain-prague-ortho/terrain.mtl
             test-results/terrain-prague-ortho/terrain-texture.png
             test-results/terrain-prague-ortho/report.json
-            test-results/terrain-prague-stream-ci/v1-0-3-3.json
-            test-results/terrain-prague-stream-ci/v1-0-3-3.png
+            test-results/terrain-prague-stream-ci/v2-0-3-3.json
+            test-results/terrain-prague-stream-ci/v2-0-3-3.png

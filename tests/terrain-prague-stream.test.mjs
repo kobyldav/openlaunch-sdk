@@ -64,6 +64,14 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/uFade/);
   assert.match(page,/uPass/);
   assert.match(page,/\/api\/visibility\.js/);
+  assert.match(page,/\/api\/inspect\.js/);
+  assert.match(page,/id="inspect-mode"/);
+  assert.match(page,/id="measurement"/);
+  assert.match(page,/id="height-profile"/);
+  assert.match(page,/id="export-profile"/);
+  assert.match(page,/inspector\.pickMeasured\(/);
+  assert.match(page,/inspector\.profile\(/);
+  assert.match(page,/elevationM===null/);
   assert.match(page,/d\.seam\?\.version!==2/);
   assert.match(page,/MAX_GPU_TILES=40/);
   assert.match(page,/gl\.deleteBuffer/);
@@ -99,10 +107,10 @@ test("local streaming server starts without any terrain download, accepts only v
       child.once("error",e=>{clearTimeout(timeout);reject(e);});
       child.once("exit",code=>{clearTimeout(timeout);reject(Error("Server exited "+code+": "+stderr));});
     });
-    const [config,root,notFound,invalid,visibility]=await Promise.all([
+    const [config,root,notFound,invalid,visibility,inspection]=await Promise.all([
       fetch(origin+"/api/config"),fetch(origin+"/"),
       fetch(origin+"/api/tiles/nope"),fetch(origin+"/api/tiles/1/22/0.json"),
-      fetch(origin+"/api/visibility.js")
+      fetch(origin+"/api/visibility.js"),fetch(origin+"/api/inspect.js")
     ]);
     assert.equal(config.status,200);
     const manifest=await config.json();
@@ -115,6 +123,9 @@ test("local streaming server starts without any terrain download, accepts only v
     assert.equal(visibility.status,200);
     assert.match(visibility.headers.get("content-type")??"",/javascript/);
     assert.match(await visibility.text(),/OpenLaunchTilePlanner/);
+    assert.equal(inspection.status,200);
+    assert.match(inspection.headers.get("content-type")??"",/javascript/);
+    assert.match(await inspection.text(),/OpenLaunchTerrainInspect/);
     // No /api/tiles/0/... valid request: the test must not fetch ČÚZK.
   } finally{
     child.kill();

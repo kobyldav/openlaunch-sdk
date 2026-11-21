@@ -5,6 +5,7 @@ import {readFile,mkdir} from "node:fs/promises";
 import {resolve} from "node:path";
 import {fileURLToPath} from "node:url";
 import {decodeCuzkOrthoPng} from "../dist/index.js";
+import {runInNewContext} from "node:vm";
 
 const cache=resolve("test-results/terrain-prague-stream-ci");
 await mkdir(cache,{recursive:true});
@@ -50,6 +51,33 @@ try{
   const uvs=Buffer.from(tile.uvsF32LE,"base64");
   assert.equal(uvs.byteLength,tile.renderVertices*2*4);
   assert.equal(triangles.byteLength,tile.triangles*3*2);
+  // Check actual measured geometry can be inspected by the same browser
+  // algorithm without ever intersecting the visual-only seam triangles.
+  const inspectionSource=await readFile(
+    new URL("./terrain-prague-stream-inspect.js",import.meta.url),"utf8");
+  const scope={window:{}};
+  runInNewContext(inspectionSource,scope);
+  const inspector=scope.window.OpenLaunchTerrainInspect;
+  const measured=new Float32Array(positions.buffer,positions.byteOffset,positions.byteLength/4);
+  const indices=new Uint16Array(triangles.buffer,triangles.byteOffset,triangles.byteLength/2);
+  const corrected=new Float32Array(measured);
+  for(let i=0;i<corrected.length;i+=3){
+    corrected[i]+=tile.originMeters[0];
+    corrected[i+1]+=tile.originMeters[1];
+  }
+  const f=Math.floor(tile.measuredTriangles/2)*3;
+  const triplet=[indices[f],indices[f+1],indices[f+2]];
+  const east=triplet.reduce((total,id)=>total+corrected[id*3],0)/3,
+    north=triplet.reduce((total,id)=>total+corrected[id*3+1],0)/3,
+    expectedM=triplet.reduce((total,id)=>total+corrected[id*3+2],0)/3;
+  const actual=inspector.pickMeasured([{
+    id:tile.key,positions:corrected,indices,
+    measuredTriangles:tile.measuredTriangles,width:tile.width,height:tile.height
+  }],{origin:[east,1000,-north],direction:[0,-1,0]},
+  {maxDistance:2000});
+  assert.ok(actual,"Real 3D click must intersect observed ČÚZK triangles");
+  assert.ok(Math.abs(actual.elevationM-expectedM)<.05,
+    "The queried Bpv elevation must match real triangle barycentric altitude");
   const texture=await fetch(origin+tile.texture.file,{signal:AbortSignal.timeout(20000)});
   assert.equal(texture.status,200);
   const pngBytes=new Uint8Array(await texture.arrayBuffer());
@@ -66,7 +94,7 @@ try{
   assert.equal(cachedPng.byteLength,pngBytes.byteLength);
   const again=await fetch(origin+"/api/tiles/0/3/3.json");
   assert.equal(again.status,200);
-  console.log("PASS seam-safe real streamed Prague tile 0-3-3: "+
+  console.log("PASS measured-ray-pick + seam-safe real streamed Prague tile 0-3-3: "+
     tile.validVertices+" measured DMP OK vertices, "+tile.triangles+
     " triangles, "+decoded.width+"×"+decoded.height+
     " genuine ČÚZK RGB pixels, cached and re-served");
