@@ -209,7 +209,7 @@ function createGpuTile(d,bitmap){
  for(let i=0;i<local.length/3;i++)if(!Number.isFinite(local[i*3+2]))
    inspectorPositions[i*3+2]=NaN;
  return {positions,uvs,faces,texture,count:indices.length,
-   inspect:{positions:inspectorPositions,indices,
+   inspect:{id:d.key,positions:inspectorPositions,indices,
      measuredTriangles:d.measuredTriangles,width:d.width,height:d.height}};
 }
 function dispose(t){
@@ -385,7 +385,7 @@ function inspectorTiles(){
    if(item.pass===1&&item.fade<.5)continue;
    if(item.pass===0&&item.fade>=.5)continue;
    const t=cache.get(item.id);
-   if(t?.inspect)active.set(item.id,{id:item.id,...t.inspect});
+   if(t?.inspect)active.set(item.id,t.inspect);
  }
  return [...active.values()];
 }
