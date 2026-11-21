@@ -232,6 +232,7 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
         vertexRgb[i*3+c]=Math.round(255*Math.pow(norm,0.87));
       }
     }
+    if(colored===0)throw new Error("Sentinel-2 has no valid pixels aligned with the selected DEM");
     const sourceSpacing=rgb.nativeResolutionM;
     const textureGroundResolutionM=sourceSpacing!==null && Number.isFinite(sourceSpacing) &&
       sourceSpacing>=5 && sourceSpacing<=60 ? sourceSpacing : resolutionM;
