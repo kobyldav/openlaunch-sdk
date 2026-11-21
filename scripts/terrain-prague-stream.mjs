@@ -10,6 +10,7 @@ import {spawn} from "node:child_process";
 import {OpenLaunch} from "../dist/index.js";
 import {bbox} from "../dist/geo/types.js";
 import {tileSpec,tileOriginOffset,pragueStreamManifest} from "./terrain-prague-stream-grid.mjs";
+import {buildSeamMesh,TERRAIN_SEAM_VERSION} from "./terrain-prague-stream-seams.mjs";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -57,7 +58,7 @@ function rgbaPng(tex){
     chunk("IEND",Buffer.alloc(0))]);
 }
 async function storedPair(spec){
-  const path=join(cacheRoot,"v1-"+spec.key);
+  const path=join(cacheRoot,"v"+TERRAIN_SEAM_VERSION+"-"+spec.key);
   try{
     const [json,png]=await Promise.all([readFile(path+".json"),readFile(path+".png")]);
     const data=JSON.parse(json.toString("utf8"));
@@ -85,15 +86,22 @@ async function generate(spec){
   if(map.kind!=="orthophoto-on-cuzk-dmpok"||metadata.verticalDatum!=="Bpv (Baltic 1957)")
     throw Error("Tile source provenance or height datum mismatch");
   // Keep the actual SDK grid, including NoData, no fabricated geometry.
-  const positions=mesh.positions;
-  const faceArray=new Uint16Array(mesh.triangles);
+  const originMeters=tileOriginOffset(elevation);
+  const render=buildSeamMesh(mesh,elevation.width,elevation.height,
+    [spec.west,spec.south,spec.east,spec.north],originMeters);
+  const positions=render.positions,faceArray=render.triangles;
   const document={
     status:"real-data",key:spec.key,z:spec.z,x:spec.x,y:spec.y,
     bbox:[spec.west,spec.south,spec.east,spec.north],
     width:elevation.width,height:elevation.height,
     validVertices:mesh.validVertices,triangles:faceArray.length/3,
-    originMeters:tileOriginOffset(elevation),
+    renderVertices:render.renderVertices,measuredTriangles:render.measuredTriangles,
+    seam:{version:TERRAIN_SEAM_VERSION,apronTriangles:render.apronTriangles,
+      skirtTriangles:render.skirtTriangles,skirtDepthM:render.skirtDepthM,
+      maxExtensionM:render.maxExtensionM,provenance:render.provenance},
+    originMeters,
     positionsF32LE:Buffer.from(positions.buffer,positions.byteOffset,positions.byteLength).toString("base64"),
+    uvsF32LE:Buffer.from(render.uvs.buffer,render.uvs.byteOffset,render.uvs.byteLength).toString("base64"),
     trianglesU16LE:Buffer.from(faceArray.buffer,faceArray.byteOffset,faceArray.byteLength).toString("base64"),
     texture:{width:imageryTexture.width,height:imageryTexture.height,
       validPixels:imageryTexture.validPixels,resolutionM:imageryTexture.groundResolutionM,
@@ -105,14 +113,15 @@ async function generate(spec){
   };
   const json=Buffer.from(JSON.stringify(document));
   const png=rgbaPng(imageryTexture);
-  const path=join(cacheRoot,"v1-"+spec.key);
+  const path=join(cacheRoot,"v"+TERRAIN_SEAM_VERSION+"-"+spec.key);
   // Stage temporary files and publish the metadata last.
   const nonce=process.pid+"-"+Date.now();
   await writeFile(path+"."+nonce+".png",png);
   await rename(path+"."+nonce+".png",path+".png");
   await writeFile(path+"."+nonce+".json",json);
   await rename(path+"."+nonce+".json",path+".json");
-  console.log("Cached "+spec.key+": "+mesh.validVertices+" vertices, "+
+  console.log("Cached "+spec.key+": "+mesh.validVertices+" measured vertices + "+
+    (render.renderVertices-mesh.validVertices)+" seam/NoData positions, "+
     imageryTexture.validPixels+" actual Ortofoto pixels");
   return {json,png};
 }
