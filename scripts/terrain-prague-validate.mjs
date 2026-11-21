@@ -12,7 +12,7 @@ const [index,obj,mtl,png,report]=await Promise.all([
   readFile(join(out,"report.json"),"utf8").then(JSON.parse)
 ]);
 assert.equal(report.status,"real-data");
-assert.equal(report.kind,"satellite-rgb-on-copernicus-dsm");
+assert.ok(["satellite-rgb-on-copernicus-dsm","satellite-rgb-on-cuzk-dmpok"].includes(report.kind));
 assert.ok(index.includes("texture2D(uTexture,vUv)"),"HTML must implement true texture sampling");
 assert.ok(index.includes("terrain-texture.png"),"viewer must link to texture");
 assert.ok(index.includes('id="measure"')&&index.includes("pickTerrain("),

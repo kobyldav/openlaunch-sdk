@@ -8,7 +8,7 @@ export interface RealTerrainSample {
   longitudeDeg:number;
   latitudeDeg:number;
   elevationM:number;
-  verticalDatum:"EGM2008 geoid";
+  verticalDatum:"EGM2008 geoid"|"Bpv (Baltic 1957)";
   interpolation:"DEM triangle";
 }
 export interface RealTerrainProfileSample {
@@ -20,7 +20,7 @@ export interface RealTerrainProfileSample {
 }
 export interface RealTerrainProfile {
   kind:"DEM triangular surface profile";
-  verticalDatum:"EGM2008 geoid";
+  verticalDatum:"EGM2008 geoid"|"Bpv (Baltic 1957)";
   horizontalDistanceM:number;
   /** Sum of finite consecutive 3D segments; null if any section is missing data. */
   surfaceDistanceM:number|null;
@@ -68,11 +68,13 @@ function sampleGrid(grid:RasterGrid,lon:number,lat:number):number|null{
   return elevation;
 }
 /** Null outside actual DEM coverage or on any hole. No invented elevations. */
-export function sampleRealTerrain(map:Pick<RealTerrainMap,"elevation">,longitudeDeg:number,latitudeDeg:number):RealTerrainSample|null{
+export function sampleRealTerrain(map:Pick<RealTerrainMap,"elevation"> & {
+  metadata?:{verticalDatum:"EGM2008 geoid"|"Bpv (Baltic 1957)"}
+},longitudeDeg:number,latitudeDeg:number):RealTerrainSample|null{
   validateRaster(map.elevation);
   const elevationM=sampleGrid(map.elevation,longitudeDeg,latitudeDeg);
   return elevationM===null?null:{
-    longitudeDeg,latitudeDeg,elevationM,verticalDatum:"EGM2008 geoid",
+    longitudeDeg,latitudeDeg,elevationM,verticalDatum:map.metadata?.verticalDatum??"EGM2008 geoid",
     interpolation:"DEM triangle"
   };
 }
@@ -114,7 +116,7 @@ export function profileRealTerrain(
   }
   return {
     kind:"DEM triangular surface profile",
-    verticalDatum:"EGM2008 geoid",horizontalDistanceM,
+    verticalDatum:map.metadata.verticalDatum,horizontalDistanceM,
     surfaceDistanceM:complete?surface:null,
     ascentM:complete?ascent:null,descentM:complete?descent:null,
     minElevationM:validSamples?min:null,maxElevationM:validSamples?max:null,

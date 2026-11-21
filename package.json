@@ -200,7 +200,8 @@
     "example:terrain-benchmark": "npm run build && node scripts/terrain-benchmark.mjs",
     "example:terrain-sgm": "npm run build && node scripts/terrain-sgm-compare.mjs",
     "example:terrain-prague": "npm run build && node scripts/terrain-prague-sentinel2.mjs",
-    "example:terrain-prague-3d": "npm run build && node scripts/terrain-prague-3d.mjs"
+    "example:terrain-prague-3d": "npm run build && node scripts/terrain-prague-3d.mjs",
+    "example:terrain-prague-detail": "npm run build && node scripts/terrain-prague-3d.mjs --dem cuzk-dmpok --bounds 14.416 50.086 14.422 50.090 --resolution 2 --out test-results/terrain-prague-detail"
   },
   "engines": {
     "node": ">=18"

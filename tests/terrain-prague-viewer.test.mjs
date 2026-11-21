@@ -23,5 +23,5 @@ test("embedded Prague WebGL viewer parses as standalone JavaScript",async()=>{
   assert.match(page,/drawMeasureOverlay\(/);
   assert.match(page,/download-profile/);
   assert.match(page,/download-geojson/);
-  assert.match(page,/verticalDatum:"EGM2008"/);
+  assert.match(page,/verticalDatum:m\.verticalDatum/);
 });

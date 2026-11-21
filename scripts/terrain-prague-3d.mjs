@@ -24,8 +24,8 @@ await mkdir(out,{recursive:true});
 const safe=s=>String(s).replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;");
 function objForTerrain(map) {
   const a=[
-    "# OpenLaunch actual Copernicus GLO-30 mesh with native Sentinel-2 image texture",
-    "# OBJ axes: X=east, Y=EGM2008 elevation, Z=north (metres)",
+    "# OpenLaunch actual measured DSM mesh with native Sentinel-2 image texture",
+    "# OBJ axes: X=east, Y=elevation above "+map.metadata.verticalDatum+", Z=north (metres)",
     "mtllib terrain.mtl",
     "o prague_real_terrain"
   ];
@@ -93,11 +93,13 @@ function rgbaPng(texture) {
 }
 
 try {
-  console.log("Downloading actual Sentinel-2 + Copernicus DEM GLO-30 for:",coords);
+  const elevationProvider=option("dem","copernicus-glo30");
+  console.log("Downloading real Sentinel-2 + "+elevationProvider+" for:",coords);
   const map=await new OpenLaunch().terrain.load({
     area:bbox(...coords),startDate:option("from","2025-06-01"),
     endDate:option("to","2025-09-30"),maxCloudPercent:numeric("max-cloud",35),
-    resolutionM:numeric("resolution",30)
+    resolutionM:numeric("resolution",elevationProvider==="cuzk-dmpok"?2:30),
+    elevationProvider
   });
   const {elevation,mesh,vertexRgb,rgbValid,imageryTexture,metadata}=map;
   const [west,south,east,north]=coords;
@@ -124,12 +126,12 @@ try {
     outputGrid:{width:elevation.width,height:elevation.height,crs:elevation.crs,
       transform:elevation.transform},
     mesh:{vertices:mesh.validVertices,triangles:mesh.triangles.length/3,
-      localCoordinateAxes:"east/north/EGM2008 metres"},
+      localCoordinateAxes:"east/north/"+metadata.verticalDatum+" metres"},
     texture:{width:imageryTexture.width,height:imageryTexture.height,
       groundResolutionM:imageryTexture.groundResolutionM,validPixels:imageryTexture.validPixels,
       asset:"terrain-texture.png",format:"8-bit RGBA PNG"},
     imageryPixelInterpretation:"native Sentinel-2 RGB texture independently aligned to the DSM",
-    modelInterpretation:"2.5D DSM, not building facade reconstruction"
+    modelInterpretation:"2.5D "+metadata.demSource+", not building facade reconstruction"
   };
   const json={
     width:elevation.width,height:elevation.height,

@@ -64,10 +64,10 @@ canvas:active{cursor:grabbing}
    <div id="point-a" class="fine">A: klikni na terén</div>
    <div id="point-b" class="fine">B: vyber druhý bod</div>
    <div id="distance" class="fine"></div>
-   <div id="measurement-hint">Přesnost výšek je omezena přibližně 30m DEM. Nejde o geodetické měření.</div>
+   <div id="measurement-hint">Rozlišení a přesnost závisejí na vybraném DEM. Nejde o geodetické měření.</div>
   </div>
   <div class="chart-area">
-   <strong>Výškový profil (EGM2008)</strong>
+   <strong>Výškový profil (<span id="profileDatum">nadmořská výška</span>)</strong>
    <canvas id="profile" aria-label="Výškový profil mezi vybranými body"></canvas>
   </div>
  </section>
@@ -75,7 +75,7 @@ canvas:active{cursor:grabbing}
  Zapnutím <strong>Měřit na mapě</strong> klikni na body A a B; zobrazí se souřadnice, EGM2008 výšky,
  vodorovná vzdálenost, převýšení a skutečným DEM omezený profil.
  <strong>1× = skutečné měřítko výšek.</strong>
- Výškový model je ~30m Copernicus DEM GLO-30; 10m Sentinel-2 textura zobrazí více obrazových detailů,
+ Výškový model pochází ze skutečného DEM; 10m Sentinel-2 textura zobrazuje obrazové detaily,
  ale nevytváří 10m přesnost výšek. Budovy ani fasády nejsou rekonstruovány.
  <span id="renderer"></span></p>
  <div class="info">
@@ -99,8 +99,9 @@ $("scene").textContent=m.sceneId+" · "+m.acquiredAt.slice(0,10);
 $("acquired").textContent=m.acquiredAt+" · Sentinel-2 L2A";
 $("cloud").textContent="Oblačnost celé scény: "+(m.sceneCloudPercent===null?"neuvedena":m.sceneCloudPercent.toFixed(3)+" %")+" (nikoli lokální maska mraků).";
 $("texture").textContent=tex.width+" × "+tex.height+" px · "+m.textureGroundResolutionM+" m/px";
-$("geometry").textContent=D.width+" × "+D.height+" výškových bodů · "+D.report.mesh.triangles+" trojúhelníků.";
-$("heights").textContent="Copernicus GLO-30: "+minH.toFixed(1)+" až "+maxH.toFixed(1)+" m (EGM2008)";
+$("geometry").textContent=D.width+" × "+D.height+" výškových bodů · "+D.report.mesh.triangles+" trojúhelníků · síť "+m.groundResolutionM+" m, zdroj "+m.demNativeResolutionM+" m." ;
+$("heights").textContent=m.demSource+": "+minH.toFixed(1)+" až "+maxH.toFixed(1)+" m ("+m.verticalDatum+")";
+$("profileDatum").textContent=m.verticalDatum;
 $("coverage").textContent=m.sampledHeights+"/"+m.totalHeights+" platných výšek · "+m.textureValidPixels+" skutečných RGB texelů.";
 const webgl=canvas.getContext("webgl",{alpha:false,antialias:true,preserveDrawingBuffer:false});
 const n=points.length/3;
@@ -410,7 +411,7 @@ function makeProfile(){
 function labelPoint(point,label){
   return label+": "+point.coords[1].toFixed(6)+"° N, "+
     point.coords[0].toFixed(6)+"° E · "+
-    point.height.toFixed(1)+" m n. m. (EGM2008)";
+    point.height.toFixed(1)+" m n. m. ("+m.verticalDatum+")";
 }
 function updateMeasurement(){
   $("measurement").classList.toggle("active",$("measure").checked||picked.length>0);
@@ -525,7 +526,7 @@ function downloadText(filename,content,mime){
 }
 $("download-profile").onclick=()=>{
   if(profileSamples.length<2)return;
-  const rows=["distance_m,longitude_deg,latitude_deg,elevation_m_egm2008"];
+  const rows=["distance_m,longitude_deg,latitude_deg,"+(m.verticalDatum.startsWith("Bpv")?"elevation_m_bpv":"elevation_m_egm2008")];
   for(const s of profileSamples)rows.push([
     s.distanceM.toFixed(3),s.coords[0].toFixed(9),s.coords[1].toFixed(9),
     s.height===null?"":s.height.toFixed(4)
@@ -535,12 +536,12 @@ $("download-profile").onclick=()=>{
 $("download-geojson").onclick=()=>{
   if(picked.length!==2)return;
   const pointsFeatures=picked.map((p,i)=>({
-    type:"Feature",properties:{name:i===0?"A":"B",elevation_m_egm2008:p.height,
+    type:"Feature",properties:{name:i===0?"A":"B",elevation_m:p.height,verticalDatum:m.verticalDatum,
       source:"Copernicus GLO-30 DEM"},geometry:{type:"Point",coordinates:p.coords}
   }));
   const segment={
     type:"Feature",properties:{name:"Measured profile",distance_m:
-      geographicDistance(picked[0].coords,picked[1].coords),verticalDatum:"EGM2008",
+      geographicDistance(picked[0].coords,picked[1].coords),verticalDatum:m.verticalDatum,
       datumCaveat:"30m surface DEM; interpolation not a geodetic survey"},
     geometry:{type:"LineString",coordinates:profileSamples.map(p=>[
       p.coords[0],p.coords[1],p.height
@@ -549,7 +550,7 @@ $("download-geojson").onclick=()=>{
   // GeoJSON geometries cannot use null Z. Export LineString in WGS84 2D; heights
   // are encoded separately, including null for NoData samples.
   segment.geometry.coordinates=profileSamples.map(p=>[p.coords[0],p.coords[1]]);
-  segment.properties.elevation_m_egm2008=profileSamples.map(p=>p.height);
+  segment.properties.elevation_m=profileSamples.map(p=>p.height);
   downloadText("praha-elevation-profile.geojson",JSON.stringify({
     type:"FeatureCollection",features:[...pointsFeatures,segment]
   },null,2),"application/geo+json");
@@ -562,7 +563,7 @@ function chooseTerrainPoint(clientX,clientY){
   if(picked.length===2){picked.length=0;profileSamples=[];}
   picked.push(p);
   if(picked.length===2)makeProfile();
-  $("measurement-hint").textContent="Interpolace skutečné ~30m DEM sítě; ne geodetické zaměření.";
+  $("measurement-hint").textContent="Interpolace skutečné "+m.groundResolutionM+"m DEM sítě ("+m.verticalDatum+"); ne geodetické zaměření.";
   updateMeasurement();schedule();
 }
 
