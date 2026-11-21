@@ -19,6 +19,12 @@ jobs:
       - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs tests/terrain-measure.test.mjs tests/terrain-cuzk-dmpok.test.mjs tests/terrain-cuzk-ortho.test.mjs
       - name: Verify terrain GLSL program actually links in headless Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs
+      - name: Validate streamed Prague grid and local server without remote downloads
+        run: node --test tests/terrain-prague-stream.test.mjs
+      - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
+        run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
+      - name: Fetch one real ČÚZK on-demand tile through the local streaming server
+        run: node scripts/terrain-prague-stream-smoke.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
         run: node scripts/terrain-prague-3d.mjs
       - name: Verify texture, OBJ UVs, PNG alpha and HTML package
@@ -52,3 +58,5 @@ jobs:
             test-results/terrain-prague-ortho/terrain.mtl
             test-results/terrain-prague-ortho/terrain-texture.png
             test-results/terrain-prague-ortho/report.json
+            test-results/terrain-prague-stream-ci/v1-0-3-3.json
+            test-results/terrain-prague-stream-ci/v1-0-3-3.png
