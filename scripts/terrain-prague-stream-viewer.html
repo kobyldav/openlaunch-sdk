@@ -79,7 +79,7 @@ a{color:#9cd1fc}
 <script>
 "use strict";
 const $=id=>document.getElementById(id),canvas=$("map");
-let config,gl,program,attrs,uni,planner,needsDraw=false;
+let config,gl,program,attrs,uni,planner,needsDraw=false,graphicsEpoch=0;
 let selection={coarse:[],finer:[],detailActive:false};
 const transitions=new Map();
 let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
@@ -138,10 +138,12 @@ function scheduleFetch(tile){
  queue.push(tile);
 }
 function pump(){
+ if(!gl)return;
  while(active<MAX_REQUESTS&&queue.length){
    const tile=queue.shift();
    if(cache.has(tile.key)||pending.has(tile.key))continue;
    active++;pending.add(tile.key);
+   const epoch=graphicsEpoch;
    const meshUrl="/api/tiles/"+tile.z+"/"+tile.x+"/"+tile.y+".json";
    (async()=>{
      const reply=await fetch(meshUrl);
@@ -152,12 +154,16 @@ function pump(){
      const textureReply=await fetch(data.texture.file);
      if(!textureReply.ok)throw Error("Orthophoto unavailable for "+tile.key);
      const blob=await textureReply.blob();
+     if(epoch!==graphicsEpoch||!gl)return; // context lost during download
      const bitmap=await createImageBitmap(blob);
-     try{const gpu=createGpuTile(data,bitmap);
+     try{
+       if(epoch!==graphicsEpoch||!gl)return;
+       const gpu=createGpuTile(data,bitmap);
        cache.set(tile.key,{...gpu,meta:data,lastUsed:Date.now()});
      }finally{bitmap.close?.();}
      $("error").textContent="";
    })().catch(err=>{
+     if(epoch!==graphicsEpoch)return;
      failed.set(tile.key,Date.now()+30_000);
      console.error(tile.key,err);
      $("error").textContent="Dlaždice "+tile.key+": "+String(err.message||err)+
@@ -503,7 +509,7 @@ $("export-profile").onclick=()=>{
  const url=URL.createObjectURL(blob);
  const a=document.createElement("a");a.href=url;a.download="praha-dem-profil-Bpv.csv";
  document.body.append(a);a.click();a.remove();
- URL.revokeObjectURL(url);
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
 };
 
 function move(dx,dy){
@@ -575,6 +581,24 @@ window.addEventListener("keydown",e=>{
  }
 });
 window.addEventListener("resize",requestDraw);
+canvas.addEventListener("webglcontextlost",event=>{
+ event.preventDefault(); // request restoration from the browser
+ graphicsEpoch++;
+ gl=null;program=null;uni=null;attrs=null;
+ cache.clear();lastRendered=[];transitions.clear();
+ $("status").textContent="WebGL kontext přerušen; čekám na obnovení.";
+ $("error").textContent="Grafický kontext byl ztracen. Mapu znovu vykreslím z uložených skutečných dlaždic.";
+});
+canvas.addEventListener("webglcontextrestored",()=>{
+ try{
+   startGpu();
+   $("error").textContent="";
+   if(config&&planner)update();
+ }catch(error){
+   console.error(error);
+   $("error").textContent="WebGL nebylo možné obnovit: "+String(error);
+ }
+});
 (async()=>{
  try{
   const response=await fetch("/api/config");
