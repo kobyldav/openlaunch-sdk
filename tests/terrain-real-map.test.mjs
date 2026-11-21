@@ -49,6 +49,15 @@ test("real map loads two independent data sources, preserves elevation and emits
   assert.ok(result.mesh.triangles.length>0);
   assert.ok(result.metadata.sampledColors>0);
   assert.equal(result.vertexRgb.length,result.elevation.values.length*3);
+  assert.ok(result.imageryTexture.width>result.elevation.width);
+  assert.ok(result.imageryTexture.height>result.elevation.height);
+  assert.equal(result.imageryTexture.groundResolutionM,10);
+  assert.equal(result.imageryTexture.rgba.length,
+    result.imageryTexture.width*result.imageryTexture.height*4);
+  assert.ok(result.imageryTexture.validPixels>result.metadata.sampledColors);
+  assert.equal(result.metadata.textureValidPixels,result.imageryTexture.validPixels);
+  const alpha=Array.from(result.imageryTexture.rgba).filter((_,i)=>i%4===3);
+  assert.equal(alpha.filter(a=>a===255).length,result.imageryTexture.validPixels);
   assert.equal(result.metadata.verticalDatum,"EGM2008 geoid");
   assert.ok(result.metadata.warnings.every(w=>!w.startsWith("No DEM,")));
   assert.equal(result.metadata.sceneId,scene.sceneId);
