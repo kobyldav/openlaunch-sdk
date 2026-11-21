@@ -35,6 +35,8 @@ export interface RealTerrainMap {
   vertexRgb:Uint8Array;
   /** 1 when an actual Sentinel-2 RGB observation contributes to the vertex. */
   rgbValid:Uint8Array;
+  /** Independently sampled real Sentinel-2 RGB texture at native ground spacing. RGBA, north row first. */
+  imageryTexture:{width:number;height:number;rgba:Uint8Array;validPixels:number;groundResolutionM:number};
   metadata:{
     area:AreaOfInterest["bbox"]; centerLatitudeDeg:number; groundResolutionM:number;
     sceneId:string; acquiredAt:string; sceneCloudPercent:number|null;
@@ -42,6 +44,7 @@ export interface RealTerrainMap {
     demSource:"Copernicus DEM GLO-30 public AWS COG";
     demTileUrls:string[]; verticalDatum:"EGM2008 geoid";
     sampledHeights:number; totalHeights:number; sampledColors:number;
+    textureGroundResolutionM:number; textureValidPixels:number;
     heightMinM:number; heightMaxM:number;
     warnings:string[];
   };
@@ -58,7 +61,7 @@ export function copernicusGlo30TileUrl(latDegree:number,lonDegree:number):string
   return BASE+"/"+label+"/"+label+".tif";
 }
 
-function outputGrid(area:AreaOfInterest,resolutionM:number):RasterGrid {
+function outputGrid(area:AreaOfInterest,resolutionM:number,maxPixels=50_000):RasterGrid {
   const [w,s,e,n]=area.bbox;
   const lat=(s+n)/2,scale=Math.cos(lat*Math.PI/180);
   const [left,bottom]=lonLatToGridCrs(w,s,"EPSG:3857");
@@ -67,7 +70,8 @@ function outputGrid(area:AreaOfInterest,resolutionM:number):RasterGrid {
   const step=resolutionM/scale;
   const width=Math.max(2,Math.ceil((right-left)/step));
   const height=Math.max(2,Math.ceil((top-bottom)/step));
-  if(width*height>50_000)throw new RangeError("Terrain grid exceeds 50,000 samples");
+  if(width*height>maxPixels||width>1024||height>1024)
+    throw new RangeError("Requested raster grid exceeds safe pixel budget");
   return {width,height,crs:"EPSG:3857",
     transform:[left,(right-left)/width,0,top,0,-(top-bottom)/height],
     values:new Float64Array(width*height).fill(NaN),unit:"m EGM2008"};
@@ -151,8 +155,28 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
     }
   }
   if(colored===0)throw new Error("Sentinel-2 has no valid pixels aligned with the selected DEM");
+  const sourceSpacing=rgb.nativeResolutionM;
+  const textureGroundResolutionM=sourceSpacing!==null && Number.isFinite(sourceSpacing) &&
+    sourceSpacing>=5 && sourceSpacing<=60 ? sourceSpacing : resolutionM;
+  const textureGrid=outputGrid(area,textureGroundResolutionM,262_144);
+  const textureBands=bands.map(b=>reprojectRasterTo(b,textureGrid,"nearest"));
+  const rgba=new Uint8Array(textureGrid.width*textureGrid.height*4);
+  let textureValidPixels=0;
+  for(let i=0;i<textureGrid.width*textureGrid.height;i++){
+    if(textureBands.some(b=>!Number.isFinite(b.values[i])||b.values[i]!<=0))continue;
+    for(let c=0;c<3;c++){
+      const value=textureBands[c]!.values[i]!,range=ranges[c]!;
+      const norm=Math.max(0,Math.min(1,(value-range[0])/(range[1]-range[0])));
+      rgba[i*4+c]=Math.round(255*Math.pow(norm,0.87));
+    }
+    rgba[i*4+3]=255;
+    textureValidPixels++;
+  }
+  if(textureValidPixels===0)throw new Error("Sentinel-2 RGB texture has no observed pixels in the selected area");
+  const imageryTexture={width:textureGrid.width,height:textureGrid.height,
+    rgba,validPixels:textureValidPixels,groundResolutionM:textureGroundResolutionM};
   return {
-    kind:"satellite-rgb-on-copernicus-dsm",elevation,mesh,vertexRgb,rgbValid,
+    kind:"satellite-rgb-on-copernicus-dsm",elevation,mesh,vertexRgb,rgbValid,imageryTexture,
     metadata:{
       area:area.bbox,centerLatitudeDeg:latitude,groundResolutionM:resolutionM,
       sceneId:rgb.sceneId,acquiredAt:rgb.acquiredAt,sceneCloudPercent:rgb.sceneCloudPercent,
@@ -160,10 +184,11 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
       demSource:"Copernicus DEM GLO-30 public AWS COG",
       demTileUrls:tiles.map(t=>t.url),verticalDatum:"EGM2008 geoid",
       sampledHeights:statistics.valid,totalHeights:heights.length,sampledColors:colored,
+      textureGroundResolutionM,textureValidPixels,
       heightMinM:statistics.min!,heightMaxM:statistics.max!,
       warnings:[
         "This is real DEM-based 2.5D: no photogrammetric building facades or measured sub-30m detail.",
-        "Mesh color is a stretched real Sentinel-2 observation, sampled at DEM grid vertices.",
+        "Mesh colors are a legacy vertex sample; the independently sampled Sentinel-2 RGBA texture preserves native imaging detail.",
         "Copernicus DEM GLO-30 is a surface model with approximate 30m native spacing; output resampling adds no detail.",
         "GLO-30 elevations are referenced to EGM2008, not WGS84 ellipsoid. No vertical datum conversion was applied.",
         "Sentinel-2 scene cloud percentage does not guarantee every pixel is cloud free.",
