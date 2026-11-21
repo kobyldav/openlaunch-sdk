@@ -28,7 +28,7 @@ try{
     child.once("exit",code=>{clearTimeout(timeout);reject(Error("server exited "+code+": "+stderr));});
   });
   const resp=await fetch(origin+"/api/tiles/0/3/3.json",{signal:AbortSignal.timeout(110_000)});
-  assert.equal(resp.status,200,"Real ČÚZK tile HTTP "+resp.status+" "+await resp.text().catch(()=>""));
+  if(!resp.ok)throw Error("Real ČÚZK tile HTTP "+resp.status+" "+(await resp.text()).slice(0,450));
   const tile=await resp.json();
   assert.equal(tile.status,"real-data");
   assert.equal(tile.z,0);
