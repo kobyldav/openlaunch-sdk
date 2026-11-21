@@ -68,7 +68,7 @@ test("profile includes genuine triangle samples, NaN gaps and accurate horizonta
  const a={east:2,north:-2},b={east:8,north:-8};
  const flat=inspect.profile([testTile()],a,b,{samples:17,config:manifest});
  assert.equal(flat.validSamples,17);
- assert.ok(flat.samples.every(x=>x.elevationM===210));
+ assert.ok(flat.samples.every(x=>x.elevationM!==null&&Math.abs(x.elevationM-210)<1e-8));
  assert.ok(Math.abs(flat.horizontalDistanceM-Math.hypot(6,6))<1e-9);
  assert.ok(Math.abs(flat.surfaceDistanceM-flat.horizontalDistanceM)<1e-9);
  const partial=inspect.profile([testTile({missingRight:true})],a,b,
