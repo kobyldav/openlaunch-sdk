@@ -268,3 +268,51 @@ photogrammetric buildings, or certified survey accuracy is claimed.
 `node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html`
 (Windows Edge), and `node scripts/terrain-prague-stream-smoke.mjs`
 (real ČÚZK HTTP tile, mesh provenance, texture PNG and disk cache).
+
+## Stage 7 — frustum visibility, LOD hysteresis and crack-concealment
+
+The streamed viewer now uses the actual **yaw, pitch, camera target,
+distance and viewport aspect ratio** to conservatively cull terrain tiles
+outside the camera view. The conservative projected bounding sphere includes
+room for tall roof/terrain surfaces, so it may fetch a few extra tiles rather
+than hide visible terrain. Up to 28 coarse tiles and 8 fine tiles may be
+selected; the resident GPU cache is capped at 40 tiles.
+
+**LOD hysteresis** enables fine source tiles on zoom-in at 1,250 m and
+disables them only after zoom-out at 1,750 m. The selected groups also have
+a positional hysteresis margin to avoid downloading different four-tile
+blocks on tiny camera movements. When all four real fine tiles are loaded,
+a 480 ms 4×4 ordered-dither screen-door transition swaps the group
+progressively while maintaining true source-derived fine heights.
+Only the presentation is mixed; the DMP OK elevations stay unchanged.
+
+**Seam cover, not invented measurement:** independent source DSM grids
+have pixel-centre locations a small distance inside each requested tile
+boundary. A visual-only apron duplicates the *observed boundary height* out
+to the shared geographic tile outline, and a vertical 18 m skirt extends
+down from that outline to conceal small differences between neighbouring
+LOD meshes. All measured positions, source DEM data and source triangles
+are retained. The new vertices and skirt faces are marked explicitly as
+**visualization-only** in the version-2 tile metadata. This is neither
+additional measured terrain nor a geodetically precise edge interpolation.
+
+The streamed viewer now fetches full render positions, explicit texture
+coordinates and the seam-index buffer via the local tile server, with
+WebGL1-safe 16-bit indices. Version-2 tiles are stored separately as
+`v2-*.json` and `v2-*.png`, so the old cache is not misinterpreted.
+Delete `test-results/terrain-prague-stream-cache/` when you no longer
+need old tile caches; nothing outside this directory is affected.
+
+**Known risks:** a steep discontinuity larger than the skirt depth or
+missing observed pixels along a tile perimeter may still leave a visible
+gap. Screen-door fading is a visual presentation technique that can show
+a subtle stipple pattern during the brief transition. Frustum culling
+uses conservative bounds rather than an occlusion or horizon renderer.
+These methods improve interactive continuity but do **not** yield a
+watertight survey-grade mesh or vertical building façades.
+
+Tests: `node --test tests/terrain-prague-stream.test.mjs` verifies actual
+camera-dependent visibility, hysteresis, shared boundaries and unchanged
+measured elevations. The Windows workflow also compiles both streamed and
+standalone GLSL shaders in Microsoft Edge and downloads a real v2 ČÚZK
+height/orthophoto tile through localhost.

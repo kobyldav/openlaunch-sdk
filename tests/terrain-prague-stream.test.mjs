@@ -99,9 +99,10 @@ test("local streaming server starts without any terrain download, accepts only v
       child.once("error",e=>{clearTimeout(timeout);reject(e);});
       child.once("exit",code=>{clearTimeout(timeout);reject(Error("Server exited "+code+": "+stderr));});
     });
-    const [config,root,notFound,invalid]=await Promise.all([
+    const [config,root,notFound,invalid,visibility]=await Promise.all([
       fetch(origin+"/api/config"),fetch(origin+"/"),
-      fetch(origin+"/api/tiles/nope"),fetch(origin+"/api/tiles/1/22/0.json")
+      fetch(origin+"/api/tiles/nope"),fetch(origin+"/api/tiles/1/22/0.json"),
+      fetch(origin+"/api/visibility.js")
     ]);
     assert.equal(config.status,200);
     const manifest=await config.json();
@@ -111,6 +112,9 @@ test("local streaming server starts without any terrain download, accepts only v
     assert.match(await root.text(),/OpenLaunch SDK.*Praha 3D/);
     assert.equal(notFound.status,404);
     assert.equal(invalid.status,400);
+    assert.equal(visibility.status,200);
+    assert.match(visibility.headers.get("content-type")??"",/javascript/);
+    assert.match(await visibility.text(),/OpenLaunchTilePlanner/);
     // No /api/tiles/0/... valid request: the test must not fetch ČÚZK.
   } finally{
     child.kill();
