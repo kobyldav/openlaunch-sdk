@@ -9,6 +9,8 @@ import {Script,runInNewContext} from "node:vm";
 import {
   PRAGUE_STREAM_REGION,mercatorFromLonLat,tileSpec,tileOriginOffset,pragueStreamManifest
 } from "../scripts/terrain-prague-stream-grid.mjs";
+import {buildSeamMesh,SEAM_SKIRT_DEPTH_M,TERRAIN_SEAM_VERSION}
+  from "../scripts/terrain-prague-stream-seams.mjs";
 
 test("streamed Prague geography is 4km-wide, bounded, and exactly tessellated",()=>{
   const manifest=pragueStreamManifest();
@@ -55,8 +57,15 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   const page=await readFile(new URL("../scripts/terrain-prague-stream-viewer.html",import.meta.url),"utf8");
   assert.match(page,/\/api\/config/);
   assert.match(page,/\/api\/tiles\//);
-  assert.match(page,/children\.every\(k=>cache\.has\(k\.key\)\)/);
-  assert.match(page,/MAX_GPU_TILES=32/);
+  assert.match(page,/ids\.every\(id=>cache\.has\(id\)\)/);
+  assert.match(page,/let selection=\{coarse:/);
+  assert.match(page,/OpenLaunchTilePlanner/);
+  assert.match(page,/lerpFade\(/);
+  assert.match(page,/uFade/);
+  assert.match(page,/uPass/);
+  assert.match(page,/\/api\/visibility\.js/);
+  assert.match(page,/d\.seam\?\.version!==2/);
+  assert.match(page,/MAX_GPU_TILES=40/);
   assert.match(page,/gl\.deleteBuffer/);
   assert.match(page,/gl\.deleteTexture/);
   assert.match(page,/DMP OK.*Ortofoto ČR/);
@@ -107,4 +116,104 @@ test("local streaming server starts without any terrain download, accepts only v
     child.kill();
     await rm(cache,{recursive:true,force:true,maxRetries:4,retryDelay:100});
   }
+});
+
+test("camera-frustum planner does not request all 36 coarse tiles, and holds LOD thresholds",async()=>{
+  const text=await readFile(new URL("../scripts/terrain-prague-stream-visibility.js",import.meta.url),"utf8");
+  const context={window:{}};
+  runInNewContext(text,context);
+  const make=context.window.OpenLaunchTilePlanner?.createPlanner;
+  assert.equal(typeof make,"function");
+  const planner=make(pragueStreamManifest());
+  const base={yaw:0,pitch:.78,panX:0,panNorth:0,vertical:1,aspect:1.6,enableDetail:true};
+  const near=planner.choose({...base,distance:1200});
+  assert.equal(near.detailActive,true);
+  assert.ok(near.coarse.length>0&&near.coarse.length<36,
+    "the view frustum removes truly invisible coarse tiles");
+  assert.ok(near.finer.length<=8);
+  assert.equal(near.finer.length%4,0,"each requested fine group is complete");
+  const selected=new Set(near.coarse.map(t=>t.key));
+  const opposite=planner.choose({...base,yaw:Math.PI,distance:1200});
+  const inverted=new Set(opposite.coarse.map(t=>t.key));
+  assert.notDeepEqual([...selected].sort(),[...inverted].sort(),
+    "looking in the opposite direction must change requested tiles");
+  assert.equal(planner.choose({...base,distance:1600}).detailActive,true,
+    "hysteresis keeps fine mode when zooming out slightly");
+  assert.equal(planner.choose({...base,distance:1750}).detailActive,false);
+  assert.equal(planner.choose({...base,distance:1400}).detailActive,false,
+    "fine mode must not immediately re-enter near its exit threshold");
+  assert.equal(planner.choose({...base,distance:1240}).detailActive,true);
+  assert.equal(planner.choose({...base,distance:200,enableDetail:false}).detailActive,false);
+  assert.throws(()=>planner.choose({...base,aspect:0,distance:200}),/Invalid camera/);
+});
+function flatMeasuredTile(spec,width=5,height=5,{invalidCorner=false}={}){
+  const sw=mercatorFromLonLat(spec.west,spec.south),ne=mercatorFromLonLat(spec.east,spec.north);
+  const grid={crs:"EPSG:3857",transform:[sw[0],(ne[0]-sw[0])/width,0,
+    ne[1],0,-(ne[1]-sw[1])/height]};
+  const origin=tileOriginOffset(grid);
+  const scale=Math.cos(PRAGUE_STREAM_REGION.centerLatitudeDeg*Math.PI/180);
+  const positions=new Float32Array(width*height*3);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    const i=y*width+x;
+    positions[i*3]=x*grid.transform[1]*scale;
+    positions[i*3+1]=y*grid.transform[5]*scale;
+    positions[i*3+2]=invalidCorner&&i===0?NaN:210;
+  }
+  const triangles=[];
+  const good=i=>Number.isFinite(positions[i*3+2]);
+  for(let y=0;y<height-1;y++)for(let x=0;x<width-1;x++){
+    const a=y*width+x,b=a+1,c=a+width,d=c+1;
+    if(good(a)&&good(b)&&good(c))triangles.push(a,b,c);
+    if(good(b)&&good(d)&&good(c))triangles.push(b,d,c);
+  }
+  return {mesh:{positions,triangles:new Uint32Array(triangles),
+    validVertices:positions.length/3-(invalidCorner?1:0)},grid,origin};
+}
+test("visual seam aprons meet exact common tile bounds while preserving measured heights",()=>{
+  const left=tileSpec(0,0,0),right=tileSpec(0,1,0);
+  const l=flatMeasuredTile(left),r=flatMeasuredTile(right);
+  const a=buildSeamMesh(l.mesh,5,5,[left.west,left.south,left.east,left.north],l.origin);
+  const b=buildSeamMesh(r.mesh,5,5,[right.west,right.south,right.east,right.north],r.origin);
+  for(const [result,input] of [[a,l],[b,r]]){
+    assert.equal(result.measuredVertices,25);
+    assert.equal(result.measuredTriangles,32);
+    assert.ok(result.apronTriangles>0&&result.skirtTriangles>0);
+    assert.ok(result.renderVertices>25&&result.renderVertices<65536);
+    assert.ok(result.triangles.every(id=>id<result.renderVertices));
+    assert.equal(result.positions.length,result.renderVertices*3);
+    assert.equal(result.uvs.length,result.renderVertices*2);
+    assert.match(result.provenance,/visual-only/);
+    for(let i=0;i<input.mesh.positions.length;i++)
+      assert.equal(result.positions[i],input.mesh.positions[i],
+        "source heights/positions remain untouched");
+    for(let i=25;i<result.renderVertices;i++){
+      const z=result.positions[i*3+2];
+      assert.ok(z===210||z===210-SEAM_SKIRT_DEPTH_M,
+        "seam heights only repeat real perimeter measurement or vertical skirt");
+    }
+  }
+  const worldEast=mercatorFromLonLat(left.east,left.north)[0];
+  const worldCentre=mercatorFromLonLat((PRAGUE_STREAM_REGION.west+PRAGUE_STREAM_REGION.east)/2,
+    (PRAGUE_STREAM_REGION.south+PRAGUE_STREAM_REGION.north)/2)[0];
+  const xExpected=(worldEast-worldCentre)*
+    Math.cos(PRAGUE_STREAM_REGION.centerLatitudeDeg*Math.PI/180);
+  const verticesAtBorder=(result,origin)=>Array.from(result.positions)
+    .filter((_,i)=>i%3===0).map(x=>x+origin[0])
+    .filter(x=>Math.abs(x-xExpected)<.005);
+  assert.ok(verticesAtBorder(a,l.origin).length>=10);
+  assert.ok(verticesAtBorder(b,r.origin).length>=10);
+  assert.ok(Math.abs(left.east-right.west)<1e-12);
+});
+test("visual seam skirts do not fabricate missing DEM corner elevations",()=>{
+  const spec=tileSpec(1,0,0);
+  const input=flatMeasuredTile(spec,5,5,{invalidCorner:true});
+  const result=buildSeamMesh(input.mesh,5,5,
+    [spec.west,spec.south,spec.east,spec.north],input.origin);
+  assert.ok(Number.isNaN(result.positions[2]));
+  assert.ok(result.apronTriangles>0);
+  // No appended vertex may contain NaN or infinite coordinates.
+  for(const value of result.positions.subarray(5*5*3))assert.ok(Number.isFinite(value));
+  assert.equal(TERRAIN_SEAM_VERSION,2);
+  assert.throws(()=>buildSeamMesh(input.mesh,5,5,[0,0,0,0],input.origin,
+    {skirtDepthM:100}),/depth/);
 });
