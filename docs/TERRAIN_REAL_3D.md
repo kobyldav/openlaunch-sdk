@@ -1,66 +1,66 @@
-# Real Prague 3D: Sentinel-2 colour + Copernicus DEM GLO-30
+# Real Prague 3D: native Sentinel-2 texture + Copernicus GLO-30 heights
 
-This feature deliberately **does not use stereo matching**. It combines real
-Sentinel-2 Level-2A bands (Element84 Earth Search public STAC/COG) with actual
-Copernicus DEM GLO-30 public AWS Cloud Optimized GeoTIFF elevation tiles.
-There are **no synthetic heights, fabricated buildings or fallback screenshots**.
+Real Sentinel-2 L2A RGB imagery is fetched from public Element84 Earth Search STAC/COG
+and independently georeferenced onto real Copernicus DEM GLO-30 public AWS height tiles.
+This is **DEM-based 2.5D**: no fictional elevations or fake high-resolution buildings.
 
-## One command on Windows CMD
+## Windows CMD
 
-From branch `feature/terrain-prague-real-dem`:
+From an existing checkout:
 
 ```cmd
 cd /d "%USERPROFILE%\Desktop\openlaunch-terrain"
-git fetch origin
 git switch feature/terrain-prague-real-dem
-npm ci
+git pull --ff-only origin feature/terrain-prague-real-dem
 npm run example:terrain-prague-3d
 start "" "test-results\terrain-prague-3d\index.html"
 ```
 
-The script makes real HTTPS requests; on provider failure, it writes a
-diagnostic HTML/report and exits nonzero. To choose a different AOI or dates:
+For another small region (<=9 km²), date range, or output sampling:
 
 ```cmd
 npm run example:terrain-prague-3d -- --bounds 14.411 50.083 14.430 50.094 --from 2025-06-01 --to 2025-09-30 --max-cloud 35 --resolution 30
 ```
 
-Outputs:
-- `index.html` — self-contained mouse/touch 3D viewer with RGB/elevation switch, rotation, zoom and exaggeration slider (1x = physical scale).
-- `terrain.obj` — local east/height/north positions in metres, height datum EGM2008.
-- `report.json` — precise provider, scene ID, date, DEM tile URLs, height coverage, and geometry metadata.
+## Outputs
 
-## SDK usage
+- `index.html`: self-contained offline WebGL viewer (GPU orbit, zoom, top view, 1–6x height exaggeration, satellite texture, elevation shading, wireframe). Includes 2D vertex-color fallback when WebGL unavailable.
+- `terrain.obj`: triangulated local east / EGM2008 height / north geometry with 0..1 UV coordinates.
+- `terrain.mtl`: OBJ material pointing to the real RGB PNG.
+- `terrain-texture.png`: true Sentinel-2 RGB RGBA texture with NoData alpha, independent of DEM mesh spacing.
+- `report.json`: satellite scene and acquisition date, image and DEM source, spatial resolution, texture dimensions, exact height coverage.
+
+**Keep OBJ, MTL and PNG in the same folder** when importing the model into Blender or another 3D tool.
+
+## SDK
 
 ```ts
-import { OpenLaunch, bbox } from "openlaunch-sdk";
-const space = new OpenLaunch();
-const result = await space.terrain.load({
-  area: bbox(14.411, 50.083, 14.430, 50.094),
-  startDate: "2025-06-01",
-  endDate: "2025-09-30",
-  resolutionM: 30
+import {OpenLaunch,bbox} from "openlaunch-sdk";
+
+const map=await new OpenLaunch().terrain.load({
+  area:bbox(14.411,50.083,14.430,50.094),
+  startDate:"2025-06-01",endDate:"2025-09-30",
+  resolutionM:30
 });
-console.log(result.mesh.positions, result.mesh.triangles, result.vertexRgb);
-console.log(result.metadata.demTileUrls, result.metadata.sceneId);
+console.log(map.mesh.positions,map.mesh.triangles);
+console.log(map.imageryTexture.width,map.imageryTexture.height);
+console.log(map.imageryTexture.rgba); // actual sampled Sentinel-2 texture bytes
+console.log(map.metadata.demTileUrls);
 ```
 
-Copernicus DEM comes directly from the public AWS GLO-30 COG bucket
-(no Planetary Computer SAS key needed). The SDK reads only COG byte ranges
-and supports up to four intersecting 1-degree tiles for a bounded AOI
-of 9 km². Both source families are already handled by SDK raster helpers.
+## Correct interpretation and constraints
 
-**Limits:** GLO-30 is a ~30m **digital surface model**, not a building
-model. Heights reference EGM2008, *not* WGS84 ellipsoidal elevations.
-No vertical datum conversion is implied. Sentinel-2 RGB is ~10m native,
-but displayed colours are sampled at 30m mesh vertices (not full 10m
-texture mapping). Scene-wide cloud cover is not a pixel cloud mask.
-No live stereophotogrammetry, sub-metre detail, rooftop vector extraction,
-facades, or accuracy certification.
-
-The 3D mesh's horizontal positions are local ground metres corrected
-for Web Mercator magnification at the AOI centre. Larger AOIs need a
-different geodetic approach; do not use this approximation for flight safety.
-
-The project keeps the original 3D stereo experimental code on its
-own API. **No changes to the repository's main branch are required.**
+- Sentinel-2 images are native ~10m RGB observations; output texture is reprojected
+  to the local target grid at native nominal ground spacing, with no fabricated pixel samples.
+  Interpolation/reprojection does not add observed information.
+- The 3D geometry is from Copernicus GLO-30 ~30m digital **surface** heights.
+  Selecting 20m output spacing does not create higher precision DEM measurements.
+- Height datum EGM2008 geoid; no ellipsoidal correction. The local display uses
+  an approximation to correct Web Mercator scale at the AOI latitude.
+- Full-scene cloud fraction is not a per-pixel cloud mask.
+- No real facades, sub-metre imagery, fine building models, or certified precision.
+- Max 9 km², max four 1-degree height tiles, max 50k mesh vertices and 262,144
+  image texels. Provider HTTP errors cause explicit failure, never synthetic fallback.
+- WebGL visualization is a browser capability; the Python/Node/CI process verifies
+  data, geometry, embedded JavaScript syntax, texture PNG and UVs, but does not
+  certify visual rendering in every GPU/browser combination.

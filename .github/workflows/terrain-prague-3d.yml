@@ -16,10 +16,12 @@ jobs:
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build
-      - run: node --test tests/terrain-real-map.test.mjs
+      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
         run: node scripts/terrain-prague-3d.mjs
-      - name: Upload 3D viewer and real-data provenance
+      - name: Verify texture, OBJ UVs, PNG alpha and HTML package
+        run: node scripts/terrain-prague-validate.mjs
+      - name: Upload complete standalone 3D model and real-data provenance
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -27,4 +29,6 @@ jobs:
           path: |
             test-results/terrain-prague-3d/index.html
             test-results/terrain-prague-3d/terrain.obj
+            test-results/terrain-prague-3d/terrain.mtl
+            test-results/terrain-prague-3d/terrain-texture.png
             test-results/terrain-prague-3d/report.json
