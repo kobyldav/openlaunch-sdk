@@ -19,6 +19,7 @@ if(!Number.isInteger(port)||port<0||port>65535)throw Error("--port must be 0..65
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
 await mkdir(cacheRoot,{recursive:true});
 const viewport=await readFile(new URL("./terrain-prague-stream-viewer.html",import.meta.url),"utf8");
+const visibilityScript=await readFile(new URL("./terrain-prague-stream-visibility.js",import.meta.url),"utf8");
 const sdk=new OpenLaunch();
 const tasks=new Map();
 let active=0;const queued=[];
@@ -151,6 +152,9 @@ const server=createServer(async(req,res)=>{
     if(req.method!=="GET"){send(res,405,"Only GET is supported","text/plain");return;}
     if(pathname==="/"){
       send(res,200,viewport,"text/html; charset=utf-8");return;
+    }
+    if(pathname==="/api/visibility.js"){
+      send(res,200,visibilityScript,"application/javascript; charset=utf-8");return;
     }
     if(pathname==="/api/config"){
       send(res,200,JSON.stringify(pragueStreamManifest()),"application/json; charset=utf-8");return;

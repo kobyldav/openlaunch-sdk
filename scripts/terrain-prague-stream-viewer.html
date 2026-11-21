@@ -47,15 +47,18 @@ a{color:#9cd1fc}
  <p class="small" id="source">Výšky: ČÚZK DMP OK, Bpv. Barvy: ČÚZK Ortofoto ČR. Nejpodrobnější geometrie 2 m, textura 0,5 m. Žádné rekonstruované fasády.</p>
  <p id="error" aria-live="polite"></p>
 </main>
+<script src="/api/visibility.js"></script>
 <script>
 "use strict";
 const $=id=>document.getElementById(id),canvas=$("map");
-let config,gl,program,attrs,uni,revision=0,needsDraw=false;
+let config,gl,program,attrs,uni,planner,needsDraw=false;
+let selection={coarse:[],finer:[],detailActive:false};
+const transitions=new Map();
 let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
 const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set();
-const MAX_REQUESTS=3,MAX_GPU_TILES=32,MAX_COARSE_VISIBLE=12,MAX_FINE_GROUPS=2;
+const MAX_REQUESTS=3,MAX_GPU_TILES=40;
 const failed=new Map();
-let active=0,lastStatus="",frameStamp=0;
+let active=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vlen=v=>Math.hypot(...v)||1;
 const vnorm=v=>v.map(x=>x/vlen(v));
@@ -82,26 +85,24 @@ function nearTile(z,x,y){
 }
 function tileKey(z,x,y){return z+"-"+x+"-"+y;}
 function choose(){
- const coarse=[],finer=[];
- const rad=clamp(distance*.7+380,570,1800);
- for(let y=0;y<config.levels[0].rows;y++)for(let x=0;x<config.levels[0].cols;x++){
-   const d=nearTile(0,x,y);
-   if(d<rad+500)coarse.push({z:0,x,y,d,key:tileKey(0,x,y)});
- }
- coarse.sort((a,b)=>a.d-b.d);
- coarse.length=Math.min(coarse.length,MAX_COARSE_VISIBLE);
- if(enableDetail&&distance<1500){
-   const groups=coarse.filter(t=>t.d<Math.min(900,distance*.78+200))
-     .slice(0,MAX_FINE_GROUPS);
-   for(const g of groups){
-     for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++){
-       const x=g.x*2+dx,y=g.y*2+dy;
-       finer.push({z:1,x,y,d:nearTile(1,x,y),key:tileKey(1,x,y),parent:g.key});
-     }
-   }
- }
- return {coarse,finer};
+ const aspect=Math.max(.5,(canvas.clientWidth||900)/(canvas.clientHeight||600));
+ return planner.choose({yaw,pitch,distance,panX,panNorth,vertical,aspect,enableDetail});
 }
+function childIds(parent){
+ const children=[];
+ for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)
+   children.push(tileKey(1,parent.x*2+dx,parent.y*2+dy));
+ return children;
+}
+function lerpFade(parent,target,now){
+ const state=transitions.get(parent)||{value:0,last:now};
+ const dt=clamp((now-state.last)/480,0,1);
+ const value=target>state.value?Math.min(target,state.value+dt):
+   Math.max(target,state.value-dt);
+ transitions.set(parent,{value,last:now});
+ return value;
+}
+
 function scheduleFetch(tile){
  if(cache.has(tile.key)||pending.has(tile.key)||queue.some(q=>q.key===tile.key)||
     (failed.get(tile.key)??0)>Date.now())return;
@@ -149,20 +150,22 @@ function makeBuffer(data,target){
 function createGpuTile(d,bitmap){
  if(d.validVertices<=0||d.width*d.height>50000||d.texture.width>1024||
     bitmap.width!==d.texture.width||bitmap.height!==d.texture.height)throw Error("Invalid tile dimensions");
- const local=binary(d.positionsF32LE,Float32Array),indices=binary(d.trianglesU16LE,Uint16Array);
- if(local.length!==d.width*d.height*3||indices.length!==d.triangles*3)
-   throw Error("Malformed tile geometry");
- const pos=new Float32Array(local.length),uv=new Float32Array(d.width*d.height*2);
+ const local=binary(d.positionsF32LE,Float32Array),
+   uv=binary(d.uvsF32LE,Float32Array),
+   indices=binary(d.trianglesU16LE,Uint16Array);
+ if(d.seam?.version!==2||d.renderVertices<d.width*d.height||
+    local.length!==d.renderVertices*3||uv.length!==d.renderVertices*2||
+    indices.length!==d.triangles*3)
+   throw Error("Malformed versioned edge-apron tile geometry");
+ const pos=new Float32Array(local.length);
  for(let i=0;i<local.length/3;i++){
-   const j=i*3,row=Math.floor(i/d.width),col=i%d.width;
+   const j=i*3;
    pos[j]=local[j]+d.originMeters[0];
    pos[j+1]=local[j+1]+d.originMeters[1];
    pos[j+2]=Number.isFinite(local[j+2])?local[j+2]:BASE_HEIGHT;
-   uv[i*2]=(col+.5)/d.width;
-   uv[i*2+1]=(row+.5)/d.height;
  }
  // All triangle indices originate in the measured SDK mesh; NoData is never drawn.
- if(indices.some(i=>i>=local.length/3))throw Error("Tile triangle index out of range");
+ if(indices.some(i=>i>=d.renderVertices))throw Error("Tile triangle index out of range");
  const positions=makeBuffer(pos,gl.ARRAY_BUFFER),uvs=makeBuffer(uv,gl.ARRAY_BUFFER);
  const faces=makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER);
  const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
@@ -189,11 +192,17 @@ function evict(keep){
 }
 function update(){
  if(!config||!gl)return;
- const {coarse,finer}=choose();
+ selection=choose();
+ const {coarse,finer}=selection;
  const ids=new Set();
  // Coarse first, then four fine children per nearby area (atomic LOD switch).
  for(const t of coarse){ids.add(t.key);scheduleFetch(t);}
  for(const t of finer){ids.add(t.key);scheduleFetch(t);}
+ for(const t of coarse){
+   if((transitions.get(t.key)?.value??0)>.001){
+     for(const child of childIds(t))ids.add(child);
+   }
+ }
  // Drop stale requests that have not started. Disk-cached requests can be reused later.
  const desired=new Set([...coarse,...finer].map(t=>t.key));
  for(let i=queue.length-1;i>=0;i--)if(!desired.has(queue[i].key))queue.splice(i,1);
@@ -230,9 +239,18 @@ function startGpu(){
  const fragmentSrc=[
    "precision mediump float;",
    "uniform sampler2D uTexture;",
+   "uniform mediump float uFade;",
+   "uniform int uPass;",
    "varying mediump vec2 vUv; varying mediump float vElevation;",
    "void main(){",
-   " vec4 rgba=texture2D(uTexture,vUv);",
+   " vec2 cell=mod(floor(gl_FragCoord.xy),4.0);",
+   " vec2 low=mod(cell,2.0),hi=floor(cell*.5);",
+   " float lo=2.0*low.x+3.0*low.y-4.0*low.x*low.y;",
+   " float up=2.0*hi.x+3.0*hi.y-4.0*hi.x*hi.y;",
+   " float threshold=(lo*4.0+up+.5)/16.0;",
+   " if(uPass==1 && uFade<threshold)discard;",
+   " if(uPass==0 && uFade>=threshold)discard;",
+   " vec4 rgba=texture2D(uTexture,vUv);
    " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
    " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",
    " gl_FragColor=vec4(colour,1.0);",
@@ -246,7 +264,7 @@ function startGpu(){
  gl.useProgram(program);
  attrs={pos:gl.getAttribLocation(program,"aPosition"),uv:gl.getAttribLocation(program,"aUv")};
  uni=Object.fromEntries(["uForward","uRight","uUp","uTarget","uVertical","uAspect",
-   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture"]
+   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture","uFade","uPass"]
    .map(n=>[n,gl.getUniformLocation(program,n)]));
  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.055,.12,.19,1);
  gl.uniform1f(uni.uBase,BASE_HEIGHT);
@@ -283,34 +301,43 @@ function draw(){
  gl.uniform1f(uni.uDistance,distance);
  gl.uniform1f(uni.uNear,.1);
  gl.uniform1f(uni.uFar,15000);
- const {coarse,finer}=choose();
- const finePerParent=new Map();
- for(const f of finer){if(!finePerParent.has(f.parent))finePerParent.set(f.parent,[]);
-   finePerParent.get(f.parent).push(f);}
- const render=[];
- for(const t of coarse){
-   const children=finePerParent.get(t.key)||[];
-   if(children.length===4&&children.every(k=>cache.has(k.key))){
-     for(const kid of children)render.push(kid.key);
-   }else if(cache.has(t.key))render.push(t.key);
+ const {coarse,finer}=selection;
+ const requesting=new Set(finer.map(t=>t.parent));
+ const now=performance.now(),render=[];
+ let animating=false;
+ for(const parent of coarse){
+   const ids=childIds(parent),ready=ids.every(id=>cache.has(id));
+   const fineRequested=requesting.has(parent.key);
+   const target=fineRequested&&ready?1:0;
+   let mix=lerpFade(parent.key,target,now);
+   if(!cache.has(parent.key)&&ready)mix=1;
+   if(mix>.001&&ready){
+     for(const id of ids)render.push({id,pass:1,fade:mix});
+   }
+   if(mix<.999&&cache.has(parent.key))
+     render.push({id:parent.key,pass:0,fade:mix});
+   if(mix>.001&&mix<.999)animating=true;
  }
  let faces=0;
- for(const id of render){
-   const t=cache.get(id);
+ for(const draw of render){
+   const t=cache.get(draw.id);
    if(!t)continue;
    t.lastUsed=Date.now();
+   gl.uniform1f(uni.uFade,draw.fade);
+   gl.uniform1i(uni.uPass,draw.pass);
    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
    bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
    gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
    faces+=t.count/3;
  }
+ if(animating)requestDraw();
  $("visible").textContent=String(render.length);
  $("resident").textContent=String(cache.size);
  $("pending").textContent=String(active+queue.length);
  $("faces").textContent=faces.toLocaleString("cs-CZ");
  $("distance").textContent=Math.round(distance)+" m";
- $("status").textContent=enableDetail&&distance<1500?"Detailní 2m dlaždice podle pohledu":"Přehledová 12m síť";
+ $("status").textContent=selection.detailActive?"Plynulý přechod detailu 2 m podle kamery":"Přehled 12 m · přesný výběr podle kamery";
 }
 function move(dx,dy){
  // Horizontal local world pan. Clamp to published Prague coverage.
@@ -379,6 +406,8 @@ window.addEventListener("resize",requestDraw);
   config=await response.json();
   if(config.status!=="real-remote-data"||config.levels.length!==2)
     throw Error("Neplatná konfigurace skutečných dlaždic");
+  planner=window.OpenLaunchTilePlanner?.createPlanner(config);
+  if(!planner)throw Error("Chybí modul pro výběr viditelných dlaždic");
   startGpu();
   update();
  }catch(err){
