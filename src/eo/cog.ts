@@ -6,7 +6,7 @@ import {
   validateRaster, worldToPixel,
 } from "./raster.js";
 import {
-  inflateDeflate, readCrs, readSample, readTransform, TiffDirectory,
+  inflateDeflate, readCrs, readSample, readTransform, undoFloatPredictor, TiffDirectory,
   undoHorizontalPredictor,
 } from "./geotiff.js";
 
@@ -122,8 +122,8 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
     if(![8,16,32,64].includes(bps)||
       !([1,2].includes(format)&&[8,16,32].includes(bps)||format===3&&[32,64].includes(bps)))
       throw new RangeError("Unsupported COG sample format");
-    if(![1,5,8,32946].includes(compression)||![1,2].includes(predictor)||
-      (format===3&&predictor===2))throw new RangeError("Unsupported COG compression/predictor");
+    if(![1,5,8,32946].includes(compression)||![1,2,3].includes(predictor)||
+      (format===3&&predictor===2)||(predictor===3&&format!==3))throw new RangeError("Unsupported COG compression/predictor");
     const crs=readCrs(tiff),transform=readTransform(tiff);
     const blockWidth=tiff.scalar(322,width),blockHeight=tiff.scalar(323,tiff.scalar(278,height));
     const tiled=tiff.numbers(322)!==undefined;
@@ -168,6 +168,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
         if(inflated.length!==expected)throw new RangeError("COG tile decompressed size mismatch");
         const raw=new Uint8Array(inflated);
         if(predictor===2)undoHorizontalPredictor(raw,blockWidth,decodedHeight,bps,tiff!.littleEndian);
+        if(predictor===3)undoFloatPredictor(raw,blockWidth,decodedHeight,bps,tiff!.littleEndian);
         const view=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
         const cx0=Math.max(c0,bx*blockWidth),cx1=Math.min(c1,(bx+1)*blockWidth,width);
         const ry0=Math.max(r0,by*blockHeight),ry1=Math.min(r1,(by+1)*blockHeight,height);
