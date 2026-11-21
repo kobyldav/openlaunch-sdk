@@ -97,3 +97,51 @@ estimates are approximate and only returned when the full profile has valid
 DEM samples. The displayed 1–6x exaggeration **does not change measured heights**.
 These are 30m Copernicus *surface* observations, not engineering-grade
 survey measurements.
+
+## High-resolution Czech DMP OK elevation source (2026)
+
+The new, officially published **ČÚZK DMP OK** supersedes the older DMP 1G.
+ČÚZK's photogrammetric surface raster has a native **0.5m pixel size**
+and contains roofs, vegetation and terrain. The SDK downloads raw
+single-band **F32 TIFF elevation**, not hillshade imagery, from:
+
+- Service: https://ags.cuzk.gov.cz/arcgis2/rest/services/dmp/ImageServer
+- Metadata: https://geoportal.gov.cz/php/micka/en/record/basic/CZ-CUZK-DMPOK
+- Copyright and licence: **© ČÚZK, CC BY 4.0**
+  (https://creativecommons.org/licenses/by/4.0/)
+- Height datum: **Bpv (Baltic 1957)**, not EGM2008. No height mixing.
+
+**Run detail mode from Windows CMD:**
+
+```cmd
+cd /d "%USERPROFILE%\Desktop\openlaunch-terrain"
+git switch feature/terrain-prague-real-dem
+git pull --ff-only origin feature/terrain-prague-real-dem
+npm run example:terrain-prague-detail
+start "" "test-results\terrain-prague-detail\index.html"
+```
+
+Default AOI: `[14.416, 50.086, 14.422, 50.090]` Prague.
+The resulting **2 m mesh** has 47,945 actual sampled vertices and
+95,016 triangles. Source height pixels are native **0.5m**, but 2m grid
+is used for manageable browser performance. Unlike simulated upsampling
+of the GLO-30 30m DSM, the height source genuinely contains finer detail.
+The RGB still comes from native **10m Sentinel-2**, so geometry is
+sharper than image texture; future work can add real ČÚZK orthophoto.
+
+SDK usage:
+
+```ts
+const map=await new OpenLaunch().terrain.load({
+  area:bbox(14.416,50.086,14.422,50.090),
+  elevationProvider:"cuzk-dmpok",resolutionM:2,
+  startDate:"2025-06-01",endDate:"2025-09-30"
+});
+console.log(map.metadata.verticalDatum); // Bpv (Baltic 1957)
+```
+
+Bounded to max 9 km² AOI and 50,000 mesh vertices. Choose a sufficiently
+small region at resolution >=0.5m. Service errors or NoData fail explicitly:
+no synthetic interpolation or undisclosed global-DEM fallback. The height
+sample grid is resampled from an actual 0.5m raster; this does not imply
+0.5m precision in the rendered 2m model. Facade meshes are not reconstructed.

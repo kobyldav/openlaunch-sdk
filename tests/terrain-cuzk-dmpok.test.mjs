@@ -94,6 +94,8 @@ test("SDK integrates DMP OK measured surface with real-image semantics and disti
   assert.equal(map.metadata.elevationProvider,"cuzk-dmpok");
   assert.equal(map.metadata.verticalDatum,"Bpv (Baltic 1957)");
   assert.equal(map.metadata.demNativeResolutionM,.5);
+  assert.match(map.metadata.demAttribution,/ČÚZK.*CC BY 4\.0/);
+  assert.match(map.metadata.demLicenseUrl,/creativecommons\.org\/licenses\/by\/4\.0/);
   assert.equal(map.metadata.demTileUrls.length,0);
   assert.ok(map.elevation.width>50);
   assert.equal(map.mesh.validVertices,map.elevation.values.length);

@@ -49,7 +49,7 @@ export interface RealTerrainMap {
     demSource:"Copernicus DEM GLO-30 public AWS COG"|"ČÚZK DMP OK ArcGIS ImageServer";
     demTileUrls:string[]; verticalDatum:"EGM2008 geoid"|"Bpv (Baltic 1957)";
     elevationProvider:"copernicus-glo30"|"cuzk-dmpok"; demNativeResolutionM:number;
-    demServiceUrl?:string;
+    demServiceUrl?:string; demAttribution?:string; demLicenseUrl?:string;
     sampledHeights:number; totalHeights:number; sampledColors:number;
     textureGroundResolutionM:number; textureValidPixels:number;
     heightMinM:number; heightMaxM:number;
@@ -208,7 +208,11 @@ export async function loadRealTerrain(o:RealTerrainLoadOptions):Promise<RealTerr
       imagerySource:rgb.provider,imageryNativeResolutionM:rgb.nativeResolutionM,
       demSource,demTileUrls:tiles.map(t=>t.url),verticalDatum,
       elevationProvider,demNativeResolutionM,
-      ...(elevationProvider==="cuzk-dmpok"?{demServiceUrl:CUZK_DMPOK_SERVICE}:{}),
+      ...(elevationProvider==="cuzk-dmpok"?{
+        demServiceUrl:CUZK_DMPOK_SERVICE,
+        demAttribution:"© ČÚZK — DMP OK, CC BY 4.0",
+        demLicenseUrl:"https://creativecommons.org/licenses/by/4.0/"
+      }:{}),
       sampledHeights:statistics.valid,totalHeights:heights.length,sampledColors:colored,
       textureGroundResolutionM,textureValidPixels,
       heightMinM:statistics.min!,heightMaxM:statistics.max!,

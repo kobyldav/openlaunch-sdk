@@ -26,6 +26,8 @@ function objForTerrain(map) {
   const a=[
     "# OpenLaunch actual measured DSM mesh with native Sentinel-2 image texture",
     "# OBJ axes: X=east, Y=elevation above "+map.metadata.verticalDatum+", Z=north (metres)",
+    "# Elevation source: "+map.metadata.demSource,
+    "# Attribution: "+(map.metadata.demAttribution??map.metadata.demSource),
     "mtllib terrain.mtl",
     "o prague_real_terrain"
   ];

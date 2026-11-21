@@ -81,7 +81,7 @@ canvas:active{cursor:grabbing}
  <div class="info">
   <div><strong>Družicový snímek</strong><p id="acquired"></p><p id="cloud" class="fine"></p></div>
   <div><strong>Textura a geometrie</strong><p id="texture"></p><p id="geometry" class="fine"></p></div>
-  <div><strong>Výšky a původ</strong><p id="heights"></p><p id="coverage" class="fine"></p></div>
+  <div><strong>Výšky a původ</strong><p id="heights"></p><p id="coverage" class="fine"></p><p id="demAttribution" class="fine"></p></div>
  </div>
 </main>
 <script>
@@ -102,6 +102,7 @@ $("texture").textContent=tex.width+" × "+tex.height+" px · "+m.textureGroundRe
 $("geometry").textContent=D.width+" × "+D.height+" výškových bodů · "+D.report.mesh.triangles+" trojúhelníků · síť "+m.groundResolutionM+" m, zdroj "+m.demNativeResolutionM+" m." ;
 $("heights").textContent=m.demSource+": "+minH.toFixed(1)+" až "+maxH.toFixed(1)+" m ("+m.verticalDatum+")";
 $("profileDatum").textContent=m.verticalDatum;
+$("demAttribution").textContent=m.demAttribution??"";
 $("coverage").textContent=m.sampledHeights+"/"+m.totalHeights+" platných výšek · "+m.textureValidPixels+" skutečných RGB texelů.";
 const webgl=canvas.getContext("webgl",{alpha:false,antialias:true,preserveDrawingBuffer:false});
 const n=points.length/3;
