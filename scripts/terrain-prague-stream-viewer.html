@@ -20,6 +20,16 @@ label{white-space:nowrap}
 .stats>div{background:#142c41;border:1px solid #31506a;padding:12px;border-radius:9px}
 .stats strong{display:block;font-size:18px;color:#a8e1d5;font-variant-numeric:tabular-nums}
 #error{color:#ffae9e;min-height:1.4em}
+.map-wrap{position:relative}
+.map-pin{position:absolute;pointer-events:none;transform:translate(-50%,-100%);display:none;
+ font-weight:700;font-size:12px;background:#082739d9;border:2px solid #7de4e2;
+ border-radius:20px;padding:4px 8px;color:#fff;box-shadow:0 2px 8px #000}
+.map-pin.b{border-color:#f5bb83}
+#measurement{margin:12px 0;padding:14px;border:1px solid #365570;border-radius:9px;background:#132b3e}
+#measurement[hidden]{display:none}
+.measure-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.measure-grid>div{line-height:1.8}
+#height-profile{width:100%;max-width:850px;height:170px;background:#0b2033;border-radius:8px;margin-top:10px}
 a{color:#9cd1fc}
 </style>
 </head>
@@ -33,9 +43,26 @@ a{color:#9cd1fc}
   <button id="reset">Střed Prahy</button>
   <button id="detail">Detail: automaticky</button>
   <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="5" step=".25" value="1"> <b id="verticalValue">1×</b></label>
+  <label><input id="inspect-mode" type="checkbox"> Měřit skutečný terén</label>
+  <button id="clear-inspect" disabled>Vymazat body</button>
+  <button id="export-profile" disabled>Profil CSV</button>
   <span id="status" class="small">Připravuji mapu…</span>
  </div>
- <canvas id="map" aria-label="3D interaktivní mapa Prahy načítaná po dlaždicích"></canvas>
+ <div class="map-wrap">
+  <canvas id="map" aria-label="3D interaktivní mapa Prahy načítaná po dlaždicích"></canvas>
+  <span class="map-pin" id="pinA">A</span>
+  <span class="map-pin b" id="pinB">B</span>
+ </div>
+ <section id="measurement" hidden>
+  <strong>Výšky ČÚZK DMP OK (Bpv) · původní změřené trojúhelníky</strong>
+  <div class="measure-grid">
+   <div id="pointA">A: klikni na terén pro první bod.</div>
+   <div id="pointB">B: vyber druhý bod.</div>
+   <div id="measure-distance">Vzdálenost: —</div>
+  </div>
+  <canvas id="height-profile" width="850" height="170" aria-label="Výškový profil ze skutečného DEM"></canvas>
+  <p class="small" id="measure-note">Klikni bez táhnutí na dva body. Chybějící dlaždice nejsou doplňovány umělými výškami. Výšky jsou Bpv; délky jsou orientační lokální metry.</p>
+ </section>
  <div class="stats">
   <div>Viditelné dlaždice<strong id="visible">0</strong></div>
   <div>Načtené v paměti<strong id="resident">0</strong></div>
@@ -48,12 +75,14 @@ a{color:#9cd1fc}
  <p id="error" aria-live="polite"></p>
 </main>
 <script src="/api/visibility.js"></script>
+<script src="/api/inspect.js"></script>
 <script>
 "use strict";
 const $=id=>document.getElementById(id),canvas=$("map");
 let config,gl,program,attrs,uni,planner,needsDraw=false;
 let selection={coarse:[],finer:[],detailActive:false};
 const transitions=new Map();
+let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
 let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
 const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set();
 const MAX_REQUESTS=3,MAX_GPU_TILES=40;
@@ -175,7 +204,13 @@ function createGpuTile(d,bitmap){
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
- return {positions,uvs,faces,texture,count:indices.length};
+ // CPU arrays retain only source elevations, independent of GPU color and skirts.
+ const inspectorPositions=new Float32Array(pos);
+ for(let i=0;i<local.length/3;i++)if(!Number.isFinite(local[i*3+2]))
+   inspectorPositions[i*3+2]=NaN;
+ return {positions,uvs,faces,texture,count:indices.length,
+   inspect:{positions:inspectorPositions,indices,
+     measuredTriangles:d.measuredTriangles,width:d.width,height:d.height}};
 }
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
@@ -318,6 +353,7 @@ function draw(){
      render.push({id:parent.key,pass:0,fade:mix});
    if(mix>.001&&mix<.999)animating=true;
  }
+ lastRendered=render;
  let faces=0;
  for(const draw of render){
    const t=cache.get(draw.id);
@@ -338,7 +374,138 @@ function draw(){
  $("faces").textContent=faces.toLocaleString("cs-CZ");
  $("distance").textContent=Math.round(distance)+" m";
  $("status").textContent=selection.detailActive?"Plynulý přechod detailu 2 m podle kamery":"Přehled 12 m · přesný výběr podle kamery";
+ renderMeasurePins();
 }
+
+function inspectorTiles(){
+ const active=new Map();
+ for(const item of lastRendered){
+   // During a screen-door transition, choose only the predominant LOD,
+   // so picking does not accidentally prefer a hidden overlapping triangle.
+   if(item.pass===1&&item.fade<.5)continue;
+   if(item.pass===0&&item.fade>=.5)continue;
+   const t=cache.get(item.id);
+   if(t?.inspect)active.set(item.id,{id:item.id,...t.inspect});
+ }
+ return [...active.values()];
+}
+function inspectionCamera(){return {yaw,pitch,panX,panNorth,vertical,distance};}
+function renderMeasurePins(){
+ if(!inspector||!config)return;
+ const c=inspector.cameraBasis(inspectionCamera());
+ const w=canvas.clientWidth,h=canvas.clientHeight,tan=Math.tan(Math.PI/8),aspect=w/Math.max(1,h);
+ measuredPoints.forEach((point,i)=>{
+   const pin=$(i===0?"pinA":"pinB");
+   const world=[point.east,(point.elevationM-BASE_HEIGHT)*vertical,-point.north];
+   const rel=world.map((v,j)=>v-c.target[j]);
+   const depth=vdot(rel,c.forward)+distance;
+   const sx=vdot(rel,c.right)/Math.max(.01,depth*tan*aspect);
+   const sy=vdot(rel,c.up)/Math.max(.01,depth*tan);
+   if(depth<=0||Math.abs(sx)>1.05||Math.abs(sy)>1.05){pin.style.display="none";return;}
+   pin.style.left=((sx+1)*w/2)+"px";pin.style.top=((1-sy)*h/2)+"px";
+   pin.style.display="block";
+ });
+ for(let i=measuredPoints.length;i<2;i++)$(i===0?"pinA":"pinB").style.display="none";
+}
+function fmtPoint(label,p){
+ if(!p)return label+": klikni na skutečný terén.";
+ const c=p.coords;
+ return label+": "+c.latitudeDeg.toFixed(6)+"° N · "+c.longitudeDeg.toFixed(6)+
+   "° E · "+p.elevationM.toFixed(2)+" m Bpv";
+}
+function drawProfile(){
+ const canvasProfile=$("height-profile"),ctx=canvasProfile.getContext("2d");
+ if(!ctx)return;
+ const w=canvasProfile.width,h=canvasProfile.height;
+ ctx.clearRect(0,0,w,h);
+ const data=currentProfile?.samples;
+ if(!data?.length)return;
+ const valid=data.filter(p=>p.elevationM!==null);
+ if(!valid.length)return;
+ let lo=Math.min(...valid.map(p=>p.elevationM)),hi=Math.max(...valid.map(p=>p.elevationM));
+ const pad=Math.max(2,(hi-lo)*.12);lo-=pad;hi+=pad;
+ const L=65,R=20,T=18,B=36,dx=Math.max(.001,currentProfile.horizontalDistanceM);
+ ctx.strokeStyle="#3b607c";ctx.lineWidth=1;ctx.beginPath();
+ ctx.moveTo(L,T);ctx.lineTo(L,h-B);ctx.lineTo(w-R,h-B);ctx.stroke();
+ ctx.font="12px system-ui";ctx.fillStyle="#c2dbee";
+ ctx.fillText(hi.toFixed(1)+" m",5,T+8);
+ ctx.fillText(lo.toFixed(1)+" m",5,h-B);
+ ctx.fillText("0 m",L,h-10);
+ ctx.fillText(dx.toFixed(0)+" m",w-R-58,h-10);
+ ctx.lineWidth=2.2;ctx.strokeStyle="#65dfd0";ctx.beginPath();
+ let started=false;
+ for(const p of data){
+   if(p.elevationM===null){started=false;continue;}
+   const x=L+(w-L-R)*(p.distanceM/dx),
+     y=T+(h-T-B)*(hi-p.elevationM)/(hi-lo);
+   if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+ }
+ ctx.stroke();
+}
+function inspectAt(clientX,clientY){
+ if(!inspector||!config)return;
+ const rect=canvas.getBoundingClientRect();
+ const x=clientX-rect.left,y=clientY-rect.top;
+ if(x<0||y<0||x>rect.width||y>rect.height)return;
+ const ray=inspector.screenRay(inspectionCamera(),x,y,rect.width,rect.height);
+ const hit=inspector.pickMeasured(inspectorTiles(),ray,{vertical,baseHeight:BASE_HEIGHT});
+ if(!hit){
+   $("measure-note").textContent="Na tomto místě nejsou ve vykreslených dlaždicích platné změřené trojúhelníky. Přibliž mapu nebo vyčkej na načtení; žádná výška se nedopočítává.";
+   return;
+ }
+ hit.coords=inspector.geoFromLocal(hit.east,hit.north,config);
+ if(measuredPoints.length>=2)measuredPoints=[];
+ measuredPoints.push(hit);
+ currentProfile=null;
+ if(measuredPoints.length===2){
+   const [a,b]=measuredPoints;
+   currentProfile=inspector.profile(inspectorTiles(),a,b,{samples:32,
+     config,vertical,baseHeight:BASE_HEIGHT});
+   const d=currentProfile.horizontalDistanceM,dz=b.elevationM-a.elevationM;
+   $("measure-distance").textContent="Vodorovně "+d.toFixed(1)+" m · Δh "+
+     (dz>=0?"+":"")+dz.toFixed(2)+" m · sklon "+
+     (d>0?(100*dz/d).toFixed(2):"—")+" % · profil "+
+     currentProfile.validSamples+"/32 platných";
+   $("export-profile").disabled=false;
+   $("measure-note").textContent="Profil je vzorkovaný pouze ze skutečných dostupných DEM trojúhelníků. Neplatné úseky zůstávají prázdné; přesun kamery může změnit dostupnost dat.";
+ }else{
+   $("measure-distance").textContent="Vyber druhý bod pro vzdálenost a výškový profil.";
+   $("export-profile").disabled=true;
+ }
+ $("pointA").textContent=fmtPoint("A",measuredPoints[0]);
+ $("pointB").textContent=fmtPoint("B",measuredPoints[1]);
+ $("clear-inspect").disabled=false;
+ drawProfile();renderMeasurePins();
+}
+function clearInspection(){
+ measuredPoints=[];currentProfile=null;
+ $("pointA").textContent=fmtPoint("A");
+ $("pointB").textContent=fmtPoint("B");
+ $("measure-distance").textContent="Vzdálenost: —";
+ $("measure-note").textContent="Klikni bez táhnutí na dva body. Bez naměřených DEM dat zůstávají hodnoty prázdné.";
+ $("clear-inspect").disabled=true;$("export-profile").disabled=true;
+ drawProfile();renderMeasurePins();
+}
+$("inspect-mode").onchange=()=>{
+ $("measurement").hidden=!$("inspect-mode").checked;
+ if($("inspect-mode").checked)drawProfile();
+};
+$("clear-inspect").onclick=clearInspection;
+$("export-profile").onclick=()=>{
+ if(!currentProfile)return;
+ const rows=["distance_m,longitude_deg,latitude_deg,elevation_Bpv_m",
+   ...currentProfile.samples.map(p=>[
+     p.distanceM.toFixed(3),p.longitudeDeg.toFixed(8),
+     p.latitudeDeg.toFixed(8),p.elevationM===null?"":p.elevationM.toFixed(3)
+   ].join(","))];
+ const csv=rows.join("\r\n")+"\r\n";
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");a.href=url;a.download="praha-dem-profil-Bpv.csv";
+ document.body.append(a);a.click();a.remove();
+ URL.revokeObjectURL(url);
+};
+
 function move(dx,dy){
  // Horizontal local world pan. Clamp to published Prague coverage.
  const bound=worldFor(config.bounds[2],config.bounds[3]);
@@ -357,9 +524,11 @@ $("vertical").oninput=()=>{vertical=Number($("vertical").value);
 canvas.oncontextmenu=e=>e.preventDefault();
 const pointers=new Map();
 let lastPinch=0,previous={x:0,y:0};
+const downPoints=new Map();
 canvas.addEventListener("pointerdown",e=>{
  e.preventDefault();canvas.setPointerCapture(e.pointerId);
  pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,mode:e.button===2||e.shiftKey?"pan":"orbit"});
+ downPoints.set(e.pointerId,{x:e.clientX,y:e.clientY,button:e.button,shift:e.shiftKey});
  previous={x:e.clientX,y:e.clientY};lastPinch=0;
 });
 canvas.addEventListener("pointermove",e=>{
@@ -380,7 +549,14 @@ canvas.addEventListener("pointermove",e=>{
  }
 });
 for(const name of ["pointerup","pointercancel","lostpointercapture"]){
- canvas.addEventListener(name,e=>{pointers.delete(e.pointerId);lastPinch=0;});
+ canvas.addEventListener(name,e=>{
+   const down=downPoints.get(e.pointerId);
+   if(name==="pointerup"&&$("inspect-mode").checked&&
+      down?.button===0&&!down.shift&&pointers.size===1&&
+      Math.hypot(e.clientX-down.x,e.clientY-down.y)<=6)
+     inspectAt(e.clientX,e.clientY);
+   downPoints.delete(e.pointerId);pointers.delete(e.pointerId);lastPinch=0;
+ });
 }
 canvas.addEventListener("wheel",e=>{
  e.preventDefault();
@@ -406,6 +582,8 @@ window.addEventListener("resize",requestDraw);
   config=await response.json();
   if(config.status!=="real-remote-data"||config.levels.length!==2)
     throw Error("Neplatná konfigurace skutečných dlaždic");
+  inspector=window.OpenLaunchTerrainInspect;
+  if(!inspector)throw Error("Chybí modul pro měření skutečných výšek");
   planner=window.OpenLaunchTilePlanner?.createPlanner(config);
   if(!planner)throw Error("Chybí modul pro výběr viditelných dlaždic");
   startGpu();
