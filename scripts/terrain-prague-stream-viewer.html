@@ -54,6 +54,7 @@ let config,gl,program,attrs,uni,revision=0,needsDraw=false;
 let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
 const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set();
 const MAX_REQUESTS=3,MAX_GPU_TILES=32,MAX_COARSE_VISIBLE=12,MAX_FINE_GROUPS=2;
+const failed=new Map();
 let active=0,lastStatus="",frameStamp=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const vlen=v=>Math.hypot(...v)||1;
@@ -102,7 +103,8 @@ function choose(){
  return {coarse,finer};
 }
 function scheduleFetch(tile){
- if(cache.has(tile.key)||pending.has(tile.key)||queue.some(q=>q.key===tile.key))return;
+ if(cache.has(tile.key)||pending.has(tile.key)||queue.some(q=>q.key===tile.key)||
+    (failed.get(tile.key)??0)>Date.now())return;
  queue.push(tile);
 }
 function pump(){
@@ -126,6 +128,7 @@ function pump(){
      }finally{bitmap.close?.();}
      $("error").textContent="";
    })().catch(err=>{
+     failed.set(tile.key,Date.now()+30_000);
      console.error(tile.key,err);
      $("error").textContent="Dlaždice "+tile.key+": "+String(err.message||err)+
        " · Dříve načtené dlaždice zůstávají viditelné.";
