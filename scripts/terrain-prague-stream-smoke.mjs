@@ -37,11 +37,18 @@ try{
   assert.match(tile.imagerySource,/ORTOFOTO_WM/);
   assert.ok(tile.validVertices>2000&&tile.validVertices<50000);
   assert.ok(tile.triangles>4000);
+  assert.equal(tile.seam.version,2);
+  assert.match(tile.seam.provenance,/visual-only/);
+  assert.ok(tile.seam.apronTriangles>0&&tile.seam.skirtTriangles>0);
+  assert.ok(tile.renderVertices>tile.width*tile.height&&tile.renderVertices<65536);
+  assert.ok(tile.seam.maxExtensionM<=7,"12m overview grid aprons stay within one ground cell");
   assert.ok(tile.width*tile.height<=50000);
   assert.ok(tile.originMeters.every(Number.isFinite));
   const positions=Buffer.from(tile.positionsF32LE,"base64");
   const triangles=Buffer.from(tile.trianglesU16LE,"base64");
-  assert.equal(positions.byteLength,tile.width*tile.height*3*4);
+  assert.equal(positions.byteLength,tile.renderVertices*3*4);
+  const uvs=Buffer.from(tile.uvsF32LE,"base64");
+  assert.equal(uvs.byteLength,tile.renderVertices*2*4);
   assert.equal(triangles.byteLength,tile.triangles*3*2);
   const texture=await fetch(origin+tile.texture.file,{signal:AbortSignal.timeout(20000)});
   assert.equal(texture.status,200);
@@ -53,13 +60,13 @@ try{
   assert.ok(decoded.validPixels>10000);
   // Verify persisted files can be read by the server on repeat requests.
   const [cachedJson,cachedPng]=await Promise.all([
-    readFile(cache+"/v1-0-3-3.json"),readFile(cache+"/v1-0-3-3.png")
+    readFile(cache+"/v2-0-3-3.json"),readFile(cache+"/v2-0-3-3.png")
   ]);
   assert.equal(JSON.parse(cachedJson.toString()).key,"0-3-3");
   assert.equal(cachedPng.byteLength,pngBytes.byteLength);
   const again=await fetch(origin+"/api/tiles/0/3/3.json");
   assert.equal(again.status,200);
-  console.log("PASS real streamed Prague tile 0-3-3: "+
+  console.log("PASS seam-safe real streamed Prague tile 0-3-3: "+
     tile.validVertices+" measured DMP OK vertices, "+tile.triangles+
     " triangles, "+decoded.width+"×"+decoded.height+
     " genuine ČÚZK RGB pixels, cached and re-served");
