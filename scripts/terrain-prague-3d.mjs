@@ -28,6 +28,7 @@ function objForTerrain(map) {
     "# OBJ axes: X=east, Y=elevation above "+map.metadata.verticalDatum+", Z=north (metres)",
     "# Elevation source: "+map.metadata.demSource,
     "# Attribution: "+(map.metadata.demAttribution??map.metadata.demSource),
+    "# Imagery attribution: "+(map.metadata.imageryAttribution??map.metadata.imagerySource),
     "mtllib terrain.mtl",
     "o prague_real_terrain"
   ];
@@ -96,12 +97,14 @@ function rgbaPng(texture) {
 
 try {
   const elevationProvider=option("dem","copernicus-glo30");
-  console.log("Downloading real Sentinel-2 + "+elevationProvider+" for:",coords);
+  const imageryProvider=option("imagery","sentinel2");
+  console.log("Downloading "+imageryProvider+" imagery + "+elevationProvider+" heights for:",coords);
   const map=await new OpenLaunch().terrain.load({
     area:bbox(...coords),startDate:option("from","2025-06-01"),
     endDate:option("to","2025-09-30"),maxCloudPercent:numeric("max-cloud",35),
     resolutionM:numeric("resolution",elevationProvider==="cuzk-dmpok"?2:30),
-    elevationProvider
+    elevationProvider,imageryProvider,
+    orthophotoResolutionM:numeric("texture-resolution",0.5)
   });
   const {elevation,mesh,vertexRgb,rgbValid,imageryTexture,metadata}=map;
   const [west,south,east,north]=coords;
@@ -132,7 +135,7 @@ try {
     texture:{width:imageryTexture.width,height:imageryTexture.height,
       groundResolutionM:imageryTexture.groundResolutionM,validPixels:imageryTexture.validPixels,
       asset:"terrain-texture.png",format:"8-bit RGBA PNG"},
-    imageryPixelInterpretation:"native Sentinel-2 RGB texture independently aligned to the DSM",
+    imageryPixelInterpretation:imageryProvider==="cuzk-ortofoto"?"ČÚZK orthophoto RGB export reprojected to the DSM":"Native Sentinel-2 RGB bands aligned to the DSM",
     modelInterpretation:"2.5D "+metadata.demSource+", not building facade reconstruction"
   };
   const json={

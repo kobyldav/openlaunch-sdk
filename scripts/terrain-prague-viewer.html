@@ -41,7 +41,7 @@ canvas:active{cursor:grabbing}
 <main>
  <div class="toolbar">
   <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="6" step=".25" value="1"> <strong id="vertValue">1×</strong></label>
-  <label><input id="image" type="checkbox" checked> Barvy Sentinel-2</label>
+  <label><input id="image" type="checkbox" checked> Skutečná RGB textura</label>
   <label><input id="wire" type="checkbox"> Síť</label>
   <label><input id="measure" type="checkbox"> Měřit na mapě</label>
   <button id="clear-measure" disabled>Vymazat měření</button>
@@ -79,7 +79,7 @@ canvas:active{cursor:grabbing}
  ale nevytváří 10m přesnost výšek. Budovy ani fasády nejsou rekonstruovány.
  <span id="renderer"></span></p>
  <div class="info">
-  <div><strong>Družicový snímek</strong><p id="acquired"></p><p id="cloud" class="fine"></p></div>
+  <div><strong>Obrazový podklad</strong><p id="acquired"></p><p id="cloud" class="fine"></p><p id="imageryAttribution" class="fine"></p></div>
   <div><strong>Textura a geometrie</strong><p id="texture"></p><p id="geometry" class="fine"></p></div>
   <div><strong>Výšky a původ</strong><p id="heights"></p><p id="coverage" class="fine"></p><p id="demAttribution" class="fine"></p></div>
  </div>
@@ -95,10 +95,12 @@ const m=D.report.metadata,tex=D.texture;
 let yaw=-0.7,pitch=.69,zoom=1,needsDraw=false;
 const activePointers=new Map();
 let previousPinch=0;
-$("scene").textContent=m.sceneId+" · "+m.acquiredAt.slice(0,10);
-$("acquired").textContent=m.acquiredAt+" · Sentinel-2 L2A";
-$("cloud").textContent="Oblačnost celé scény: "+(m.sceneCloudPercent===null?"neuvedena":m.sceneCloudPercent.toFixed(3)+" %")+" (nikoli lokální maska mraků).";
-$("texture").textContent=tex.width+" × "+tex.height+" px · "+m.textureGroundResolutionM+" m/px";
+$("scene").textContent=m.imageryProvider==="cuzk-ortofoto"?"© ČÚZK · Ortofoto + DMP OK":m.sceneId+" · "+m.acquiredAt.slice(0,10);
+$("acquired").textContent=m.imageryProvider==="cuzk-ortofoto"?"ČÚZK Ortofoto ČR · datum konkrétních snímků služba neuvádí":m.acquiredAt+" · Sentinel-2 L2A";
+$("imageryAttribution").textContent=m.imageryAttribution??"";
+$("cloud").textContent=m.imageryProvider==="cuzk-ortofoto"?"Výřez českého leteckého ortofota. Originál 0,125 m, exportní krok "+m.textureGroundResolutionM+" m.":
+  "Oblačnost celé scény: "+(m.sceneCloudPercent===null?"neuvedena":m.sceneCloudPercent.toFixed(3)+" %")+" (nikoli lokální maska mraků).";
+$("texture").textContent=tex.width+" × "+tex.height+" px · "+m.textureGroundResolutionM+" m/px · "+m.imageryProvider;
 $("geometry").textContent=D.width+" × "+D.height+" výškových bodů · "+D.report.mesh.triangles+" trojúhelníků · síť "+m.groundResolutionM+" m, zdroj "+m.demNativeResolutionM+" m." ;
 $("heights").textContent=m.demSource+": "+minH.toFixed(1)+" až "+maxH.toFixed(1)+" m ("+m.verticalDatum+")";
 $("profileDatum").textContent=m.verticalDatum;

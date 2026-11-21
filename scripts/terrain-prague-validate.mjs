@@ -12,7 +12,7 @@ const [index,obj,mtl,png,report]=await Promise.all([
   readFile(join(out,"report.json"),"utf8").then(JSON.parse)
 ]);
 assert.equal(report.status,"real-data");
-assert.ok(["satellite-rgb-on-copernicus-dsm","satellite-rgb-on-cuzk-dmpok"].includes(report.kind));
+assert.ok(["satellite-rgb-on-copernicus-dsm","satellite-rgb-on-cuzk-dmpok","orthophoto-on-cuzk-dmpok"].includes(report.kind));
 assert.ok(index.includes("texture2D(uTexture,vUv)"),"HTML must implement true texture sampling");
 assert.ok(index.includes("terrain-texture.png"),"viewer must link to texture");
 assert.ok(index.includes('id="measure"')&&index.includes("pickTerrain("),
@@ -67,7 +67,15 @@ if(report.metadata.elevationProvider==="cuzk-dmpok"){
   assert.equal(report.metadata.verticalDatum,"Bpv (Baltic 1957)");
   assert.equal(report.metadata.demNativeResolutionM,0.5);
   assert.ok(report.metadata.groundResolutionM<=5);
-  assert.ok(report.mesh.vertices>validPixels,"fine surface geometry resolves more cells than 10m RGB");
+  if(report.metadata.imageryProvider==="cuzk-ortofoto"){
+    assert.equal(report.kind,"orthophoto-on-cuzk-dmpok");
+    assert.equal(report.metadata.imageryNativeResolutionM,0.125);
+    assert.ok(report.metadata.textureGroundResolutionM<=1);
+    assert.ok(validPixels>report.mesh.vertices,"fine ortho has more image samples than 2m height mesh");
+    assert.match(report.metadata.imageryAttribution,/ČÚZK.*CC BY 4/);
+  }else{
+    assert.ok(report.mesh.vertices>validPixels,"fine surface geometry resolves more cells than 10m Sentinel-2 RGB");
+  }
 }else{
   assert.ok(validPixels>report.mesh.vertices,"legacy native RGB texture should preserve more pixels than coarse DEM");
 }

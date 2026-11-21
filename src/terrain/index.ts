@@ -22,5 +22,6 @@ export * from "./sgm.js";
 
 export * from "./real-map.js";
 export * from "./cuzk-dmpok.js";
+export * from "./cuzk-ortho.js";
 
 export * from "./measure.js";
