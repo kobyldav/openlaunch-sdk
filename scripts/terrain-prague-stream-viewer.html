@@ -42,6 +42,7 @@ a{color:#9cd1fc}
  <div class="toolbar">
   <button id="reset">Střed Prahy</button>
   <button id="detail">Detail: automaticky</button>
+  <button id="buildings">Budovy: zapnuto</button>
   <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="5" step=".25" value="1"> <b id="verticalValue">1×</b></label>
   <label><input id="inspect-mode" type="checkbox"> Měřit skutečný terén</label>
   <button id="clear-inspect" disabled>Vymazat body</button>
@@ -68,9 +69,11 @@ a{color:#9cd1fc}
   <div>Načtené v paměti<strong id="resident">0</strong></div>
   <div>Rozpracované požadavky<strong id="pending">0</strong></div>
   <div>Zobrazené trojúhelníky<strong id="faces">0</strong></div>
+  <div>3D budovy<strong id="building-count">0</strong></div>
   <div>Vzdálenost kamery<strong id="distance">—</strong></div>
  </div>
  <p class="small">Levé tlačítko / jeden prst: otáčení · pravé tlačítko nebo Shift + tah: posunutí mapy · kolečko / dva prsty: přiblížení · šipky / WASD: posun. Při přiblížení se automaticky stahuje skutečný jemnější výškový model, vzdálené dlaždice se vykreslují hruběji. Server uchovává stažené dlaždice na disku; GPU paměť má omezenou LRU cache.</p>
+ <p class="small" id="building-status">Budovy: OSM půdorysy (ODbL), ČÚZK DMR 5G základ, OSM výšky nebo odhad střechy z ČÚZK DMP OK. Plochá střecha je vizuální LOD1 aproximace.</p>
  <p class="small" id="source">Výšky: ČÚZK DMP OK, Bpv. Barvy: ČÚZK Ortofoto ČR. Nejpodrobnější geometrie 2 m, textura 0,5 m. Žádné rekonstruované fasády.</p>
  <p id="error" aria-live="polite"></p>
 </main>
@@ -83,9 +86,11 @@ let config,gl,program,attrs,uni,planner,needsDraw=false,graphicsEpoch=0;
 let selection={coarse:[],finer:[],detailActive:false};
 const transitions=new Map();
 let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
+let buildingsEnabled=true;
+const buildingCache=new Map(),buildingPending=new Map(),buildingFailed=new Map();
 let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
 const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set(),controllers=new Map();
-const MAX_REQUESTS=3,MAX_GPU_TILES=40;
+const MAX_REQUESTS=3,MAX_GPU_TILES=40,MAX_BUILDING_GPU=8;
 const failed=new Map();
 let active=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -222,6 +227,71 @@ function createGpuTile(d,bitmap){
    inspect:{id:d.key,positions:inspectorPositions,indices,
      measuredTriangles:d.measuredTriangles,width:d.width,height:d.height}};
 }
+function makeBuildingGpu(d){
+ if(d.status!=="real-source-buildings"||d.verticalDatum!=="Bpv (Baltic 1957)"||
+    d.roofGeometry!=="flat-LOD1-visual-proxy"||d.buildings>350||
+    !Number.isInteger(d.renderVertices)||d.renderVertices<0||d.renderVertices>=65536)
+   throw Error("Building provenance or limits invalid");
+ const positions=binary(d.positionsF32LE,Float32Array),
+   indices=binary(d.trianglesU16LE,Uint16Array);
+ if(positions.length!==d.renderVertices*3||indices.length!==d.triangles*3||
+    positions.some(n=>!Number.isFinite(n))||
+    indices.some(id=>id>=d.renderVertices))throw Error("Invalid building mesh");
+ if(indices.length===0)return {count:0,buildings:0,lastUsed:Date.now()};
+ const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,
+   new Uint8Array([166,186,190,255]));
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+ return {positions:makeBuffer(positions,gl.ARRAY_BUFFER),
+   uvs:makeBuffer(new Float32Array(d.renderVertices*2),gl.ARRAY_BUFFER),
+   faces:makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER),
+   texture,count:indices.length,buildings:d.buildings,lastUsed:Date.now()};
+}
+function updateBuildings(){
+ if(!gl||!config)return;
+ const needed=new Set();
+ if(buildingsEnabled&&selection.detailActive)
+   for(const tile of selection.finer)
+     if(tile.parent&&cache.has(tile.parent))needed.add(tile.parent);
+ for(const [id,controller] of buildingPending)
+   if(!needed.has(id))controller.abort();
+ if(buildingCache.size>MAX_BUILDING_GPU){
+   for(const [id,t] of [...buildingCache].filter(([id])=>!needed.has(id))
+     .sort((a,b)=>a[1].lastUsed-b[1].lastUsed)){
+     if(buildingCache.size<=MAX_BUILDING_GPU)break;
+     if(t.positions)dispose(t);buildingCache.delete(id);
+   }
+ }
+ for(const id of needed){
+   if(buildingCache.has(id)||buildingPending.has(id)||buildingPending.size>=2||
+     (buildingFailed.get(id)??0)>Date.now())continue;
+   const [z,x,y]=id.split("-").map(Number);
+   if(z!==0)continue;
+   const controller=new AbortController(),epoch=graphicsEpoch;
+   buildingPending.set(id,controller);
+   (async()=>{
+     const response=await fetch("/api/buildings/0/"+x+"/"+y+".json",{signal:controller.signal});
+     if(!response.ok)throw Error((await response.text()).slice(0,180));
+     const data=await response.json();
+     if(data.key!==id||epoch!==graphicsEpoch||controller.signal.aborted||!gl)return;
+     buildingCache.set(id,makeBuildingGpu(data));
+     $("building-status").textContent="Budovy "+id+": "+data.buildings+
+       " půdorysů; OSM výška "+data.heightMethods.explicitOsmHeight+
+       ", odvozená z ČÚZK "+data.heightMethods.estimatedDsmMinusDmr+
+       ". Střechy jsou pouze přibližné ploché LOD1.";
+   })().catch(error=>{
+     if(controller.signal.aborted||epoch!==graphicsEpoch||error?.name==="AbortError")return;
+     buildingFailed.set(id,Date.now()+90000);
+     $("building-status").textContent="Budovy "+id+" nedostupné: "+
+       String(error?.message||error).slice(0,120)+". Terén zůstává viditelný.";
+   }).finally(()=>{
+     if(buildingPending.get(id)===controller)buildingPending.delete(id);
+     if(gl){requestDraw();updateBuildings();}
+   });
+ }
+}
+
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
@@ -253,7 +323,7 @@ function update(){
  for(const [id,controller] of controllers)if(!desired.has(id))controller.abort();
  for(let i=queue.length-1;i>=0;i--)if(!desired.has(queue[i].key))queue.splice(i,1);
  evict(ids);
- pump();requestDraw();
+ pump();updateBuildings();requestDraw();
 }
 function camera(){
  const ray=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
@@ -379,6 +449,21 @@ function draw(){
    faces+=t.count/3;
  }
  if(animating)requestDraw();
+ let shownBuildings=0;
+ if(buildingsEnabled&&selection.detailActive){
+   gl.uniform1f(uni.uFade,0);gl.uniform1i(uni.uPass,0);
+   for(const id of requesting){
+     const t=buildingCache.get(id);
+     if(!t?.count)continue;
+     t.lastUsed=Date.now();
+     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
+     bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
+     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
+     gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
+     faces+=t.count/3;shownBuildings+=t.buildings;
+   }
+ }
+ $("building-count").textContent=String(shownBuildings);
  $("visible").textContent=String(render.length);
  $("resident").textContent=String(cache.size);
  $("pending").textContent=String(active+queue.length);
@@ -525,6 +610,11 @@ function move(dx,dy){
  update();
 }
 $("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
+$("buildings").onclick=()=>{
+ buildingsEnabled=!buildingsEnabled;
+ $("buildings").textContent="Budovy: "+(buildingsEnabled?"zapnuto":"vypnuto");
+ update();
+};
 $("detail").onclick=()=>{
  enableDetail=!enableDetail;
  $("detail").textContent="Detail: "+(enableDetail?"automaticky":"vypnuto");
@@ -594,6 +684,8 @@ canvas.addEventListener("webglcontextlost",event=>{
  queue.length=0;
  gl=null;program=null;uni=null;attrs=null;
  cache.clear();lastRendered=[];transitions.clear();
+ for(const controller of buildingPending.values())controller.abort();
+ buildingPending.clear();buildingCache.clear();
  $("status").textContent="WebGL kontext přerušen; čekám na obnovení.";
  $("error").textContent="Grafický kontext byl ztracen. Mapu znovu vykreslím z uložených skutečných dlaždic.";
 });
@@ -612,7 +704,11 @@ canvas.addEventListener("webglcontextrestored",()=>{
   const response=await fetch("/api/config");
   if(!response.ok)throw Error("Server nenabídl konfiguraci");
   config=await response.json();
-  if(config.offlineMode)$("status").textContent="Offline: zobrazuji pouze uložené skutečné dlaždice.";
+  if(config.offlineMode){
+    buildingsEnabled=false;
+    $("buildings").textContent="Budovy: vypnuto";
+    $("status").textContent="Offline: zobrazuji pouze uložené skutečné dlaždice.";
+  }
   if(config.status!=="real-remote-data"||config.levels.length!==2)
     throw Error("Neplatná konfigurace skutečných dlaždic");
   inspector=window.OpenLaunchTerrainInspect;
