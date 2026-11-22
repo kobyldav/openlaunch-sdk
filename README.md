@@ -30,7 +30,7 @@ These are **actual application screenshots and SDK-computed visualizations**, no
 
 ### Earth observation — real Sentinel-2 imagery
 
-[![Real Czech Republic Sentinel-2 satellite scene displayed in an application backed by OpenLaunch SDK](docs/images/live/sentinel2-real-ui.png)](https://www.kobylkadavid.cz/)
+[![Real Czech Republic Sentinel-2 satellite scene displayed in an application backed by OpenLaunch SDK](docs/images/live/sentinel2-real-ui.png)](https://www.kobylkadavid.cz/?utm_source=chatgpt.com)
 
 The [interactive satellite explorer on kobylkadavid.cz](https://www.kobylkadavid.cz/) uses SDK-backed endpoints for Copernicus and NASA observation data. This is real Sentinel-2 RGB imagery in a working map interface with geographic alignment and source selection, not a replacement photograph.
 
