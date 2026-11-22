@@ -48,3 +48,4 @@ export * from "./sentinel-seasonal.js";
 export * from "./sentinel-multiyear.js";
 export * from "./sentinel-region.js";
 export * from "./sentinel-region-seams.js";
+export * from "./sentinel-region-catalog.js";
