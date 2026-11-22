@@ -485,6 +485,116 @@ async function loadObservation(){
  }
 }
 
+
+/** Request two real dated observations. Comparing already-palette-colored
+ * NDVI PNGs would be numerically invalid: the SDK compares cached Float32
+ * calibrated reflectance-derived NDVI for identical pixel centers.
+ */
+async function loadComparison(){
+ const tile=observationTile,beforeId=$("compare-before").value;
+ const afterId=$("obs-scene").value;
+ if(!tile||!validSceneId(beforeId)||!validSceneId(afterId)||
+    !observationCatalog.has(beforeId)||!observationCatalog.has(afterId))return;
+ const before=observationCatalog.get(beforeId),after=observationCatalog.get(afterId);
+ if(beforeId===afterId||Date.parse(before.acquiredAt)>=Date.parse(after.acquiredAt)){
+   observationMessage("Vyber dvě různá data: starší snímek v dolním poli a novější v horním.");
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("compare-load").disabled=true;
+ comparisonData=null;$("compare-export").disabled=true;
+ let changeTexture=null;
+ try{
+   const path="/api/observations/compare/0/"+tile.x+"/"+tile.y+"/"+
+     encodeURIComponent(beforeId)+"/"+encodeURIComponent(afterId);
+   observationMessage("Počítám ΔNDVI ze dvou skutečných snímků "+
+     before.acquiredAt.slice(0,10)+" a "+after.acquiredAt.slice(0,10)+
+     ". Kontroluji platné pixely v obou datech…");
+   const response=await fetch(path+".json",{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,210));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel-ndvi-comparison"||meta.version!==1||
+      meta.key!==tile.key||meta.before?.sceneId!==beforeId||
+      meta.after?.sceneId!==afterId||meta.qa?.bothSclMasked!==true||
+      meta.qa?.sameGrid!==true||meta.terrainElevationUnchanged!==true||
+      meta.grid?.crs!=="EPSG:3857"||!Number.isInteger(meta.width)||
+      !Number.isInteger(meta.height)||meta.width*meta.height>50000||
+      !Number.isInteger(meta.statistics?.overlapPixels)||
+      meta.statistics.overlapPixels<16||
+      typeof meta.deltaF32LE!=="string")
+     throw Error("NDVI časové porovnání nemá ověřený společný rastr");
+   const deltas=binary(meta.deltaF32LE,Float32Array);
+   if(deltas.length!==meta.width*meta.height||
+      deltas.filter(Number.isFinite).length!==meta.statistics.overlapPixels||
+      deltas.some(v=>!Number.isNaN(v)&&(!Number.isFinite(v)||Math.abs(v)>2.001)))
+     throw Error("Číselný ΔNDVI rastr je nekompletní nebo poškozený");
+   const png=await fetch(path+".png",{signal:controller.signal});
+   if(!png.ok)throw Error("Výsledek ΔNDVI nemá skutečný obrázek");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     changeTexture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   disposeObservation(observationActive);
+   observationActive={key:tile.key,changeTexture,sceneId:afterId,meta};
+   changeTexture=null;
+   comparisonData={meta,deltas};
+   $("compare-export").disabled=false;
+   $("obs-mode").value="change";
+   const stats=meta.statistics;
+   const summary="ΔNDVI "+meta.before.acquiredAt.slice(0,10)+" → "+
+     meta.after.acquiredAt.slice(0,10)+": "+
+     stats.overlapPixels+" společných validních pixelů ("+
+     stats.overlapPercent.toFixed(1)+" % plochy rastru); "+
+     stats.increasedPixels+" nárůst ≥"+stats.thresholdNdvi.toFixed(2)+", "+
+     stats.decreasedPixels+" pokles ≤−"+stats.thresholdNdvi.toFixed(2)+", "+
+     stats.stablePixels+" menší změna. Průměrný ΔNDVI "+
+     stats.meanDeltaNdvi.toFixed(3)+
+     ". Nejde o automatické určení příčiny nebo zdravotního stavu vegetace.";
+   $("compare-summary").textContent=summary;
+   observationMessage("Zobrazuji porovnání dvou skutečných scén Sentinel-2. "+
+     "Jen shodné 10m pixely platné v obou SCL maskách; 3D ČÚZK Bpv zůstává stejné.");
+   requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   observationMessage("NDVI porovnání odmítnuto: "+
+     String(error?.message||error).slice(0,245)+
+     ". Bez dostatečných skutečných společných pixelů změnu neodhaduji.");
+ }finally{
+   if(changeTexture)gl?.deleteTexture(changeTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("compare-load").disabled=$("compare-before").disabled;
+ }
+}
+function exportComparison(){
+ if(!comparisonData)return;
+ const {meta,deltas}=comparisonData;
+ const t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const EARTH_RADIUS=6378137;
+ const lines=["before_scene,after_scene,longitude_deg,latitude_deg,delta_ndvi,valid_both"];
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const x=t[0]+t[1]*(col+.5)+t[2]*(row+.5);
+   const y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const lon=x/EARTH_RADIUS*180/Math.PI;
+   const lat=(2*Math.atan(Math.exp(y/EARTH_RADIUS))-Math.PI/2)*180/Math.PI;
+   const value=deltas[row*meta.width+col];
+   lines.push([meta.before.sceneId,meta.after.sceneId,
+     lon.toFixed(8),lat.toFixed(8),
+     Number.isFinite(value)?value.toFixed(6):"",
+     Number.isFinite(value)?"1":"0"].join(","));
+ }
+ const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement("a");
+ link.href=url;link.download="praha-sentinel-delta-ndvi.csv";
+ document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
