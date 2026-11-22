@@ -121,8 +121,8 @@ export function compareSentinelSeasonalNdvi(
  for(const current of scenes.slice(1))
    if(current.width!==reference.width||current.height!==reference.height||
       current.groundSamplingM!==reference.groundSamplingM||
-      current.area.some((v,i)=>v!==reference.area[i])||
-      current.grid.transform.some((v,i)=>v!==reference.grid.transform[i]))
+      current.area.some((v:number,i:number)=>v!==reference.area[i])||
+      current.grid.transform.some((v:number,i:number)=>v!==reference.grid.transform[i]))
      throw new RangeError("Seasonal inputs use mismatched source pixel grids");
  const sceneIds=new Set(scenes.map(s=>s.sceneId));
  const dates=scenes.map(s=>new Date(s.acquiredAt));
