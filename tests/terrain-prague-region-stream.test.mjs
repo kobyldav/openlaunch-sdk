@@ -105,6 +105,21 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.equal(q.cogRangeCache.verifiedObjects,0);
    assert.equal(q.cogRangeCache.reusedBytes,0,
      "Offline absent sources cannot claim HTTP transfers or original ETag reuse");
+   assert.equal(q.cogMemory.mode,"adaptive");
+   assert.equal(q.cogMemory.configuredRssTargetMiB,512);
+   assert.equal(q.cogMemory.effectiveRssTargetMiB,512);
+   assert.equal(q.cogMemory.rssSafetyReserveMiB,96);
+   assert.equal(q.cogMemory.systemSafetyReserveMiB,512);
+   assert.ok(q.cogMemory.checks>=0);
+   assert.ok(q.cogMemory.shrinkEvents>=0);
+   assert.ok(q.cogMemory.recoveryEvents>=0);
+   assert.ok(q.cogMemory.minimumBudgetMiB>=0);
+   assert.ok(q.cogRangeCache.activeBudgetMiB<=64);
+   assert.ok(q.cogRangeCache.residentMiB<=q.cogRangeCache.activeBudgetMiB);
+   assert.equal(q.cogMemory.activeBudgetMiB,q.cogRangeCache.activeBudgetMiB);
+   assert.ok(q.cogMemory.freedFromCacheBytes>=0);
+   assert.ok(["none","both","host-free-memory","process-rss","disabled"]
+     .includes(q.cogMemory.lastConstraint));
 
    const page=await (await fetch(origin+"/")).text();
    assert.match(page,/id="region-coverage"/);
