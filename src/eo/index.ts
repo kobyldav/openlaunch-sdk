@@ -8,6 +8,7 @@ export * from "./geotiff.js";
 export * from "./calibration.js";
 export * from "./cog.js";
 export * from "./cog-range-cache.js";
+export * from "./cog-range-memory.js";
 export * from "./aoi-quality.js";
 export * from "./utm.js";
 export * from "./tiff-lzw.js";
