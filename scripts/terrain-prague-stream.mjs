@@ -15,6 +15,7 @@ import {fetchOsmFootprints,fetchGroundDmr,buildBuildings,BUILDING_LAYER_VERSION}
   from "./terrain-prague-buildings.mjs";
 import {SENTINEL_TERRAIN_OVERLAY_VERSION,validateObservationDates}
   from "../dist/terrain/sentinel-overlay.js";
+import {SENTINEL_NDVI_CHANGE_VERSION} from "../dist/terrain/sentinel-change.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -29,6 +30,7 @@ const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.j
 const sdk=new OpenLaunch();
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
+const changeTasks=new Map();
 const MAX_OBSERVATION_JOBS=2;
 const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
@@ -237,7 +239,10 @@ async function storedObservation(spec,sceneId){
    const doc=JSON.parse(json.toString("utf8"));
    if(doc.status==="real-sentinel2-observation"&&doc.sceneId===sceneId&&
      doc.key===spec.key&&doc.version===SENTINEL_TERRAIN_OVERLAY_VERSION&&
-     doc.qa?.sclMask===true&&rgb.length>100&&ndvi.length>100)
+     doc.qa?.sclMask===true&&doc.grid?.crs==="EPSG:3857"&&
+     typeof doc.ndviF32LE==="string"&&
+     Buffer.from(doc.ndviF32LE,"base64").byteLength===doc.width*doc.height*4&&
+     rgb.length>100&&ndvi.length>100)
      return {json,rgb,ndvi};
  }catch{}
  return null;
@@ -268,7 +273,9 @@ async function generateObservation(spec,sceneId){
    cloudPercent:product.cloudPercent,source:product.source,
    collection:product.collection,area:product.area,
    width:product.width,height:product.height,
-   groundSamplingM:product.groundSamplingM,
+   groundSamplingM:product.groundSamplingM,grid:product.grid,
+   ndviF32LE:Buffer.from(product.ndviValues.buffer,
+     product.ndviValues.byteOffset,product.ndviValues.byteLength).toString("base64"),
    statistics:product.statistics,qa:product.qa,caveats:product.caveats,
    imageryOnly:true,terrainElevationUnchanged:true,
    images:{
@@ -303,6 +310,75 @@ function obtainObservation(spec,sceneId){
  observationTasks.set(key,task);return task;
 }
 
+/** Cached pairwise change requires TWO real source observations, both
+ * sharing an identical 10m EPSG:3857 grid and valid SCL masks. */
+function changePath(spec,beforeId,afterId){
+ if(!OBS_SCENE_ID.test(beforeId)||!OBS_SCENE_ID.test(afterId)||beforeId===afterId)
+   throw RangeError("Select two different valid Sentinel scene IDs");
+ return join(cacheRoot,"changes-v"+SENTINEL_NDVI_CHANGE_VERSION+"-"+
+   beforeId+"--"+afterId+"-"+spec.key);
+}
+async function generateChange(spec,beforeId,afterId){
+ const target=changePath(spec,beforeId,afterId);
+ try{
+   const [json,png]=await Promise.all([readFile(target+".json"),readFile(target+".png")]);
+   const d=JSON.parse(json.toString("utf8"));
+   if(d.status==="real-sentinel-ndvi-comparison"&&d.version===SENTINEL_NDVI_CHANGE_VERSION&&
+      d.key===spec.key&&d.before?.sceneId===beforeId&&d.after?.sceneId===afterId&&
+      d.qa?.bothSclMasked===true&&d.qa?.sameGrid===true&&png.length>100)
+     return {json,png};
+ }catch{}
+ const [baseline,followup]=await Promise.all([
+   obtainObservation(spec,beforeId),obtainObservation(spec,afterId)
+ ]);
+ function measuredDocument(data,expected){
+   const d=JSON.parse(data.json.toString("utf8"));
+   if(d.status!=="real-sentinel2-observation"||d.version!==SENTINEL_TERRAIN_OVERLAY_VERSION||
+      d.sceneId!==expected||d.key!==spec.key||d.grid?.crs!=="EPSG:3857"||
+      d.terrainElevationUnchanged!==true||d.qa?.sclMask!==true||
+      !OBS_SCENE_ID.test(d.sceneId)||typeof d.ndviF32LE!=="string")
+     throw Error("Source observation has no numerical, calibrated NDVI proof");
+   const raw=Buffer.from(d.ndviF32LE,"base64");
+   if(raw.byteLength!==d.width*d.height*4||raw.byteLength>200000)
+     throw Error("Source NDVI buffer does not match its true georeferenced grid");
+   const values=new Float32Array(raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength));
+   return {...d,ndviValues:values};
+ }
+ const change=sdk.terrain.compareSentinelNdvi(
+   measuredDocument(baseline,beforeId),measuredDocument(followup,afterId),
+   {thresholdNdvi:.15,minOverlapPixels:16}
+ );
+ const result={status:change.status,version:change.version,key:spec.key,
+   before:change.before,after:change.after,source:change.source,
+   width:change.width,height:change.height,area:change.area,grid:change.grid,
+   groundSamplingM:change.groundSamplingM,statistics:change.statistics,
+   qa:change.qa,caveats:change.caveats,
+   deltaF32LE:Buffer.from(change.deltaValues.buffer,
+     change.deltaValues.byteOffset,change.deltaValues.byteLength).toString("base64"),
+   image:"/api/observations/compare/0/"+spec.x+"/"+spec.y+"/"+beforeId+"/"+afterId+".png",
+   terrainElevationUnchanged:true};
+ const json=Buffer.from(JSON.stringify(result)),
+   png=rgbaPng({width:change.width,height:change.height,rgba:change.deltaRgba});
+ const nonce="."+process.pid+"-"+Date.now();
+ await writeFile(target+nonce+".png",png);
+ await rename(target+nonce+".png",target+".png");
+ await writeFile(target+nonce+".json",json);
+ await rename(target+nonce+".json",target+".json");
+ console.log("PASS real paired ΔNDVI "+spec.key+": "+
+   beforeId+" -> "+afterId+"; "+change.statistics.overlapPixels+
+   " clear pixels in both scenes; mean "+change.statistics.meanDeltaNdvi);
+ return {json,png};
+}
+function obtainChange(spec,beforeId,afterId){
+ const key=spec.key+"/"+beforeId+"/"+afterId;
+ if(changeTasks.has(key))return changeTasks.get(key);
+ if(changeTasks.size>=2){
+   const e=Error("Two NDVI comparisons are already running");
+   e.code="OBSERVATION_BUSY";throw e;
+ }
+ const p=generateChange(spec,beforeId,afterId).finally(()=>changeTasks.delete(key));
+ changeTasks.set(key,p);return p;
+}
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -341,6 +417,14 @@ const server=createServer(async(req,res)=>{
       const maxCloud=Number(incoming.searchParams.get("cloud")??"35");
       const catalog=await observationScenes(spec,from,to,maxCloud);
       send(res,200,JSON.stringify(catalog),"application/json; charset=utf-8");return;
+    }
+    const changeMatch=/^\/api\/observations\/compare\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_-]{5,120})\/([A-Za-z0-9_-]{5,120})\.(json|png)$/.exec(pathname);
+    if(changeMatch){
+      const spec=tileSpec(0,Number(changeMatch[1]),Number(changeMatch[2]));
+      const result=await obtainChange(spec,changeMatch[3],changeMatch[4]);
+      send(res,200,changeMatch[5]==="json"?result.json:result.png,
+        changeMatch[5]==="json"?"application/json; charset=utf-8":"image/png");
+      return;
     }
     const obsMatch=/^\/api\/observations\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_-]{5,120})\.(json|rgb\.png|ndvi\.png)$/.exec(pathname);
     if(obsMatch){
@@ -382,7 +466,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
-  console.log("Sentinel-2 analytical layer: real dated RGB, radiometrically calibrated NDVI + SCL cloud/invalid mask.");
+  console.log("Sentinel-2 analytical layer: real dated RGB, calibrated NDVI and two-scene ΔNDVI on common 10m grid with dual SCL masks.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
