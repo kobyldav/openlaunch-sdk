@@ -1,0 +1,47 @@
+name: Import verified 3D SDK screenshots
+
+on:
+  push:
+    branches: [feature/readme-sdk-showcase-v2]
+    paths:
+      - .github/workflows/import-sdk-3d-assets.yml
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  import:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Retrieve verified SDK render screenshots
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test-results/verified-showcase docs/images/live
+          gh run download 45032125752 --repo kobyldav/openlaunch-sdk --name openlaunch-sdk-real-3d-showcase --dir test-results/verified-showcase
+          cp test-results/verified-showcase/sdk-orbit-3d.png docs/images/live/sdk-orbit-3d.png
+          cp test-results/verified-showcase/sdk-launch-3d.png docs/images/live/sdk-launch-3d.png
+          cp test-results/verified-showcase/terrain-prague-real-3d.png docs/images/live/terrain-prague-real-3d.png
+          cp test-results/verified-showcase/sdk-showcase-provenance.json docs/images/live/sdk-showcase-provenance.json
+      - name: Verify original screenshot bytes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ('sdk-orbit-3d.png','sdk-launch-3d.png','terrain-prague-real-3d.png'):
+              data=(Path('docs/images/live')/name).read_bytes()
+              assert data[:8]==bytes((137,80,78,71,13,10,26,10)) and len(data)>30000,name
+              print(name,len(data))
+          PY
+      - name: Commit only verified images
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin feature/readme-sdk-showcase-v2
+          git reset --mixed origin/feature/readme-sdk-showcase-v2
+          git add docs/images/live/sdk-orbit-3d.png docs/images/live/sdk-launch-3d.png docs/images/live/terrain-prague-real-3d.png docs/images/live/sdk-showcase-provenance.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs: publish verified SDK WebGL screenshot evidence"
+          git push origin HEAD:feature/readme-sdk-showcase-v2
