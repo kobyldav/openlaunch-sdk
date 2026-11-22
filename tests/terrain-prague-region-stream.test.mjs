@@ -98,6 +98,13 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.equal(q.maxObservedConcurrentSourceJobs,0,
      "Offline absent-source region cannot have fabricated active Sentinel reads");
    assert.match(q.sourceLoadPolicy,/two genuine source acquisitions/);
+   assert.equal(q.cogRangeCache.maxResidentMiB,16);
+   assert.equal(q.cogRangeCache.rangeCacheHits,0);
+   assert.equal(q.cogRangeCache.httpRequests,0);
+   assert.equal(q.cogRangeCache.httpBytesRead,0);
+   assert.equal(q.cogRangeCache.verifiedObjects,0);
+   assert.equal(q.cogRangeCache.reusedBytes,0,
+     "Offline absent sources cannot claim HTTP transfers or original ETag reuse");
 
    const page=await (await fetch(origin+"/")).text();
    assert.match(page,/id="region-coverage"/);
