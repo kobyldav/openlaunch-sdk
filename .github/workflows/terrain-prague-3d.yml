@@ -29,6 +29,8 @@ jobs:
         run: node --test tests/terrain-sentinel-overlay.test.mjs
       - name: Verify source-backed interannual Sentinel same-month median, NoData and pixel support counts
         run: node --test tests/terrain-sentinel-seasonal.test.mjs
+      - name: Validate 3-5 annual same-month Sentinel source NDVI, Theil-Sen, leave-year-out instability and all-year masks
+        run: node --test tests/terrain-sentinel-multiyear.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
@@ -47,6 +49,9 @@ jobs:
         continue-on-error: true
       - name: Verify actual two-year same-month Sentinel-2 COG scenes, per-year source medians and measured ΔNDVI
         run: node scripts/terrain-prague-seasonal-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify three historical years and six true Sentinel-2 same-month COG acquisitions
+        run: node scripts/terrain-prague-multiyear-live-smoke.mjs
         continue-on-error: true
       - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
         run: node scripts/terrain-prague-browser-smoke.mjs
@@ -110,3 +115,7 @@ jobs:
             test-results/terrain-prague-stream-ci/seasonal-v2-*.png
             test-results/terrain-prague-stream-ci/seasonal-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-seasonal-interannual.png
+            test-results/terrain-prague-stream-ci/multiyear-v1-*.json
+            test-results/terrain-prague-stream-ci/multiyear-v1-*.png
+            test-results/terrain-prague-stream-ci/multiyear-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-multiyear-3-annual-trend.png

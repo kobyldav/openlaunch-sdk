@@ -777,3 +777,84 @@ actual interannual spectral observation of one bounded tile,
 spatial resolution of Sentinel-2 remains about 10m. A next
 research iteration could create annual seasonally matched
 multi-year replicates with coverage and uncertainty thresholds.
+
+## Stage 15 — Repeated same-season 3–5-year NDVI and year-exclusion sensitivity
+
+**Aim:** an SDK-native observational analysis of three to five
+consecutive same-calendar-month years, not another photogrammetric
+3D application or a statistically significant land-cover alarm.
+
+### The reusable OpenLaunch API
+
+New `src/terrain/sentinel-multiyear.ts` exports
+`analyzeSentinelMultiYearSeasons([{year,observations},...],options)`
+from both `openlaunch-sdk` and `new OpenLaunch().terrain.analyzeSentinelMultiYear`.
+Every year must contain **two independently acquired Sentinel-2 L2A
+observations** at least four days apart, with original authenticated
+scene ID/date, calibrated numerical 10m `Float32Array` NDVI, SCL
+validity and identical EPSG:3857 pixel grid/extent.
+
+The pure analysis first calculates **median NDVI per year, per pixel**
+from only genuine source-valid measurements. A pixel is retained only
+when it has ≥1 real clear acquisition in **every** requested year
+(optionally `minValidPerYear:2` requires both acquisitions in every
+year). If fewer than 16 pixels share all annual observations,
+calculation fails explicitly. Masked pixels remain NaN/transparent;
+no missing years/pixels are interpolated or replaced with zero.
+
+Per pixel, a **Theil–Sen median of the actual pairwise annual NDVI
+slopes** yields NDVI/year, which is *descriptive* for the analyzed
+years, not a forecast. The panel shows one genuine measured
+annual-median NDVI point per year, using **exactly the same observed
+pixel cohort for all the years** to avoid false coverage-driven trends.
+Spatial visualization is placed over the original ČÚZK Bpv 3D
+terrain without changing geometry, measured ray heights or buildings.
+
+### Meaningful checks without invented statistical confidence
+
+The output also computes **leave-one-year-out** sensitivity per pixel:
+recalculate the observed trend omitting each year's *actual* median,
+then record minimum and maximum slopes. These intervals show
+how much a single year can influence the answer, but are explicitly
+**NOT 95% confidence intervals or statistical significance tests**.
+Metadata reports the number of pixels whose sensitivity ranges
+cross zero, the mean range width, common area %, low-area warnings,
+within-month date-alignment warnings, and the number of pixels
+supported by two SCL-valid measurements **in every year**.
+
+Default magnitude palette ±0.04 NDVI/year is illustrative, and
+pixels with only one real clear observation in any year are drawn
+less opaque than those backed by two. The color shader
+alpha-blends the source-derived result over actual ČÚZK ortho,
+not replacing high-resolution ground imagery with an artificial
+satellite-pixel photograph.
+
+### Real source browsing, caching, and reproducible exports
+
+One explicit camera tile only (not all of Prague). Local API:
+
+- `/api/observations/multiyear/scenes/0/X/Y.json?from=2023&to=2025&month=8&cloud=50`
+- `/api/observations/multiyear/0/X/Y/2023/2025/8.json?cloud=50`
+- `/api/observations/multiyear/0/X/Y/2023/2025/8.png?cloud=50`
+
+Source selection only uses Element84 Earth Search public HTTPS STAC
+and previously qualified Sentinel-2 COGs, never client-submitted
+remote URLs. Six to ten original scene windows are read sequentially
+with one active multiyear job. `multiyear-v1-*` cache keys include
+all scene identities, date window and source-cloud threshold via
+SHA-256; PNG and numeric float32 arrays are saved with metadata last.
+Offline mode reads genuine prior sources only and refuses missing
+acquisitions. Per-year actual NDVI means, actual georeferenced per-
+pixel slope, leave-one-year-out range and strong/weak support masks
+can be exported as CSV with WGS84 pixel-center coordinates.
+
+### Interpretation limits
+
+Three to five August seasons are a better basis than an 18-day
+trend, but are **still not** a statistically rigorous long-term
+ecological, deforestation or land-use survey. Weather, atmospheric
+correction, sensor geometry, scene-wide versus local clouds, SCL
+misclassification and variation within a calendar month may
+produce spectral differences. Native Sentinel-2 spectral
+resolution remains ~10 m, and the original ČÚZK Bpv 2m DEM
+is unaffected. No newly inferred building heights.
