@@ -12,6 +12,7 @@ import {mercatorFromLonLat,PRAGUE_STREAM_REGION} from "./terrain-prague-stream-g
 export const BUILDING_LAYER_VERSION=1;
 export const CUZK_DMR_5G="https://ags.cuzk.gov.cz/arcgis/rest/services/3D/dmr5g_wm/ImageServer";
 export const OVERPASS_ENDPOINT="https://overpass.private.coffee/api/interpreter";
+export const OSM_MAP_ENDPOINT="https://api.openstreetmap.org/api/0.6/map";
 const LAT=PRAGUE_STREAM_REGION.centerLatitudeDeg*Math.PI/180;
 const SCALE=Math.cos(LAT);
 const C=mercatorFromLonLat((PRAGUE_STREAM_REGION.west+PRAGUE_STREAM_REGION.east)/2,
@@ -55,18 +56,85 @@ async function readBounded(response,maxBytes){
  for(const c of chunks){bytes.set(c,i);i+=c.length;}
  return bytes;
 }
+/** Strict bounded XML parser for the official OSM 0.6 map API.
+ * Geometry comes exclusively from real nodes and closed OSM building ways.
+ * No inferred positions, heights, relations or fabricated missing nodes.
+ */
+export function parseOsmXml(xml){
+ if(typeof xml!=="string"||xml.length>16*1024*1024||!/<osm\b/.test(xml))
+   throw Error("OSM map source did not return bounded OSM XML");
+ const attr=(tag,name)=>{
+   const m=new RegExp("(?:^|\\s)"+name+"=\"([^\"]*)\"").exec(tag);
+   return m?.[1]??null;
+ };
+ const nodes=new Map();
+ for(const m of xml.matchAll(/<node\b[^>]*\/?>/g)){
+   const id=attr(m[0],"id"),lat=Number(attr(m[0],"lat")),
+     lon=Number(attr(m[0],"lon"));
+   if(id&&finite(lat)&&finite(lon)&&Math.abs(lat)<=85&&Math.abs(lon)<=180)
+     nodes.set(id,{lon,lat});
+   if(nodes.size>120000)throw Error("OSM node count exceeds tile budget");
+ }
+ const result=[];
+ for(const m of xml.matchAll(/<way\b[^>]*>[\s\S]*?<\/way>/g)){
+   const raw=m[0],id=Number(attr(raw.match(/^<way\b[^>]*>/)?.[0]??"","id"));
+   const tags={};
+   for(const t of raw.matchAll(/<tag\b[^>]*\/>/g)){
+     const k=attr(t[0],"k"),v=attr(t[0],"v");
+     if(k==="building"||k==="height")tags[k]=v;
+   }
+   if(!tags.building||!finite(id))continue;
+   const ids=[...raw.matchAll(/<nd\b[^>]*\/>/g)].map(t=>attr(t[0],"ref"));
+   if(ids.length<4||ids.length>100)continue;
+   const geometry=ids.map(ref=>nodes.get(ref));
+   if(geometry.some(p=>!p))continue;
+   result.push({type:"way",id,tags,geometry});
+   if(result.length>1500)throw Error("OSM building count exceeds budget");
+ }
+ return result;
+}
+async function fetchOsmMap(spec,fetchImpl,timeoutMs){
+ overpassQuery(spec); // same bounded input guard as filtered Overpass
+ const url=new URL(OSM_MAP_ENDPOINT);
+ url.searchParams.set("bbox",[spec.west,spec.south,spec.east,spec.north].join(","));
+ const res=await fetchImpl(url.href,{method:"GET",
+   headers:{"User-Agent":"OpenLaunchSDK-PragueTerrain/1.0 (github.com/kobyldav/openlaunch-sdk)",
+     Accept:"application/xml,text/xml"},
+   signal:AbortSignal.timeout(timeoutMs)});
+ const xml=new TextDecoder().decode(await readBounded(res,16*1024*1024));
+ return parseOsmXml(xml);
+}
 export async function fetchOsmFootprints(spec,{fetchImpl=fetch,timeoutMs=35000}={}){
  const body=new URLSearchParams({data:overpassQuery(spec)});
- const res=await fetchImpl(OVERPASS_ENDPOINT,{
-   method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded",
-     "User-Agent":"OpenLaunchSDK-PragueTerrain/1.0 (github.com/kobyldav/openlaunch-sdk)",
-     Accept:"application/json"},
-   body:body.toString(),signal:AbortSignal.timeout(timeoutMs)
- });
- const data=JSON.parse(new TextDecoder().decode(await readBounded(res,8*1024*1024)));
- if(!Array.isArray(data.elements))throw Error("Overpass did not return OSM elements");
- if(data.elements.length>1500)throw Error("Building feature count exceeds budget");
- return data.elements;
+ let reason=null;
+ try{
+   const res=await fetchImpl(OVERPASS_ENDPOINT,{
+     method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded",
+       "User-Agent":"OpenLaunchSDK-PragueTerrain/1.0 (github.com/kobyldav/openlaunch-sdk)",
+       Accept:"application/json"},
+     body:body.toString(),signal:AbortSignal.timeout(Math.min(timeoutMs,12000))
+   });
+   // Refused, rate-limited or unavailable Overpass is not source data.
+   // The tiny bounded official OSM map extract is a genuine alternate source.
+   if(!res.ok)throw Error("Building source HTTP "+res.status);
+   const data=JSON.parse(new TextDecoder().decode(await readBounded(res,8*1024*1024)));
+   if(!Array.isArray(data.elements))throw Error("Overpass did not return OSM elements");
+   if(data.elements.length>1500)throw Error("Building feature count exceeds budget");
+   return data.elements;
+ }catch(error){
+   // Only connectivity/HTTP refusal/timeouts cause alternate-source lookup.
+   // Malformed 200 responses must not be silently accepted as real data.
+   if(/did not return OSM elements|feature count exceeds budget/.test(String(error)))
+     throw error;
+   reason=error;
+ }
+ try{
+   return await fetchOsmMap(spec,fetchImpl,Math.max(12000,timeoutMs));
+ }catch(error){
+   throw Error("No real OSM building source available (Overpass: "+
+     String(reason?.message||reason).slice(0,110)+
+     "; official OSM map: "+String(error?.message||error).slice(0,150)+")");
+ }
 }
 export async function fetchGroundDmr(spec,{fetchImpl=fetch,timeoutMs=90000}={}){
  const [x0,y0]=mercatorFromLonLat(spec.west,spec.south);
