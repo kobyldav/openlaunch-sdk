@@ -19,7 +19,7 @@ const x=numeric("x",1),y=numeric("y",1),cols=numeric("cols",4),rows=numeric("row
  month=numeric("month",8),cloud=numeric("cloud",50),
  repeat=numeric("repeat",2),rssLimitMiB=numeric("rss-limit-mib",1536),
  scenePairConcurrency=numeric("scene-pair-concurrency",2),
- cogRangeCacheMiB=numeric("cog-range-cache-mib",16),
+ cogRangeCacheMiB=numeric("cog-range-cache-mib",64),
  timeoutMs=numeric("timeout-ms",live?900000:60000);
 const cache=resolve(arg("cache","test-results/terrain-prague-stream-cache"));
 const output=resolve(arg("output","test-results/terrain-prague-region-4x4-benchmark.json"));
@@ -32,7 +32,7 @@ if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(cols)||!Number.
  !Number.isInteger(repeat)||repeat<1||repeat>4||
  !Number.isInteger(rssLimitMiB)||rssLimitMiB<256||rssLimitMiB>8192||
  ![1,2].includes(scenePairConcurrency)||
- !Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>32||
+ !Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>128||
  !Number.isInteger(timeoutMs)||timeoutMs<10000||timeoutMs>3600000)
  throw new RangeError("Benchmark requires 1..4x1..4 Prague tiles, 3..5 years, repeat 1..4, bounded memory/time");
 
