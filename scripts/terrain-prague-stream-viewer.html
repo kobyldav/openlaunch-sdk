@@ -1343,12 +1343,12 @@ function downloadRegion(name,mime,text){
 function exportRegionCsv(){
  if(!regionResult)return;
  const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
- const rows=[["tile","status","west","south","east","north",
+ const rows=[["source_lock_id","tile","status","west","south","east","north",
    "valid_all_years_px","analyzed_px","valid_percent_within_tile",
    "two_valid_sources_each_year_px","mean_ndvi_slope_per_year","note"].join(",")];
  for(const t of regionResult.tiles){
    const b=t.bounds;
-   rows.push([t.key,t.status,b.west,b.south,b.east,b.north,
+   rows.push([regionResult.sourceLockId??"",t.key,t.status,b.west,b.south,b.east,b.north,
      t.commonValidPixels,t.totalPixels,t.commonValidPercent,
      t.robustAllYearsPixels,t.meanSlopeNdviPerYear,t.reason??""].map(quote).join(","));
  }
@@ -1358,12 +1358,12 @@ function exportRegionCsv(){
 function exportRegionSeamsCsv(){
  if(!regionResult?.seams)return;
  const quote=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
- const lines=[["tile_a","tile_b","orientation","source_comparable","state",
+ const lines=[["source_lock_id","tile_a","tile_b","orientation","source_comparable","state",
    "paired_real_pixel_centers","edge_pixels",
    "mean_absolute_ndvi_year_difference","max_absolute_ndvi_year_difference",
    "signed_b_minus_a_ndvi_year","warning","interpretation"].join(",")];
  for(const s of regionResult.seams)lines.push([
-   s.tileA,s.tileB,s.orientation,s.comparableSources,s.state,
+   regionResult.sourceLockId??"",s.tileA,s.tileB,s.orientation,s.comparableSources,s.state,
    s.pairedPixels,s.sourceEdgePixels,
    s.meanAbsDifferenceNdviPerYear,s.maxAbsDifferenceNdviPerYear,
    s.meanSignedBMinusANdviPerYear,s.warning,s.note].map(quote).join(","));
@@ -1389,7 +1389,13 @@ function exportRegionGeoJson(){
      ]]}}
  });
  downloadRegion("praha-sentinel-ndvi-regional-coverage.geojson",
-   "application/geo+json",JSON.stringify({type:"FeatureCollection",features},null,2));
+   "application/geo+json",JSON.stringify({type:"FeatureCollection",
+     metadata:{sourceLockId:regionResult.sourceLockId??null,
+       sourceSelectionStatus:regionResult.sourceSelectionStatus??"unavailable",
+       originalAnnualScenes:regionResult.lockedSourceYears??[],
+       fromYear:regionResult.fromYear,toYear:regionResult.toYear,
+       month:regionResult.month,partial:!regionResult.regionFullyAnalyzed},
+     features},null,2));
 }
 async function runRegionCoverage(){
  if(regionRun||!config)return;
