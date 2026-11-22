@@ -444,7 +444,7 @@ measurement: selecting A/B points still returns the unchanged ČÚZK
 DMP OK surface. The original streamed terrain remains functional if
 Overpass or DMR services fail, with explicit error feedback.
 
-Cache: `test-results/terrain-prague-stream-cache/buildings-v1-*.json`.
+Cache: `test-results/terrain-prague-stream-cache/buildings-v2-*.json`.
 Cached real building meshes are re-used; the offline mode does not
 download missing source data and defaults to buildings switched off.
 Enable them manually when offline if they have been visited before.
@@ -456,3 +456,18 @@ accuracy varies; a flat roof proxy does not recreate roof ridges,
 chimneys, vertical façades or photogrammetric details. The source
 dataset is limited to OSM closed building ways; attribution includes
 OSM ODbL and © ČÚZK for the height products.
+
+**Textured flat roofs:** Stage 10 now reprojects the *actual ČÚZK Ortofoto ČR*
+pixel image onto the OSM roof polygons (the same tile texture as the
+measured DSM surface). Walls use a neutral solid material, with separate
+WebGL draw ranges for walls versus roofs. No fake roof RGB samples are
+created, but a real orthophoto does **not** provide surveyed roof facets,
+building detail, or accurate vertical façade textures. The source cache
+schema is versioned as `buildings-v2` so v1 uniform-color models cannot
+silently bypass the new UV/provenance validation.
+
+If the public Overpass endpoint refuses or times out, the server makes
+a **bounded small-area** request to the official OSM map API and accepts
+only original referenced OSM node coordinates and closed building ways.
+No bulk download or city-wide prefetch occurs. Both services can fail;
+a missing building layer never silently becomes synthetic geometry.

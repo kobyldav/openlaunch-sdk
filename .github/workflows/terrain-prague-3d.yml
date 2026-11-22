@@ -69,7 +69,7 @@ jobs:
             test-results/terrain-prague-ortho/report.json
             test-results/terrain-prague-stream-ci/v2-0-3-3.json
             test-results/terrain-prague-stream-ci/v2-0-3-3.png
-            test-results/terrain-prague-stream-ci/buildings-v1-0-3-3.json
+            test-results/terrain-prague-stream-ci/buildings-v2-0-3-3.json
             test-results/terrain-prague-browser-ci/report.json
             test-results/terrain-prague-browser-ci/prague-real-3d-initial.png
             test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png

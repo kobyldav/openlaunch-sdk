@@ -194,7 +194,7 @@ try{
    const buildingDoc=await buildingResponse.json();
    if(buildingDoc.status==="real-source-buildings"&&buildingDoc.buildings>0){
      await evalJs(c.send,'(()=>{const p=tileCenter(0,3,3);panX=p[0];panNorth=p[1];'+
-       'yaw=0;pitch=1.24;distance=900;enableDetail=true;buildingsEnabled=true;'+
+       'yaw=-.6;pitch=.78;distance=920;enableDetail=true;buildingsEnabled=true;$("buildings").textContent="Budovy: zapnuto";'+
        'update();return true;})()');
      await until(async()=>await evalJs(c.send,'buildingCache.has("0-3-3")'),
        "cached true-source OSM/ČÚZK building overlay uploading to WebGL",20000);

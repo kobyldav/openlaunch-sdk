@@ -77,6 +77,10 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/\/api\/buildings\/0\//);
   assert.match(page,/buildingsEnabled/);
   assert.match(page,/makeBuildingGpu\(/);
+  assert.match(page,/d\.roofTexture/);
+  assert.match(page,/d\.uvsF32LE/);
+  assert.match(page,/gl\.drawElements\(gl\.TRIANGLES,t\.wallCount/);
+  assert.match(page,/gl\.drawElements\(gl\.TRIANGLES,t\.roofCount/);
   assert.match(page,/updateBuildings\(/);
   assert.match(page,/webglcontextrestored/);
   assert.match(page,/graphicsEpoch/);

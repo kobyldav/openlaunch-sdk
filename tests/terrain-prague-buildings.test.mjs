@@ -31,7 +31,7 @@ test("source height parser uses explicit numeric OSM heights only, never guessed
  assert.ok(Math.abs(parseOsmHeight("36ft")-10.9728)<1e-7);
  for(const input of ["4-6","~10","building:levels=5","2","301 m","10;20",null,14])
    assert.equal(parseOsmHeight(input),null);
- assert.equal(BUILDING_LAYER_VERSION,1);
+ assert.equal(BUILDING_LAYER_VERSION,2);
  assert.match(CUZK_DMR_5G,/cuzk/);
  assert.match(OVERPASS_ENDPOINT,/overpass/);
 });
@@ -79,6 +79,15 @@ test("3D building geometry has real OSM footprint and DMR ground, explicitly tag
  assert.ok(heights.slice(0,4).every(h=>h===183));
  assert.ok(heights.slice(4).every(h=>h===199));
  assert.equal(result.triangles,10);
+ assert.equal(result.wallTriangles,8);
+ assert.equal(result.roofTriangles,2);
+ assert.equal(result.roofTexture,"real-ČÚZK-ortofoto-reprojected");
+ const rawUV=Buffer.from(result.uvsF32LE,"base64");
+ assert.equal(rawUV.byteLength,result.renderVertices*2*4);
+ const uv=new Float32Array(rawUV.buffer,rawUV.byteOffset,rawUV.byteLength/4);
+ assert.ok(uv.every(Number.isFinite));
+ assert.ok(uv.every(v=>v>=0&&v<=1),
+   "roof orthophoto UVs must be grounded in the actual source tile bounds");
 });
 test("without tag, roof is derived only from real DSM points and real ground heights",()=>{
  const {ground,dsm}=inputs();
