@@ -145,7 +145,7 @@ a{color:#9cd1fc}
   </div>
   <div aria-label="Regionální víceroční analýza Sentinel-2">
     <strong>Regionální pokrytí NDVI · více skutečných dlaždic</strong>
-    <p class="small">Prověří 2×2 až 4×4 sousedních přibližně 0,7km dlaždic kolem středu kamery. Každá dlaždice má samostatně ověřené zdroje, masky SCL a trend. Výsledky přicházejí průběžně; zůstávají jen malé souhrny, ne všechny rastry v paměti.</p>
+    <p class="small">Prověří 2×2 až 4×4 sousedních přibližně 0,7km dlaždic kolem středu kamery. V celém regionu se zamknou společné termíny družicových scén; každá dlaždice dál samostatně ověřuje masky SCL a trend. Výsledky přicházejí průběžně; zůstávají jen malé souhrny, ne všechny rastry v paměti.</p>
     <div class="toolbar">
       <label>Území <select id="region-size">
         <option value="2" selected>2×2 dlaždice (přibližně 1,4 km)</option>
@@ -159,6 +159,7 @@ a{color:#9cd1fc}
       <button id="region-seam-export" disabled>Kontrola hranic CSV</button>
       <button id="region-3d" disabled>Zobrazit regionální trend ve 3D</button>
     </div>
+    <p id="region-source-status" class="small" aria-live="polite">Etapa 19: před výpočtem regionu vyberu stejné dvě původní scény Sentinel-2 pro každý rok a všechny dlaždice. Pokud společné zdroje chybí, výpočet nepoužije náhradní snímky.</p>
     <p id="region-seam-note" class="small" aria-live="polite">Hranice dlaždic: zatím bez porovnání původních pixelů. Oranžové hranice znamenají nesrovnatelná měření nebo výraznější rozdíl mezi sousedními pixelovými středy – nikoli automaticky chybu terénu.</p>
     <p id="region-3d-status" class="small" aria-live="polite">3D vrstva: vypnutá. Po dokončení skutečné regionální analýzy lze promítnout ověřené pixely na původní ČÚZK terén. Načítají se jen právě potřebné textury (nejvýše 6 v GPU).</p>
     <p id="region-status" class="small" aria-live="polite">Použije roky, měsíc a limit oblačnosti ze sekce víceleté analýzy výše.</p>
@@ -1414,9 +1415,10 @@ async function runRegionCoverage(){
  clearRegionGpu();
  if($("obs-mode").value==="region")$("obs-mode").value="ortho";
  $("region-3d").disabled=true;$("region-3d").textContent="Zobrazit regionální trend ve 3D";
- regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud};
+ regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud,sourceLockId:null,lockedSourceYears:[]};
  regionTiles.clear();regionSeams=[];regionResult=null;drawRegionCoverage();
  $("region-seam-export").disabled=true;
+ $("region-source-status").textContent="Nejprve ověřuji dvě stejné původní scény pro každý rok v celém regionu. Pokud společná scéna chybí, nic nenahradím.";
  $("region-seam-note").textContent="Kontroluji nativní okraje každé dvojice sousedních skutečných Sentinel dlaždic. Žádné mezery automaticky nevyhlazuji.";
  const controller=new AbortController();regionRun=controller;
  $("region-start").disabled=true;$("region-stop").disabled=false;
@@ -1435,7 +1437,31 @@ async function runRegionCoverage(){
    const consume=line=>{
      if(!line.trim())return;
      const event=JSON.parse(line);
-     if(event.type==="tile"){
+     if(event.type==="source-lock"){
+       if(event.status==="unavailable"){
+         $("region-source-status").textContent="Společné scény nebyly ověřeny: "+
+           String(event.reason??"zdroj nedostupný").slice(0,160)+
+           ". Všechny nedoložené dlaždice zůstanou bez Sentinel vrstvy.";
+       }else{
+         const groups=event.seasons;
+         if(event.status!=="real-sentinel-region-shared-scenes"||
+           !/^[a-f0-9]{32}$/.test(event.id)||
+           event.from!==from||event.to!==to||event.month!==month||
+           event.cloud!==cloud||!Array.isArray(groups)||
+           groups.length!==to-from+1||
+           !groups.every((y,i)=>y.year===from+i&&y.scenes.length===2&&
+             y.scenes.every(scene=>validSceneId(scene.id)&&
+               typeof scene.acquiredAt==="string"&&
+               Number.isFinite(Date.parse(scene.acquiredAt)))))
+           throw Error("Společný Sentinel regionální katalog nebyl ověřen");
+         regionPlan.sourceLockId=event.id;
+         regionPlan.lockedSourceYears=groups;
+         $("region-source-status").textContent="Snímky uzamčeny pro "+
+           cells.length+" dlaždic: "+groups.map(y=>y.year+" ("+
+             y.scenes.map(o=>o.acquiredAt.slice(0,10)).join(" a ")+")").join(" | ")+
+           ". Každá dlaždice používá totožné scény, ale vlastní SCL platnost.";
+       }
+     }else if(event.type==="tile"){
        const t=event.tile;
        if(!cells.some(c=>c.key===t.key)||!["analyzed","insufficient","error"].includes(t.status))
          throw Error("Neověřená regionální dlaždice");
@@ -1468,6 +1494,18 @@ async function runRegionCoverage(){
          r.month!==month||r.requestedTiles!==cells.length||
          r.pendingTiles!==0||r.tiles.length!==cells.length)
          throw Error("Neúplný nebo neověřený regionální přehled");
+       if(!["shared","unavailable"].includes(r.sourceSelectionStatus)||
+         r.sourceLockId!==(regionPlan.sourceLockId??null)||
+         !Array.isArray(r.lockedSourceYears)||
+         r.lockedSourceYears.length!==(r.sourceLockId?to-from+1:0)||
+         r.tiles.some(t=>t.status==="analyzed"&&!r.sourceLockId)||
+         (r.sourceLockId&&r.tiles.some(t=>t.status==="analyzed"&&
+           !r.lockedSourceYears.every((y,i)=>
+             y.year===from+i&&t.sourceScenes?.[i]?.year===y.year&&
+             y.scenes.every((scene,j)=>
+               t.sourceScenes[i].scenes[j]?.sceneId===scene.id&&
+               t.sourceScenes[i].scenes[j]?.acquiredAt===scene.acquiredAt)))))
+         throw Error("Regionální výsledek nedodržel společné historické zdroje");
        if(!Array.isArray(r.seams)||r.seams.length!==regionSeams.length||
          r.seamWarningCount!==regionSeams.filter(s=>s.warning).length)
          throw Error("Regionální kontrola skutečných hranic není úplná");
@@ -1569,6 +1607,9 @@ function validateRegionSource(meta,tile){
    meta.statistics?.totalPixels!==n||
    meta.statistics?.commonValidPixels!==report.commonValidPixels||
    meta.statistics?.robustAllYearsPixels!==report.robustAllYearsPixels||
+   (regionResult?.sourceLockId&&
+     (meta.sourceLockId!==regionResult.sourceLockId||
+      meta.regionSourceLocked!==true))||
    !Array.isArray(meta.years)||meta.years.length!==to-from+1||
    !Array.isArray(scenes)||scenes.length!==meta.years.length||
    !meta.years.every((y,i)=>y.year===from+i&&
@@ -1609,7 +1650,9 @@ async function loadRegionTexture(tile,epoch,controller){
    params.fromYear+"/"+params.toYear+"/"+params.month+".";
  const cloud=Number(regionPlan?.cloud);
  if(!Number.isFinite(cloud))throw Error("Regionální oblačnost nebyla doložena");
- const suffix="?cloud="+cloud;
+ const suffix="?"+new URLSearchParams({
+   cloud:String(cloud),...(params.sourceLockId?{lock:params.sourceLockId}:{})
+ });
  const reply=await fetch(base+"json"+suffix,{signal:controller.signal});
  if(!reply.ok)throw Error("Sentinel regionální metadata HTTP "+reply.status);
  const meta=await reply.json();
