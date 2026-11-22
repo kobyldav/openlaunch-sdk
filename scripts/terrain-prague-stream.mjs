@@ -38,9 +38,9 @@ if(!Number.isInteger(port)||port<0||port>65535)throw Error("--port must be 0..65
 const scenePairConcurrency=Number(getArg("scene-pair-concurrency","2"));
 if(![1,2].includes(scenePairConcurrency))
  throw RangeError("--scene-pair-concurrency must be 1 (baseline) or 2 (bounded original COG pair)");
-const cogRangeCacheMiB=Number(getArg("cog-range-cache-mib","16"));
-if(!Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>32)
- throw RangeError("--cog-range-cache-mib must be 0 (actual network baseline) or 1..32 bounded MiB");
+const cogRangeCacheMiB=Number(getArg("cog-range-cache-mib","64"));
+if(!Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>128)
+ throw RangeError("--cog-range-cache-mib must be 0 (actual network baseline) or 1..128 bounded MiB");
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
 const offline=args.includes("--offline");
 await mkdir(cacheRoot,{recursive:true});
