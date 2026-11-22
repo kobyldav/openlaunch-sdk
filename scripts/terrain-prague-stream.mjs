@@ -19,6 +19,7 @@ import {SENTINEL_TERRAIN_OVERLAY_VERSION,validateObservationDates}
 import {SENTINEL_NDVI_CHANGE_VERSION} from "../dist/terrain/sentinel-change.js";
 import {SENTINEL_NDVI_TREND_VERSION,SENTINEL_TREND_MAX_SCENES}
   from "../dist/terrain/sentinel-trend.js";
+import {SENTINEL_SEASONAL_COMPOSITE_VERSION} from "../dist/terrain/sentinel-seasonal.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -33,7 +34,7 @@ const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.j
 const sdk=new OpenLaunch();
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
-const changeTasks=new Map(),trendTasks=new Map();
+const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map();
 const MAX_OBSERVATION_JOBS=2;
 const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
@@ -468,6 +469,153 @@ function obtainTrend(spec,sceneIds){
  trendTasks.set(key,promise);return promise;
 }
 
+/** Annual comparability: two independently acquired Sentinel scenes in
+ * the same calendar month of each distinct year. Only true scene-wide
+ * cloud metadata may rank candidates; pixel SCL is assessed afterward.
+ */
+function seasonalArguments(beforeYear,afterYear,month,cloud){
+ if(!Number.isInteger(beforeYear)||!Number.isInteger(afterYear)||
+    beforeYear<2017||afterYear>2100||beforeYear>=afterYear||
+    afterYear-beforeYear>15||!Number.isInteger(month)||month<1||month>12||
+    !Number.isFinite(cloud)||cloud<0||cloud>100)
+   throw RangeError("Seasonal query requires two ascending years, one month and cloud 0..100");
+}
+function seasonalDates(year,month){
+ const two=String(month).padStart(2,"0");
+ const end=new Date(Date.UTC(year,month,0)).getUTCDate();
+ return [year+"-"+two+"-01",year+"-"+two+"-"+end];
+}
+function selectSeasonalSources(scenes,year,month){
+ const candidates=scenes.filter(s=>
+   OBS_SCENE_ID.test(s.id)&&typeof s.acquiredAt==="string"&&
+   new Date(s.acquiredAt).getUTCFullYear()===year&&
+   new Date(s.acquiredAt).getUTCMonth()+1===month
+ ).sort((a,b)=>{
+   const diff=(a.cloudPercent??101)-(b.cloudPercent??101);
+   return diff||Math.abs(new Date(a.acquiredAt).getUTCDate()-16)-
+     Math.abs(new Date(b.acquiredAt).getUTCDate()-16);
+ });
+ const selected=[];
+ for(const s of candidates){
+   const day=Date.parse(s.acquiredAt);
+   if(!Number.isFinite(day)||selected.some(old=>
+     Math.abs(Date.parse(old.acquiredAt)-day)<4*86400000))continue;
+   selected.push(s);
+   if(selected.length===2)break;
+ }
+ return selected.sort((a,b)=>a.acquiredAt.localeCompare(b.acquiredAt));
+}
+async function seasonalSceneSelection(spec,beforeYear,afterYear,month,cloud){
+ seasonalArguments(beforeYear,afterYear,month,cloud);
+ const catalogs=[];
+ for(const year of [beforeYear,afterYear]){
+   const [from,to]=seasonalDates(year,month);
+   const data=await observationScenes(spec,from,to,cloud);
+   const picked=selectSeasonalSources(data.scenes,year,month);
+   if(picked.length<2){
+     const error=Error("Fewer than two genuine, distinct Sentinel-2 acquisitions "+
+       "in "+year+"-"+String(month).padStart(2,"0")+
+       ". Try a different month or scene-wide cloud limit.");
+     error.code="OBSERVATION_INSUFFICIENT";throw error;
+   }
+   catalogs.push({year,scenes:picked});
+ }
+ return {status:"real-sentinel-seasonal-catalog",key:spec.key,
+   month,cloud,maxScenesPerYear:2,before:catalogs[0],after:catalogs[1],
+   note:"Scene-wide cloud score is only for discovery ranking; every source pixel uses independent SCL QA."};
+}
+function seasonalCachePath(spec,meta){
+ const selected=[...meta.before.scenes,...meta.after.scenes].map(s=>s.id);
+ const digest=createHash("sha256").update(JSON.stringify({
+   key:spec.key,beforeYear:meta.before.year,afterYear:meta.after.year,
+   month:meta.month,cloud:meta.cloud,selected
+ })).digest("hex").slice(0,24);
+ return join(cacheRoot,"seasonal-v"+SENTINEL_SEASONAL_COMPOSITE_VERSION+"-"+
+   spec.key+"-"+digest);
+}
+async function generateSeasonal(spec,beforeYear,afterYear,month,cloud){
+ const meta=await seasonalSceneSelection(spec,beforeYear,afterYear,month,cloud);
+ const target=seasonalCachePath(spec,meta);
+ try{
+   const [json,png]=await Promise.all([readFile(target+".json"),readFile(target+".png")]);
+   const d=JSON.parse(json.toString("utf8"));
+   if(d.status==="real-sentinel-interannual-ndvi"&&
+      d.version===SENTINEL_SEASONAL_COMPOSITE_VERSION&&d.key===spec.key&&
+      d.before?.year===beforeYear&&d.after?.year===afterYear&&
+      d.before?.month===month&&d.qa?.pixelSclMasked===true&&
+      d.qa?.medianPerYear===true&&
+      d.statistics?.overlapPixels>=16&&
+      Buffer.from(d.deltaF32LE??"","base64").byteLength===d.width*d.height*4&&
+      Buffer.from(d.beforeCountB64??"","base64").byteLength===d.width*d.height&&
+      Buffer.from(d.afterCountB64??"","base64").byteLength===d.width*d.height&&
+      png.byteLength>100)return {json,png};
+ }catch{}
+ const values=[];
+ for(const group of [meta.before,meta.after]){
+   const data=[];
+   for(const s of group.scenes){
+     const source=await obtainObservation(spec,s.id);
+     const observation=JSON.parse(source.json.toString("utf8"));
+     if(observation.sceneId!==s.id||observation.key!==spec.key||
+        observation.status!=="real-sentinel2-observation"||
+        observation.version!==SENTINEL_TERRAIN_OVERLAY_VERSION||
+        observation.qa?.sclMask!==true||
+        observation.grid?.crs!=="EPSG:3857"||
+        observation.terrainElevationUnchanged!==true||
+        typeof observation.ndviF32LE!=="string"||
+        !Number.isInteger(observation.width)||!Number.isInteger(observation.height)||
+        observation.width*observation.height>50000)
+       throw Error("No source-qualified numerical same-season NDVI in selected observation");
+     const raw=Buffer.from(observation.ndviF32LE,"base64");
+     if(raw.byteLength!==observation.width*observation.height*4)
+       throw Error("Observed annual source raster contains invalid numeric samples");
+     data.push({...observation,ndviValues:new Float32Array(
+       raw.buffer.slice(raw.byteOffset,raw.byteOffset+raw.byteLength))});
+   }
+   values.push(data);
+ }
+ const product=sdk.terrain.compareSentinelSeasons(values[0],values[1],{
+   thresholdNdvi:.15,minOverlapPixels:16,minValidPerYear:1
+ });
+ const result={status:product.status,version:product.version,key:spec.key,
+   before:product.before,after:product.after,source:product.source,
+   area:product.area,grid:product.grid,
+   width:product.width,height:product.height,groundSamplingM:product.groundSamplingM,
+   statistics:product.statistics,qa:product.qa,caveats:product.caveats,
+   deltaF32LE:Buffer.from(product.deltaValues.buffer,product.deltaValues.byteOffset,
+     product.deltaValues.byteLength).toString("base64"),
+   beforeCountB64:Buffer.from(product.beforeValidCount).toString("base64"),
+   afterCountB64:Buffer.from(product.afterValidCount).toString("base64"),
+   image:"/api/observations/seasonal/0/"+spec.x+"/"+spec.y+"/"+
+     beforeYear+"/"+afterYear+"/"+month+".png?cloud="+cloud,
+   terrainElevationUnchanged:true};
+ const json=Buffer.from(JSON.stringify(result));
+ const png=rgbaPng({width:product.width,height:product.height,rgba:product.deltaRgba});
+ const nonce="."+process.pid+"-"+Date.now();
+ await writeFile(target+nonce+".png",png);
+ await rename(target+nonce+".png",target+".png");
+ await writeFile(target+nonce+".json",json);
+ await rename(target+nonce+".json",target+".json");
+ console.log("PASS genuine same-season "+beforeYear+" -> "+afterYear+
+   " for "+spec.key+": "+product.statistics.overlapPixels+" paired pixels, "+
+   product.statistics.robustTwoPerYearPixels+" two-per-year robust pixels, "+
+   "ΔNDVI "+product.statistics.meanDeltaNdvi.toFixed(5));
+ return {json,png};
+}
+function obtainSeasonal(spec,beforeYear,afterYear,month,cloud){
+ seasonalArguments(beforeYear,afterYear,month,cloud);
+ const key=spec.key+"/"+beforeYear+"/"+afterYear+"/"+month+"/"+cloud;
+ if(seasonalTasks.has(key))return seasonalTasks.get(key);
+ if(seasonalTasks.size>=1){
+   const e=Error("Another real Sentinel yearly comparison is in progress");
+   e.code="OBSERVATION_BUSY";throw e;
+ }
+ const promise=generateSeasonal(spec,beforeYear,afterYear,month,cloud)
+   .finally(()=>seasonalTasks.delete(key));
+ seasonalTasks.set(key,promise);
+ return promise;
+}
+
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -506,6 +654,27 @@ const server=createServer(async(req,res)=>{
       const maxCloud=Number(incoming.searchParams.get("cloud")??"35");
       const catalog=await observationScenes(spec,from,to,maxCloud);
       send(res,200,JSON.stringify(catalog),"application/json; charset=utf-8");return;
+    }
+    const seasonalScenes=/^\/api\/observations\/seasonal\/scenes\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
+    if(seasonalScenes){
+      const spec=tileSpec(0,Number(seasonalScenes[1]),Number(seasonalScenes[2]));
+      const beforeYear=Number(incoming.searchParams.get("before")??"2024");
+      const afterYear=Number(incoming.searchParams.get("after")??"2025");
+      const month=Number(incoming.searchParams.get("month")??"8");
+      const cloud=Number(incoming.searchParams.get("cloud")??"50");
+      const result=await seasonalSceneSelection(spec,beforeYear,afterYear,month,cloud);
+      send(res,200,JSON.stringify(result),"application/json; charset=utf-8");return;
+    }
+    const seasonalResult=/^\/api\/observations\/seasonal\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})\/([0-9]{4})\/([0-9]{1,2})\.(json|png)$/.exec(pathname);
+    if(seasonalResult){
+      const spec=tileSpec(0,Number(seasonalResult[1]),Number(seasonalResult[2]));
+      const beforeYear=Number(seasonalResult[3]),afterYear=Number(seasonalResult[4]);
+      const month=Number(seasonalResult[5]);
+      const cloud=Number(incoming.searchParams.get("cloud")??"50");
+      const result=await obtainSeasonal(spec,beforeYear,afterYear,month,cloud);
+      send(res,200,seasonalResult[6]==="json"?result.json:result.png,
+        seasonalResult[6]==="json"?"application/json; charset=utf-8":"image/png");
+      return;
     }
     const trendMatch=/^\/api\/observations\/trend\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_,-]{16,760})\.(json|png)$/.exec(pathname);
     if(trendMatch){
@@ -553,7 +722,7 @@ const server=createServer(async(req,res)=>{
   }catch(err){
     console.error("Tile error:",String(err));
     const message=String(err?.message??err).slice(0,250);
-    send(res,err?.code==="TILE_NOT_CACHED"?404:err?.code==="OBSERVATION_BUSY"?429:err instanceof RangeError?400:503,
+    send(res,err?.code==="TILE_NOT_CACHED"?404:err?.code==="OBSERVATION_BUSY"?429:err?.code==="OBSERVATION_INSUFFICIENT"?422:err instanceof RangeError?400:503,
       JSON.stringify({error:message,syntheticFallback:false}),
       "application/json; charset=utf-8");
   }
@@ -564,7 +733,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
-  console.log("Sentinel-2 analytical layer: real RGB, calibrated NDVI, paired ΔNDVI, and 3..6-acquisition fixed-pixel Theil-Sen NDVI trend.");
+  console.log("Sentinel-2 analytics: RGB, NDVI, two-date change, 3..6-date time series, and two-year same-month real seasonal median composites.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
