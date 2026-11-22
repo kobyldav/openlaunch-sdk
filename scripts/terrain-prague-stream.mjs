@@ -13,6 +13,8 @@ import {tileSpec,tileOriginOffset,pragueStreamManifest} from "./terrain-prague-s
 import {buildSeamMesh,TERRAIN_SEAM_VERSION} from "./terrain-prague-stream-seams.mjs";
 import {fetchOsmFootprints,fetchGroundDmr,buildBuildings,BUILDING_LAYER_VERSION}
   from "./terrain-prague-buildings.mjs";
+import {SENTINEL_TERRAIN_OVERLAY_VERSION,validateObservationDates}
+  from "../dist/terrain/sentinel-overlay.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -26,6 +28,9 @@ const visibilityScript=await readFile(new URL("./terrain-prague-stream-visibilit
 const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.js",import.meta.url),"utf8");
 const sdk=new OpenLaunch();
 const buildingTasks=new Map();
+const observationCatalog=new Map(),observationTasks=new Map();
+const MAX_OBSERVATION_JOBS=2;
+const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
 let active=0;const queued=[];
 const MAX_SIMULTANEOUS=2,MAX_QUEUE=12;
@@ -182,6 +187,122 @@ function obtainBuildings(spec){
  const promise=generateBuildings(spec).finally(()=>buildingTasks.delete(spec.key));
  buildingTasks.set(spec.key,promise);return promise;
 }
+/** Cached historical STAC metadata, no user-controlled remote COG URLs. */
+async function observationScenes(spec,from,to,maxCloud){
+ validateObservationDates(from,to);
+ if(!Number.isFinite(maxCloud)||maxCloud<0||maxCloud>100)
+   throw RangeError("cloud must be 0..100 percent");
+ const label="observations-scenes-v"+SENTINEL_TERRAIN_OVERLAY_VERSION+"-"+
+   spec.key+"-"+from+"-"+to+"-"+maxCloud+".json";
+ const file=join(cacheRoot,label);
+ let raw=null;
+ try{
+   raw=JSON.parse(await readFile(file,"utf8"));
+   if(!Array.isArray(raw.items)||!Array.isArray(raw.scenes))raw=null;
+ }catch{}
+ if(!raw){
+   if(offline){
+     const e=Error("No real Sentinel catalog is cached for this date range.");
+     e.code="TILE_NOT_CACHED";throw e;
+   }
+   const result=await sdk.terrain.discoverObservations({
+     area:bbox(spec.west,spec.south,spec.east,spec.north),
+     from,to,maxCloudPercent:maxCloud,limit:40
+   });
+   raw={status:"real-sentinel-catalog",key:spec.key,items:result.items,
+     scenes:result.scenes,from,to,maxCloud,source:"Element84 Earth Search STAC v1",
+     retrievedAt:new Date().toISOString()};
+   const temp=file+"."+process.pid+"-"+Date.now()+".tmp";
+   await writeFile(temp,JSON.stringify(raw));await rename(temp,file);
+ }
+ for(const item of raw.items){
+   if(!OBS_SCENE_ID.test(item.id))continue;
+   observationCatalog.set(item.id,item);
+ }
+ return {status:"real-sentinel-catalog",key:spec.key,
+   from,to,maxCloud,retrievedAt:raw.retrievedAt,
+   source:raw.source,scenes:raw.scenes,
+   note:"Scene-wide cloud fraction is not local cloud-free proof; SCL pixel QA is applied during reading."};
+}
+function observationPath(spec,sceneId){
+ if(!OBS_SCENE_ID.test(sceneId))throw RangeError("Invalid Sentinel scene ID");
+ return join(cacheRoot,"observations-v"+SENTINEL_TERRAIN_OVERLAY_VERSION+"-"+
+   sceneId+"-"+spec.key);
+}
+async function storedObservation(spec,sceneId){
+ const path=observationPath(spec,sceneId);
+ try{
+   const [json,rgb,ndvi]=await Promise.all([
+     readFile(path+".json"),readFile(path+".rgb.png"),readFile(path+".ndvi.png")]);
+   const doc=JSON.parse(json.toString("utf8"));
+   if(doc.status==="real-sentinel2-observation"&&doc.sceneId===sceneId&&
+     doc.key===spec.key&&doc.version===SENTINEL_TERRAIN_OVERLAY_VERSION&&
+     doc.qa?.sclMask===true&&rgb.length>100&&ndvi.length>100)
+     return {json,rgb,ndvi};
+ }catch{}
+ return null;
+}
+async function generateObservation(spec,sceneId){
+ const cached=await storedObservation(spec,sceneId);
+ if(cached)return cached;
+ if(offline){
+   const e=Error("Scene overlay is not yet cached; offline mode forbids remote COG requests.");
+   e.code="TILE_NOT_CACHED";throw e;
+ }
+ const scene=observationCatalog.get(sceneId);
+ if(!scene){
+   const e=Error("Scene metadata not selected. Search for a dated Sentinel-2 scene first.");
+   e.code="TILE_NOT_CACHED";throw e;
+ }
+ console.log("Loading real Sentinel-2 RGB+NDVI "+sceneId+" on Prague tile "+spec.key);
+ const product=await sdk.terrain.observeSentinel2({
+   area:bbox(spec.west,spec.south,spec.east,spec.north),
+   scene,resolutionM:10
+ });
+ if(product.status!=="real-sentinel2-observation"||
+    product.sceneId!==sceneId||product.qa.sclMask!==true||
+    product.statistics.validPixels<4)
+   throw Error("Sentinel-2 raster failed calibrated single-scene provenance checks");
+ const doc={status:product.status,version:product.version,
+   key:spec.key,sceneId:product.sceneId,acquiredAt:product.acquiredAt,
+   cloudPercent:product.cloudPercent,source:product.source,
+   collection:product.collection,area:product.area,
+   width:product.width,height:product.height,
+   groundSamplingM:product.groundSamplingM,
+   statistics:product.statistics,qa:product.qa,caveats:product.caveats,
+   imageryOnly:true,terrainElevationUnchanged:true,
+   images:{
+     rgb:"/api/observations/0/"+spec.x+"/"+spec.y+"/"+sceneId+".rgb.png",
+     ndvi:"/api/observations/0/"+spec.x+"/"+spec.y+"/"+sceneId+".ndvi.png"
+   }};
+ const json=Buffer.from(JSON.stringify(doc)),rgb=rgbaPng({
+   width:product.width,height:product.height,rgba:product.rgbRgba
+ }),ndvi=rgbaPng({
+   width:product.width,height:product.height,rgba:product.ndviRgba
+ });
+ const path=observationPath(spec,sceneId),nonce="."+process.pid+"-"+Date.now();
+ await writeFile(path+nonce+".rgb.png",rgb);
+ await writeFile(path+nonce+".ndvi.png",ndvi);
+ await rename(path+nonce+".rgb.png",path+".rgb.png");
+ await rename(path+nonce+".ndvi.png",path+".ndvi.png");
+ await writeFile(path+nonce+".json",json);
+ await rename(path+nonce+".json",path+".json");
+ console.log("Cached Sentinel scene "+sceneId+" / "+spec.key+
+   " "+doc.statistics.validPixels+" SCL-accepted pixels, NDVI avg "+
+   doc.statistics.ndviMean);
+ return {json,rgb,ndvi};
+}
+function obtainObservation(spec,sceneId){
+ const key=spec.key+"/"+sceneId;
+ if(observationTasks.has(key))return observationTasks.get(key);
+ if(observationTasks.size>=MAX_OBSERVATION_JOBS){
+   const e=Error("Too many satellite scenes in progress; retry once current analysis finishes.");
+   e.code="OBSERVATION_BUSY";throw e;
+ }
+ const task=generateObservation(spec,sceneId).finally(()=>observationTasks.delete(key));
+ observationTasks.set(key,task);return task;
+}
+
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -197,7 +318,8 @@ const server=createServer(async(req,res)=>{
     if(!/^(?:127\.0\.0\.1|localhost):\d{1,5}$/.test(host)){
       send(res,403,"Forbidden host","text/plain; charset=utf-8");return;
     }
-    const pathname=new URL(req.url??"/","http://127.0.0.1").pathname;
+    const incoming=new URL(req.url??"/","http://127.0.0.1");
+    const pathname=incoming.pathname;
     if(req.method!=="GET"){send(res,405,"Only GET is supported","text/plain");return;}
     if(pathname==="/"){
       send(res,200,viewport,"text/html; charset=utf-8");return;
@@ -210,6 +332,25 @@ const server=createServer(async(req,res)=>{
     }
     if(pathname==="/api/config"){
       send(res,200,JSON.stringify({...pragueStreamManifest(),offlineMode:offline}),"application/json; charset=utf-8");return;
+    }
+    const obsCatalogPath=/^\/api\/observations\/scenes\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
+    if(obsCatalogPath){
+      const spec=tileSpec(0,Number(obsCatalogPath[1]),Number(obsCatalogPath[2]));
+      const from=incoming.searchParams.get("from")??"2025-06-01";
+      const to=incoming.searchParams.get("to")??"2025-09-30";
+      const maxCloud=Number(incoming.searchParams.get("cloud")??"35");
+      const catalog=await observationScenes(spec,from,to,maxCloud);
+      send(res,200,JSON.stringify(catalog),"application/json; charset=utf-8");return;
+    }
+    const obsMatch=/^\/api\/observations\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_-]{5,120})\.(json|rgb\.png|ndvi\.png)$/.exec(pathname);
+    if(obsMatch){
+      const spec=tileSpec(0,Number(obsMatch[1]),Number(obsMatch[2]));
+      const sceneId=obsMatch[3],kind=obsMatch[4];
+      const product=await obtainObservation(spec,sceneId);
+      send(res,200,kind==="json"?product.json:
+        kind==="rgb.png"?product.rgb:product.ndvi,
+        kind==="json"?"application/json; charset=utf-8":"image/png");
+      return;
     }
     const buildingMatch=/^\/api\/buildings\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
     if(buildingMatch){
@@ -230,7 +371,7 @@ const server=createServer(async(req,res)=>{
   }catch(err){
     console.error("Tile error:",String(err));
     const message=String(err?.message??err).slice(0,250);
-    send(res,err?.code==="TILE_NOT_CACHED"?404:err instanceof RangeError?400:503,
+    send(res,err?.code==="TILE_NOT_CACHED"?404:err?.code==="OBSERVATION_BUSY"?429:err instanceof RangeError?400:503,
       JSON.stringify({error:message,syntheticFallback:false}),
       "application/json; charset=utf-8");
   }
@@ -241,6 +382,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
+  console.log("Sentinel-2 analytical layer: real dated RGB, radiometrically calibrated NDVI + SCL cloud/invalid mask.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
