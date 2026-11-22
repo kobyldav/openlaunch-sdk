@@ -109,7 +109,7 @@ test("Stage 15: rejected unverified source years, calendar mismatches, CRS drift
 });
 test("Stage 15: five observed yearly cohorts, original 10m geometry and actual sensitivity values",()=>{
  const result=analyzeSentinelMultiYearSeasons([
-   season(2020),season(2021,.1),season(2022,.2),season(2023,.3),season(2024,.4)
+   season(2020,-.2),season(2021,-.1),season(2022,0),season(2023,.1),season(2024,.2)
  ],{minCommonPixels:4});
  assert.equal(result.statistics.yearCount,5);
  assert.equal(result.statistics.lastYear,2024);
