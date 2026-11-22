@@ -124,12 +124,11 @@ export function analyzeSentinelMultiYearSeasons(
    ![1,2].includes(minPerYear))
    throw new RangeError("Invalid annual slope threshold, common pixels or annual source minimum");
  const seasons=[...input].sort((a,b)=>a.year-b.year);
- const all=scenes=>scenes.flatMap(s=>s.observations);
  if(seasons.some((s,i)=>!Number.isInteger(s.year)||s.year<2017||s.year>2100||
    !Array.isArray(s.observations)||s.observations.length!==2||
    (i>0&&s.year!==seasons[i-1]!.year+1)))
    throw new RangeError("Three to five consecutive years require exactly two genuine dated scenes each");
- const sources=all(seasons);
+ const sources=seasons.flatMap(s=>s.observations);
  sources.forEach((s,i)=>validate(s,"Annual scene "+i));
  const ref=sources[0]!;
  const month=new Date(ref.acquiredAt).getUTCMonth()+1;

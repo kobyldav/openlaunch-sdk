@@ -9,6 +9,7 @@ import {discoverSentinelTerrainScenes,loadSentinelTerrainOverlay} from "./sentin
 import {compareSentinelNdviScenes} from "./sentinel-change.js";
 import {analyzeSentinelNdviTimeSeries} from "./sentinel-trend.js";
 import {compareSentinelSeasonalNdvi} from "./sentinel-seasonal.js";
+import {analyzeSentinelMultiYearSeasons} from "./sentinel-multiyear.js";
 export class TerrainReconstructionEngine {
   load = loadRealTerrain;
   discoverObservations = discoverSentinelTerrainScenes;
@@ -16,6 +17,7 @@ export class TerrainReconstructionEngine {
   compareSentinelNdvi = compareSentinelNdviScenes;
   analyzeSentinelNdviTrend = analyzeSentinelNdviTimeSeries;
   compareSentinelSeasons = compareSentinelSeasonalNdvi;
+  analyzeSentinelMultiYear = analyzeSentinelMultiYearSeasons;
   reconstruct = reconstructTerrain;
   reconstructFromSource = reconstructTerrainFromSource;
   validate = validateTerrainHeights;
@@ -39,3 +41,4 @@ export * from "./sentinel-overlay.js";
 export * from "./sentinel-change.js";
 export * from "./sentinel-trend.js";
 export * from "./sentinel-seasonal.js";
+export * from "./sentinel-multiyear.js";
