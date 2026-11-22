@@ -702,3 +702,78 @@ reported explicitly, never silently replaced with fixtures.
 - The output remains one camera-selected ~700m Prague tile, never an
   invented full-city global NDVI mosaic or improved native spatial
   resolution. Original ČÚZK Bpv 3D measurements are untouched.
+
+## Stage 14 — Same-month two-year Sentinel-2 annual medians (experimental)
+
+The Earth Intelligence panel now provides **two-year same-calendar-month
+selection**, source date/cloud metadata for four independent dated
+Sentinel-2 L2A scenes (two dates per year), a **measured annual ΔNDVI
+composite** projected over the unchanged ČÚZK 3D Prague DSM, and
+a numerical **CSV export** with WGS84 pixel centers, counts of accepted
+observations per year, and actual NDVI difference. The original
+single-scene, two-date and 3–6-date time-series features remain available.
+
+### Scientific data model: no synthetic cloud gap filling
+
+Reusable `compareSentinelSeasonalNdvi(beforeScenes,afterScenes,options)`
+from `src/terrain/sentinel-seasonal.ts`, root SDK exports and
+`new OpenLaunch().terrain.compareSentinelSeasons`. The pure engine
+accepts **2–3 genuine** Sentinel-2 L2A observations per year, with
+source scene identity, acquisition time, calibrated numeric NDVI
+`Float32Array`, SCL QA, original EPSG:3857 affine pixel-center
+transform and fixed area extent. Both selected years must differ
+(1–15 years apart) and all observations must be from the **same
+calendar month**; observations must have distinct days, dates and
+valid source pixel counts. Mismatched grids, uncalibrated pixels,
+duplicate source dates and source QA failures are explicitly rejected.
+
+For each 10m pixel, the engine takes the **median of only genuine,
+SCL-valid, radiometrically valid observations** from each year's
+source scenes, then computes `NDVI_later_year - NDVI_earlier_year`.
+Default output requires at least one true clear observation from
+**each year**. Optional `minValidPerYear:2` requires two actual
+measurements from each year for every displayed pixel; it never
+interpolates masked pixels. Pixels with no valid source in either
+year remain NaN/transparent above the unchanged ČÚZK orthophoto.
+
+Results retain `deltaValues`, `beforeValidCount`,
+`afterValidCount`, real source scene IDs/dates, per-year mean NDVI
+on the **same intersected pixel cohort**, count of pixels with
+two clear measurements in both years, exact overlap percentage,
+mean/min/max change and gain/loss/stable visual bins. The
+±0.15 NDVI color threshold is only a selectable illustrative
+analysis level, **not** statistically significant evidence
+of deforestation or urban development. Real source coverage
+below 25% or median acquisition day-of-month shifted by >10 days
+receives an explicit QA warning rather than a full-area claim.
+
+### Source-qualified bounded local server
+
+`/api/observations/seasonal/scenes/0/X/Y.json?before=2024&after=2025&month=8&cloud=50`
+looks up actual STAC scenes for the same bounded tile in two separate
+calendar-year calls. Server chooses two source-qualified acquisitions
+in each year separated by ≥4 days, prioritizing lower scene-wide
+cloud values (which **do not** establish local clear-sky quality).
+`/api/observations/seasonal/0/X/Y/2024/2025/8.json?cloud=50`
+and `.png` return the original-source measured interannual composite.
+Four scenes are read sequentially through the existing source
+COG/mask SDK, and `seasonal-v1-*` real source metadata + image
+are stored on disk with atomic metadata-last writes. One seasonal
+computation can run at a time; the original tile streamer is
+independent. `--offline` never fetches missing original COGs
+or constructs a fake image. Without cached sources it returns
+an explicit error.
+
+### Limitations and recommended next research
+
+Same calendar month reduces—but does **not** remove—seasonal
+phenology, atmospheric correction and sun geometry differences.
+A pixel with only one valid scene per year is **weak evidence**;
+`robustTwoPerYearPixels` distinguishes higher-support pixels.
+Even strong support is not proof of cause, ecological health,
+or statistical significance. The plotted signal remains an
+actual interannual spectral observation of one bounded tile,
+**not a complete Prague land-use change detector**, and the
+spatial resolution of Sentinel-2 remains about 10m. A next
+research iteration could create annual seasonally matched
+multi-year replicates with coverage and uncertainty thresholds.
