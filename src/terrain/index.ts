@@ -7,11 +7,13 @@ import {discoverAsterStereo} from "./aster.js";
 import {loadRealTerrain} from "./real-map.js";
 import {discoverSentinelTerrainScenes,loadSentinelTerrainOverlay} from "./sentinel-overlay.js";
 import {compareSentinelNdviScenes} from "./sentinel-change.js";
+import {analyzeSentinelNdviTimeSeries} from "./sentinel-trend.js";
 export class TerrainReconstructionEngine {
   load = loadRealTerrain;
   discoverObservations = discoverSentinelTerrainScenes;
   observeSentinel2 = loadSentinelTerrainOverlay;
   compareSentinelNdvi = compareSentinelNdviScenes;
+  analyzeSentinelNdviTrend = analyzeSentinelNdviTimeSeries;
   reconstruct = reconstructTerrain;
   reconstructFromSource = reconstructTerrainFromSource;
   validate = validateTerrainHeights;
@@ -33,3 +35,4 @@ export * from "./measure.js";
 
 export * from "./sentinel-overlay.js";
 export * from "./sentinel-change.js";
+export * from "./sentinel-trend.js";
