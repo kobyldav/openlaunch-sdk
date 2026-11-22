@@ -171,7 +171,9 @@ function pump(){
      $("error").textContent="Dlaždice "+tile.key+": "+String(err.message||err)+
        " · Dříve načtené dlaždice zůstávají viditelné.";
      // Failed tiles remain eligible for explicit movement/reload rather than inventing a replacement.
-   }).finally(()=>{active--;pending.delete(tile.key);controllers.delete(tile.key);update();pump();});
+   }).finally(()=>{active--;pending.delete(tile.key);
+     if(controllers.get(tile.key)===controller)controllers.delete(tile.key);
+     update();pump();});
  }
  $("pending").textContent=String(active+queue.length);
 }
