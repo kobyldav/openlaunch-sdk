@@ -84,6 +84,7 @@ a{color:#9cd1fc}
     <option value="trend">Trend NDVI – 3 až 6 snímků</option>
     <option value="seasonal">Meziroční ΔNDVI – stejný měsíc</option>
     <option value="multiyear">Víceletý NDVI trend · stejná sezóna</option>
+    <option value="region">Regionální NDVI trend · více 3D dlaždic</option>
    </select></label>
   </div>
   <div class="toolbar" aria-label="Časové porovnání NDVI">
@@ -155,7 +156,9 @@ a{color:#9cd1fc}
       <button id="region-stop" disabled>Zastavit</button>
       <button id="region-export" disabled>Pokrytí CSV</button>
       <button id="region-geojson" disabled>Pokrytí GeoJSON</button>
+      <button id="region-3d" disabled>Zobrazit regionální trend ve 3D</button>
     </div>
+    <p id="region-3d-status" class="small" aria-live="polite">3D vrstva: vypnutá. Po dokončení skutečné regionální analýzy lze promítnout ověřené pixely na původní ČÚZK terén. Načítají se jen právě potřebné textury (nejvýše 6 v GPU).</p>
     <p id="region-status" class="small" aria-live="polite">Použije roky, měsíc a limit oblačnosti ze sekce víceleté analýzy výše.</p>
     <canvas id="region-coverage" width="760" height="400" role="img" aria-label="Geografická mapa platného pokrytí dlaždic Sentinel-2 od severu k jihu"></canvas>
     <div id="region-detail">Zelená = podíl platných pixelů ve všech letech uvnitř ověřené dlaždice; šedá = chybí úplná datová řada; oranžová = chyba zdroje. Číslo není statistická spolehlivost. Regionální průměr zahrnuje pouze skutečně doložené pixely a neúplné území není považováno za prozkoumané.</div>
@@ -208,6 +211,9 @@ let comparisonData=null,trendData=null,trendSceneIds=[];
 let seasonalSelection=null,seasonalData=null;
 let multiSelection=null,multiData=null;
 let regionRun=null,regionResult=null,regionPlan=null;
+// Six individually source-verified GPU textures, never a whole-region mosaic.
+const MAX_REGION_GPU=6,regionGpu=new Map(),regionFailed=new Map();
+let regionTextureLoading=null,regionEpoch=0;
 const regionTiles=new Map();
 let observationEpoch=0;
 const observationCatalog=new Map();
@@ -1360,7 +1366,10 @@ async function runRegionCoverage(){
    cells.push({key:"0-"+ix+"-"+iy,x:ix,y:iy,
      bounds:{west:b[0],south:b[1],east:b[2],north:b[3]}});
  }
- regionPlan={x,y,cols:size,rows:size,tiles:cells};
+ clearRegionGpu();
+ if($("obs-mode").value==="region")$("obs-mode").value="ortho";
+ $("region-3d").disabled=true;$("region-3d").textContent="Zobrazit regionální trend ve 3D";
+ regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud};
  regionTiles.clear();regionResult=null;drawRegionCoverage();
  const controller=new AbortController();regionRun=controller;
  $("region-start").disabled=true;$("region-stop").disabled=false;
@@ -1397,6 +1406,7 @@ async function runRegionCoverage(){
          r.pendingTiles!==0||r.tiles.length!==cells.length)
          throw Error("Neúplný nebo neověřený regionální přehled");
        regionResult=r;completed=true;
+       $("region-3d").disabled=r.analyzedTiles===0;
        $("region-export").disabled=false;$("region-geojson").disabled=false;
        const mean=r.meanSlopeOnObservedPixels===null?"bez platných měření":
          r.meanSlopeOnObservedPixels.toFixed(5)+" NDVI/rok";
@@ -1441,6 +1451,149 @@ async function runRegionCoverage(){
  }
 }
 
+/** Regional overlay textures are never shared with or allowed to alter
+ * the genuine source ČÚZK mesh/elevation data.
+ * The Stage 15 server validates the actual Sentinel-2 COG source raster.
+ */
+function clearRegionGpu(){
+ regionEpoch++;
+ regionTextureLoading?.controller.abort();
+ regionTextureLoading=null;
+ for(const layer of regionGpu.values())gl?.deleteTexture(layer.texture);
+ regionGpu.clear();regionFailed.clear();
+ const line=$("region-3d-status");
+ if(line)line.textContent="3D regionální textury uvolněny; žádné nedoložené pixely se nezobrazují.";
+}
+function regionOverlayActive(){
+ return !!gl&&!!regionResult&&$("obs-mode").value==="region";
+}
+function regionWantedTiles(){
+ if(!regionOverlayActive())return [];
+ const selected=new Map(regionPlan?.tiles.map(t=>[t.key,t])??[]);
+ // Use only already verified, *currently render-selected* coarse parents.
+ // Fine z=1 meshes reuse the corresponding georeferenced source parent.
+ const visible=new Set(selection.coarse.map(t=>t.key));
+ for(const t of selection.finer)if(t.parent)visible.add(t.parent);
+ return [...visible].filter(id=>regionTiles.get(id)?.status==="analyzed"&&selected.has(id))
+   .map(id=>({key:id,cell:selected.get(id)}))
+   .sort((a,b)=>nearTile(0,a.cell.x,a.cell.y)-nearTile(0,b.cell.x,b.cell.y))
+   .slice(0,MAX_REGION_GPU);
+}
+function validateRegionSource(meta,tile){
+ const report=regionTiles.get(tile.key),from=regionResult?.fromYear,
+   to=regionResult?.toYear,month=regionResult?.month;
+ const n=meta?.width*meta?.height,scenes=report?.sourceScenes;
+ if(report?.status!=="analyzed"||
+   meta?.status!=="real-sentinel-multiyear-seasonal-trend"||
+   meta.version!==1||meta.key!==tile.key||meta.month!==month||
+   meta.terrainElevationUnchanged!==true||
+   meta.qa?.allSourceSclMasked!==true||meta.qa?.allSameGrid!==true||
+   meta.qa?.fixedCommonPixelPopulation!==true||
+   meta.qa?.noGapFilling!==true||
+   meta.qa?.leaveOneYearOutSensitivity!==true||
+   meta.grid?.crs!=="EPSG:3857"||
+   !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+   meta.width<2||meta.height<2||n>50000||
+   meta.statistics?.firstYear!==from||meta.statistics?.lastYear!==to||
+   meta.statistics?.totalPixels!==n||
+   meta.statistics?.commonValidPixels!==report.commonValidPixels||
+   meta.statistics?.robustAllYearsPixels!==report.robustAllYearsPixels||
+   !Array.isArray(meta.years)||meta.years.length!==to-from+1||
+   !Array.isArray(scenes)||scenes.length!==meta.years.length||
+   !meta.years.every((y,i)=>y.year===from+i&&
+     scenes[i].year===y.year&&y.scenes.length===2&&
+     scenes[i].scenes.length===2&&y.scenes.every((scene,j)=>
+       scene.sceneId===scenes[i].scenes[j].sceneId&&
+       scene.acquiredAt===scenes[i].scenes[j].acquiredAt)))
+   throw Error("3D regionální vrstva neodpovídá zdrojově ověřenému roku, SCL, geometrii nebo scénám");
+ // The sampled raster is separately recalculated from actual source bits
+ // and checked against the Stage 16 tile summary before uploading to GPU.
+ const slopes=binary(meta.slopeF32LE,Float32Array),
+   robust=binary(meta.robustB64,Uint8Array);
+ if(slopes.length!==n||robust.length!==n||
+   slopes.filter(Number.isFinite).length!==report.commonValidPixels||
+   robust.reduce((a,v)=>a+(v===1?1:0),0)!==report.robustAllYearsPixels||
+   robust.some((v,i)=>v>1||(v===1&&!Number.isFinite(slopes[i]))))
+   throw Error("3D regionální NDVI mřížka nesouhlasí s doloženými SCL pixely");
+ return true;
+}
+async function loadRegionTexture(tile,epoch,controller){
+ const id=tile.key,params=regionResult;
+ const base="/api/observations/multiyear/0/"+tile.cell.x+"/"+tile.cell.y+"/"+
+   params.fromYear+"/"+params.toYear+"/"+params.month+".";
+ const cloud=Number($("region-cloud-frozen")?.value??regionPlan.cloud);
+ if(!Number.isFinite(cloud))throw Error("Regionální oblačnost nebyla doložena");
+ const suffix="?cloud="+cloud;
+ const reply=await fetch(base+"json"+suffix,{signal:controller.signal});
+ if(!reply.ok)throw Error("Sentinel regionální metadata HTTP "+reply.status);
+ const meta=await reply.json();
+ if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+ validateRegionSource(meta,tile);
+ const bitmapReply=await fetch(base+"png"+suffix,{signal:controller.signal});
+ if(!bitmapReply.ok)throw Error("Ověřená regionální Sentinel textura HTTP "+bitmapReply.status);
+ const bitmap=await createImageBitmap(await bitmapReply.blob());
+ let texture=null;
+ try{
+   if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+   texture=observationTexture(bitmap,meta.width,meta.height);
+   if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+   regionGpu.set(id,{texture,lastUsed:Date.now(),sourceScenes:meta.years.length});
+   texture=null;
+ }finally{
+   bitmap.close?.();
+   if(texture)gl?.deleteTexture(texture);
+ }
+}
+function updateRegionOverlays(){
+ if(!gl||!config)return;
+ if(!regionOverlayActive()){
+   if(regionGpu.size||regionTextureLoading)clearRegionGpu();
+   return;
+ }
+ const targets=regionWantedTiles(),keys=new Set(targets.map(t=>t.key));
+ if(regionTextureLoading&&!keys.has(regionTextureLoading.key))
+   regionTextureLoading.controller.abort();
+ for(const [key,entry] of regionGpu)
+   if(!keys.has(key)){gl.deleteTexture(entry.texture);regionGpu.delete(key);}
+ if(regionGpu.size>MAX_REGION_GPU)throw Error("Regional GPU texture budget exceeded");
+ const line=$("region-3d-status");
+ line.textContent="3D Sentinel: "+regionGpu.size+"/"+MAX_REGION_GPU+
+   " skutečných textur v GPU; pouze aktuálně potřebné oblasti. "+
+   "Chybějící pixely, scény a celé dlaždice nechávám průhledné.";
+ if(regionTextureLoading)return;
+ const next=targets.find(t=>!regionGpu.has(t.key)&&
+   (regionFailed.get(t.key)??0)<=Date.now());
+ if(!next)return;
+ const controller=new AbortController(),epoch=regionEpoch;
+ regionTextureLoading={controller,key:next.key};
+ loadRegionTexture(next,epoch,controller).catch(error=>{
+   if(controller.signal.aborted||epoch!==regionEpoch||error?.name==="AbortError")return;
+   regionFailed.set(next.key,Date.now()+30000);
+   line.textContent="Dlaždice "+next.key+" nemá ověřenou regionální 3D texturu: "+
+     String(error?.message||error).slice(0,170)+
+     ". Nedoplňuji jí žádnými náhradními pixely.";
+ }).finally(()=>{
+   if(regionTextureLoading?.controller===controller)
+     regionTextureLoading=null;
+   if(epoch===regionEpoch&&gl){
+     requestDraw();updateRegionOverlays();
+   }
+ });
+}
+function toggleRegion3d(){
+ if(!regionResult||regionResult.analyzedTiles===0)return;
+ if($("obs-mode").value==="region"){
+   $("obs-mode").value="ortho";
+   $("region-3d").textContent="Zobrazit regionální trend ve 3D";
+   clearRegionGpu();
+ }else{
+   disposeObservation(observationActive);observationActive=null;
+   $("obs-mode").value="region";
+   $("region-3d").textContent="Skrýt regionální 3D trend";
+   updateRegionOverlays();
+ }
+ requestDraw();
+}
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
@@ -1472,7 +1625,7 @@ function update(){
  for(const [id,controller] of controllers)if(!desired.has(id))controller.abort();
  for(let i=queue.length-1;i>=0;i--)if(!desired.has(queue[i].key))queue.splice(i,1);
  evict(ids);
- pump();updateBuildings();requestDraw();
+ pump();updateBuildings();updateRegionOverlays();requestDraw();
 }
 function camera(){
  const ray=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
@@ -1609,16 +1762,18 @@ function draw(){
    const parts=draw.id.split("-").map(Number);
    const z=parts[0],x=parts[1],y=parts[2];
    const parentKey=z===0?draw.id:"0-"+Math.floor(x/2)+"-"+Math.floor(y/2);
+   const regional=kind==="region"?regionGpu.get(parentKey)?.texture:null;
    const observed=kind==="rgb"?active?.rgbTexture:
      kind==="ndvi"?active?.ndviTexture:
      kind==="change"?active?.changeTexture:
      kind==="trend"?active?.trendTexture:
      kind==="seasonal"?active?.seasonalTexture:
      kind==="multiyear"?active?.multiTexture:null;
-   const validObservation=!!observed&&active.key===parentKey;
+   const sourceTexture=regional??observed;
+   const validObservation=!!regional||!!observed&&active?.key===parentKey;
    gl.uniform1i(uni.uOverlayMode,validObservation?1:0);
    if(validObservation){
-     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,observed);
+     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,sourceTexture);
      gl.uniform4f(uni.uOverlayUv,z===0?0:(x%2)*.5,
        z===0?0:(y%2)*.5,z===0?1:.5,z===0?1:.5);
      gl.activeTexture(gl.TEXTURE0);
@@ -1816,7 +1971,16 @@ $("region-start").onclick=runRegionCoverage;
 $("region-stop").onclick=()=>regionRun?.abort();
 $("region-export").onclick=exportRegionCsv;
 $("region-geojson").onclick=exportRegionGeoJson;
-$("obs-mode").onchange=requestDraw;
+$("region-3d").onclick=toggleRegion3d;
+$("obs-mode").onchange=()=>{
+ if($("obs-mode").value!=="region"){
+   clearRegionGpu();
+   $("region-3d").textContent="Zobrazit regionální trend ve 3D";
+ }else if(regionResult?.analyzedTiles){
+   $("region-3d").textContent="Skrýt regionální 3D trend";
+ }
+ updateRegionOverlays();requestDraw();
+};
 $("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
 $("buildings").onclick=()=>{
  buildingsEnabled=!buildingsEnabled;
@@ -1890,6 +2054,7 @@ canvas.addEventListener("webglcontextlost",event=>{
  observationEpoch++;
  observationRequest?.abort();observationRequest=null;
  observationActive=null; // all GPU textures were destroyed by lost context
+ clearRegionGpu(); // GPU-owned source textures died with the context
  for(const controller of controllers.values())controller.abort();
  controllers.clear();
  queue.length=0;
@@ -1905,7 +2070,9 @@ canvas.addEventListener("webglcontextrestored",()=>{
    startGpu();
    $("error").textContent="";
    if(config&&planner)update();
-   if($("obs-mode").value==="multiyear"&&multiSelection)loadMultiYear();
+   if($("obs-mode").value==="region"&&regionResult){
+     updateRegionOverlays();requestDraw();
+   }else if($("obs-mode").value==="multiyear"&&multiSelection)loadMultiYear();
    else if($("obs-mode").value==="seasonal"&&seasonalSelection)loadSeasonal();
    else if(observationTile&&observationCatalog.has($("obs-scene").value)){
      if($("obs-mode").value==="trend"&&trendSceneIds.length>=3)
