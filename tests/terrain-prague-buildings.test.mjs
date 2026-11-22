@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
  BUILDING_LAYER_VERSION,CUZK_DMR_5G,OVERPASS_ENDPOINT,
- world,parseOsmHeight,overpassQuery,fetchOsmFootprints,buildBuildings
+ world,parseOsmHeight,overpassQuery,fetchOsmFootprints,parseOsmXml,buildBuildings
 } from "../scripts/terrain-prague-buildings.mjs";
 import {tileSpec} from "../scripts/terrain-prague-stream-grid.mjs";
 const tile=tileSpec(0,3,3);
@@ -116,4 +116,38 @@ test("open, incomplete and invalid OSM buildings are omitted without synthetic g
  assert.ok(result.buildings<=1);
  assert.throws(()=>buildBuildings(tile,[],{...ground,verticalDatum:"EGM2008"},dsm),/Bpv/);
  assert.throws(()=>buildBuildings(tile,[],ground,{...dsm,verticalDatum:"EGM2008"}),/Bpv/);
+});
+
+test("official OSM 0.6 XML fallback retains real node-referenced closed building geometry",async()=>{
+ const [lon,lat]=center;
+ const points=[
+  [101,lon-.0002,lat-.0002],[102,lon+.0002,lat-.0002],
+  [103,lon+.0002,lat+.0002],[104,lon-.0002,lat+.0002]
+ ];
+ const raw='<?xml version="1.0"?><osm version="0.6">'+
+  points.map(([id,lon,lat])=>'<node id="'+id+'" lon="'+lon+'" lat="'+lat+'"/>').join("")+
+  '<way id="151"><nd ref="101"/><nd ref="102"/><nd ref="103"/>'+
+  '<nd ref="104"/><nd ref="101"/><tag k="building" v="yes"/>'+
+  '<tag k="height" v="14.5"/></way>'+
+  '<way id="152"><nd ref="101"/><nd ref="102"/><nd ref="999"/>'+
+  '<nd ref="101"/><tag k="building" v="yes"/></way></osm>';
+ const parsed=parseOsmXml(raw);
+ assert.equal(parsed.length,1);
+ assert.equal(parsed[0].id,151);
+ assert.equal(parsed[0].geometry.length,5);
+ assert.equal(parsed[0].tags.height,"14.5");
+ let calls=0;
+ const fallback=await fetchOsmFootprints(tile,{fetchImpl:async(url,opts)=>{
+   calls++;
+   if(url===OVERPASS_ENDPOINT)return new Response("refused",{status:406});
+   assert.match(url,/api\.openstreetmap\.org\/api\/0\.6\/map\?bbox=/);
+   assert.equal(opts.method,"GET");
+   return new Response(raw,{status:200});
+ }});
+ assert.equal(calls,2);
+ assert.equal(fallback.length,1);
+ assert.equal(fallback[0].id,151);
+ assert.throws(()=>parseOsmXml("<html>Not real data</html>"),/OSM XML/);
+ assert.equal(parseOsmXml(raw.replace('<node id="101"','<node id="99999"')).length,0,
+   "missing source node references cannot create artificial polygons");
 });
