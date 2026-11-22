@@ -415,3 +415,44 @@ on Windows CI; local hardware drivers and performance still differ.
 Offline mode only shows previously visited regions; uncached regions
 remain missing and the viewer reports the absence of data. Historical
 cached v1 files are not silently treated as current v2 tiles.
+
+## Stage 10 — real-source building volumes (experimental)
+
+The streamed 3D viewer now has a **Budovy: zapnuto/vypnuto** toggle.
+At close zoom and when 2m fine tiles are requested, it can request
+a separate 3D building layer. Building footprints are actual **closed
+OpenStreetMap building ways** from the Overpass API (ODbL, © OSM contributors).
+Ground elevations come from the officially published **ČÚZK DMR 5G**
+F32 Web Mercator elevation image (Bpv). If an OSM way includes
+an unambiguous `height` tag, that height is respected. Otherwise
+the 3D roof level is an **estimate from a real ČÚZK DMP OK roof surface
+versus a real DMR 5G ground observation**, requiring multiple actual
+interior raster samples. Missing heights and ambiguous or incomplete
+footprints are omitted; **no synthetic elevation values** are inserted.
+
+The visible walls and flat roof geometry are deliberately labelled
+**LOD1 visual proxies**. They are not original 3D roof geometry
+and should not be used for accurate building measurements. Real
+photogrammetric roofs/façades can be obtained from the IPR Praha
+open 3D building model in CityGML, but would require a separate
+parser/reprojection/tiling pipeline (IPR scene service does not directly
+publish OGC 3D Tiles). See https://geoportalpraha.cz/data-a-sluzby/
+clanky-a-projekty/3D-model/3d-model-budovy-mosty
+
+The building layer is not part of the base DEM or height-profile
+measurement: selecting A/B points still returns the unchanged ČÚZK
+DMP OK surface. The original streamed terrain remains functional if
+Overpass or DMR services fail, with explicit error feedback.
+
+Cache: `test-results/terrain-prague-stream-cache/buildings-v1-*.json`.
+Cached real building meshes are re-used; the offline mode does not
+download missing source data and defaults to buildings switched off.
+Enable them manually when offline if they have been visited before.
+
+Limitations: OpenStreetMap way footprints are incomplete, and building
+relations/courtyards are deliberately skipped. Floor counts are
+**not** multiplied by an arbitrary floor height. DMP/DMR sampling
+accuracy varies; a flat roof proxy does not recreate roof ridges,
+chimneys, vertical façades or photogrammetric details. The source
+dataset is limited to OSM closed building ways; attribution includes
+OSM ODbL and © ČÚZK for the height products.

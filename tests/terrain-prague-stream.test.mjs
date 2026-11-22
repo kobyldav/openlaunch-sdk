@@ -72,6 +72,12 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/inspector\.pickMeasured\(/);
   assert.match(page,/inspector\.profile\(/);
   assert.match(page,/webglcontextlost/);
+  assert.match(page,/id="buildings"/);
+  assert.match(page,/id="building-count"/);
+  assert.match(page,/\/api\/buildings\/0\//);
+  assert.match(page,/buildingsEnabled/);
+  assert.match(page,/makeBuildingGpu\(/);
+  assert.match(page,/updateBuildings\(/);
   assert.match(page,/webglcontextrestored/);
   assert.match(page,/graphicsEpoch/);
   assert.match(page,/controllers=new Map/);
@@ -125,6 +131,8 @@ test("local streaming server starts without any terrain download, accepts only v
     assert.equal(manifest.offlineMode,true);
     assert.match(manifest.caveat,/no vertical facades/);
     assert.equal(root.status,200);
+    assert.equal((await fetch(origin+"/api/buildings/0/99/0.json")).status,400,
+      "Building API must reject out-of-bounds paths");
     assert.match(await root.text(),/OpenLaunch SDK.*Praha 3D/);
     assert.equal(notFound.status,404);
     assert.equal(invalid.status,400);

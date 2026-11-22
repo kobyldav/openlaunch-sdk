@@ -207,7 +207,8 @@
     "test:terrain-prague-stream": "npm run build && node --test tests/terrain-prague-stream.test.mjs",
     "test:terrain-prague-stream-live": "npm run build && node scripts/terrain-prague-stream-smoke.mjs",
     "test:terrain-prague-inspect": "node --test tests/terrain-prague-stream-inspect.test.mjs",
-    "test:terrain-prague-browser": "node scripts/terrain-prague-browser-smoke.mjs"
+    "test:terrain-prague-browser": "node scripts/terrain-prague-browser-smoke.mjs",
+    "test:terrain-prague-buildings": "node --test tests/terrain-prague-buildings.test.mjs"
   },
   "engines": {
     "node": ">=18"
