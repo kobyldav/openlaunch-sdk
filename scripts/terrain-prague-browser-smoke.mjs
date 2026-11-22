@@ -292,9 +292,9 @@ try{
      'observationCatalog.set('+JSON.stringify(after.sceneId)+
      ',{id:'+JSON.stringify(after.sceneId)+',acquiredAt:'+
      JSON.stringify(after.acquiredAt)+'});'+
-     '$("compare-before").replaceChildren(new Option("before",'+
+     '$("compare-before").replaceChildren(new Option('+JSON.stringify(before.acquiredAt.slice(0,10)+" · "+before.sceneId)+','+
      JSON.stringify(before.sceneId)+'));$("compare-before").disabled=false;'+
-     '$("obs-scene").replaceChildren(new Option("after",'+
+     '$("obs-scene").replaceChildren(new Option('+JSON.stringify(after.acquiredAt.slice(0,10)+" · "+after.sceneId)+','+
      JSON.stringify(after.sceneId)+'));$("obs-scene").disabled=false;'+
      '$("compare-load").disabled=false;return true;})()';
    await evalJs(c.send,expression);
