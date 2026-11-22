@@ -530,6 +530,9 @@ function startGpu(){
  const fragmentSrc=[
    "precision mediump float;",
    "uniform sampler2D uTexture;",
+   "uniform sampler2D uOverlayTexture;",
+   "uniform mediump vec4 uOverlayUv;",
+   "uniform int uOverlayMode;",
    "uniform mediump float uFade;",
    "uniform int uPass;",
    "varying mediump vec2 vUv; varying mediump float vElevation;",
@@ -542,6 +545,10 @@ function startGpu(){
    " if(uPass==1 && uFade<threshold)discard;",
    " if(uPass==0 && uFade>=threshold)discard;",
    " vec4 rgba=texture2D(uTexture,vUv);",
+   " if(uOverlayMode==1){",
+   "   vec4 observation=texture2D(uOverlayTexture,vUv*uOverlayUv.zw+uOverlayUv.xy);",
+   "   if(observation.a>0.5)rgba=observation;",
+   " }",
    " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
    " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",
    " gl_FragColor=vec4(colour,1.0);",
@@ -555,11 +562,15 @@ function startGpu(){
  gl.useProgram(program);
  attrs={pos:gl.getAttribLocation(program,"aPosition"),uv:gl.getAttribLocation(program,"aUv")};
  uni=Object.fromEntries(["uForward","uRight","uUp","uTarget","uVertical","uAspect",
-   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture","uFade","uPass"]
+   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture","uFade","uPass",
+   "uOverlayTexture","uOverlayUv","uOverlayMode"]
    .map(n=>[n,gl.getUniformLocation(program,n)]));
  gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.055,.12,.19,1);
  gl.uniform1f(uni.uBase,BASE_HEIGHT);
  gl.uniform1i(uni.uTexture,0);
+ gl.uniform1i(uni.uOverlayTexture,1);
+ gl.uniform1i(uni.uOverlayMode,0);
+ gl.uniform4f(uni.uOverlayUv,0,0,1,1);
 }
 function bindAttr(buffer,location,size){
  gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
@@ -618,6 +629,20 @@ function draw(){
    gl.uniform1f(uni.uFade,draw.fade);
    gl.uniform1i(uni.uPass,draw.pass);
    gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
+   const active=observationActive,kind=$("obs-mode").value;
+   const parts=draw.id.split("-").map(Number);
+   const z=parts[0],x=parts[1],y=parts[2];
+   const parentKey=z===0?draw.id:"0-"+Math.floor(x/2)+"-"+Math.floor(y/2);
+   const observed=kind==="rgb"?active?.rgbTexture:
+     kind==="ndvi"?active?.ndviTexture:null;
+   const validObservation=!!observed&&active.key===parentKey;
+   gl.uniform1i(uni.uOverlayMode,validObservation?1:0);
+   if(validObservation){
+     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,observed);
+     gl.uniform4f(uni.uOverlayUv,z===0?0:(x%2)*.5,
+       z===0?0:(y%2)*.5,z===0?1:.5,z===0?1:.5);
+     gl.activeTexture(gl.TEXTURE0);
+   }
    bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
    gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
@@ -626,6 +651,7 @@ function draw(){
  if(animating)requestDraw();
  let shownBuildings=0;
  if(buildingsEnabled&&selection.detailActive){
+   gl.uniform1i(uni.uOverlayMode,0);
    gl.uniform1f(uni.uFade,0);gl.uniform1i(uni.uPass,0);
    for(const id of requesting){
      const t=buildingCache.get(id);
