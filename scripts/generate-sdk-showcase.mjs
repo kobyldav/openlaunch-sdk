@@ -19,6 +19,7 @@ const OUT=join(ROOT,"docs/images/live");
 const req=createRequire(join(TOOLS,"package.json"));
 const {chromium}=req("playwright");
 const THREE_MODULE=join(TOOLS,"node_modules","three","build","three.module.js");
+const THREE_CORE=join(TOOLS,"node_modules","three","build","three.core.js");
 const ISS1="1 25544U 98067A   19156.50900463  .00003075  00000-0  59442-4 0  9992";
 const ISS2="2 25544  51.6433  59.2583 0008217  16.4489 347.6017 15.51174618173442";
 const START=new Date("2019-06-05T12:00:00Z");
@@ -87,10 +88,12 @@ async function texture(){
 function serve(scene,earth){
  const viewer=readFile(join(TOOLS,"showcase-viewer.html"));
  const module=readFile(THREE_MODULE);
+ const coreModule=readFile(THREE_CORE);
  const server=createServer(async(request,response)=>{
   const pathname=(request.url||"/").split("?")[0];
   const payload=pathname==="/viewer.html"?[await viewer,"text/html; charset=utf-8"]
    :pathname==="/three.module.js"?[await module,"text/javascript; charset=utf-8"]
+   :pathname==="/three.core.js"?[await coreModule,"text/javascript; charset=utf-8"]
    :pathname==="/scene.json"?[Buffer.from(JSON.stringify(scene)),"application/json"]
    :pathname==="/earth.jpg"?[earth,"image/jpeg"]:null;
   if(!payload){response.writeHead(404);response.end();return;}
