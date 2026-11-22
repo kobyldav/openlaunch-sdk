@@ -18,6 +18,7 @@ const x=numeric("x",1),y=numeric("y",1),cols=numeric("cols",4),rows=numeric("row
  from=numeric("from",2023),to=numeric("to",2025),
  month=numeric("month",8),cloud=numeric("cloud",50),
  repeat=numeric("repeat",2),rssLimitMiB=numeric("rss-limit-mib",1536),
+ scenePairConcurrency=numeric("scene-pair-concurrency",2),
  timeoutMs=numeric("timeout-ms",live?900000:60000);
 const cache=resolve(arg("cache","test-results/terrain-prague-stream-cache"));
 const output=resolve(arg("output","test-results/terrain-prague-region-4x4-benchmark.json"));
@@ -29,12 +30,13 @@ if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(cols)||!Number.
  !Number.isFinite(cloud)||cloud<0||cloud>100||
  !Number.isInteger(repeat)||repeat<1||repeat>4||
  !Number.isInteger(rssLimitMiB)||rssLimitMiB<256||rssLimitMiB>8192||
+ ![1,2].includes(scenePairConcurrency)||
  !Number.isInteger(timeoutMs)||timeoutMs<10000||timeoutMs>3600000)
  throw new RangeError("Benchmark requires 1..4x1..4 Prague tiles, 3..5 years, repeat 1..4, bounded memory/time");
 
 const report={status:"incomplete",mode:live?"live-original-STAC-COG":"offline-original-cache-only",
  area:{x,y,cols,rows},season:{from,to,month,cloud},
- repeat,rssLimitMiB,timeoutMs,
+ repeat,rssLimitMiB,timeoutMs,scenePairConcurrency,
  note:"All timing and Node RSS/heap counters are actual measured values, not reference numbers. Missing original source tiles never count as valid observations.",
  runs:[]};
 await mkdir(dirname(output),{recursive:true});
@@ -54,7 +56,9 @@ const fingerprint=result=>{
 async function withServer(fn){
  const child=spawn(process.execPath,[
    fileURLToPath(new URL("./terrain-prague-stream.mjs",import.meta.url)),
-   "--port","0","--no-open","--cache",cache,...(offline?["--offline"]:[])
+   "--port","0","--no-open","--cache",cache,
+   "--scene-pair-concurrency",String(scenePairConcurrency),
+   ...(offline?["--offline"]:[])
  ],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let stdout="",stderr="";
  child.stderr.on("data",chunk=>{stderr=(stderr+chunk.toString()).slice(-4000);});
@@ -98,6 +102,9 @@ try{
    assert.deepEqual(tiles.map(e=>e.tile.key),complete.tiles.map(t=>t.key));
    assert.equal(complete.quality?.status,"real-sentinel-region-runtime-quality");
    assert.equal(complete.quality?.measuredTileCount,cols*rows);
+   assert.equal(complete.quality?.scenePairConcurrency,scenePairConcurrency);
+   assert.ok(complete.quality.maxObservedConcurrentSourceJobs<=2);
+   assert.ok(complete.quality.maxObservedConcurrentSourceJobs>=0);
    assert.ok(complete.quality.peakRssMiB>0);
    assert.ok(complete.quality.elapsedMs>=0);
    assert.equal(complete.quality.analyzedTiles,complete.analyzedTiles);
@@ -132,7 +139,7 @@ try{
   await persist();
   console.log("Stage 20 "+iteration+"/"+repeat+": "+
    record.coverage.analyzedTiles+"/"+record.coverage.requestedTiles+
-   " source-backed tiles, "+record.coverage.commonValidPixels+
+   " source-backed tiles, source concurrency "+scenePairConcurrency+", "+record.coverage.commonValidPixels+
    " truly observed common pixels; "+record.fullRequestWallMs.toFixed(0)+
    "ms wall, "+record.metrics.peakRssMiB.toFixed(1)+
    " MiB sampled server RSS; raster cache "+record.metrics.rasterCacheHits+
