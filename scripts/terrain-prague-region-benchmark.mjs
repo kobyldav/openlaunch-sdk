@@ -20,6 +20,8 @@ const x=numeric("x",1),y=numeric("y",1),cols=numeric("cols",4),rows=numeric("row
  repeat=numeric("repeat",2),rssLimitMiB=numeric("rss-limit-mib",1536),
  scenePairConcurrency=numeric("scene-pair-concurrency",2),
  cogRangeCacheMiB=numeric("cog-range-cache-mib",64),
+ cogMemoryMode=arg("cog-memory-mode","adaptive"),
+ cogRssTargetMiB=numeric("cog-rss-target-mib",512),
  timeoutMs=numeric("timeout-ms",live?900000:60000);
 const cache=resolve(arg("cache","test-results/terrain-prague-stream-cache"));
 const output=resolve(arg("output","test-results/terrain-prague-region-4x4-benchmark.json"));
@@ -33,12 +35,15 @@ if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(cols)||!Number.
  !Number.isInteger(rssLimitMiB)||rssLimitMiB<256||rssLimitMiB>8192||
  ![1,2].includes(scenePairConcurrency)||
  !Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>128||
+ !["fixed","adaptive"].includes(cogMemoryMode)||
+ !Number.isInteger(cogRssTargetMiB)||cogRssTargetMiB<256||cogRssTargetMiB>8192||
  !Number.isInteger(timeoutMs)||timeoutMs<10000||timeoutMs>3600000)
  throw new RangeError("Benchmark requires 1..4x1..4 Prague tiles, 3..5 years, repeat 1..4, bounded memory/time");
 
 const report={status:"incomplete",mode:live?"live-original-STAC-COG":"offline-original-cache-only",
  area:{x,y,cols,rows},season:{from,to,month,cloud},
  repeat,rssLimitMiB,timeoutMs,scenePairConcurrency,cogRangeCacheMiB,
+ cogMemoryMode,cogRssTargetMiB,
  note:"All timing and Node RSS/heap counters are actual measured values, not reference numbers. Missing original source tiles never count as valid observations.",
  runs:[]};
 await mkdir(dirname(output),{recursive:true});
@@ -61,6 +66,8 @@ async function withServer(fn){
    "--port","0","--no-open","--cache",cache,
    "--scene-pair-concurrency",String(scenePairConcurrency),
    "--cog-range-cache-mib",String(cogRangeCacheMiB),
+   "--cog-memory-mode",cogMemoryMode,
+   "--cog-rss-target-mib",String(cogRssTargetMiB),
    ...(offline?["--offline"]:[])
  ],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let stdout="",stderr="";
@@ -113,6 +120,23 @@ try{
    assert.ok(Number.isInteger(range.rangeCacheHits)&&range.rangeCacheHits>=0);
    assert.ok(Number.isInteger(range.httpBytesRead)&&range.httpBytesRead>=0);
    assert.ok(range.rangeCacheHits===0||cogRangeCacheMiB>0);
+   assert.ok(Number.isFinite(range.activeBudgetMiB)&&range.activeBudgetMiB>=0);
+   assert.ok(range.activeBudgetMiB<=cogRangeCacheMiB);
+   const memory=complete.quality?.cogMemory;
+   assert.equal(memory?.mode,cogMemoryMode);
+   assert.equal(memory?.configuredRssTargetMiB,cogRssTargetMiB);
+   assert.equal(memory?.effectiveRssTargetMiB,
+     Math.min(cogRssTargetMiB,rssLimitMiB));
+   assert.equal(memory?.activeBudgetMiB,range.activeBudgetMiB);
+   assert.ok(Number.isInteger(memory?.checks)&&memory.checks>=0);
+   assert.ok(Number.isInteger(memory?.shrinkEvents)&&memory.shrinkEvents>=0);
+   assert.ok(Number.isInteger(memory?.pressureChecks)&&memory.pressureChecks>=0);
+   assert.ok(memory.minimumBudgetMiB>=0&&memory.minimumBudgetMiB<=cogRangeCacheMiB);
+   if(cogMemoryMode==="fixed"){
+     assert.equal(memory.shrinkEvents,0);
+     assert.equal(memory.recoveryEvents,0);
+     assert.equal(range.activeBudgetMiB,cogRangeCacheMiB);
+   }
    assert.ok(complete.quality.maxObservedConcurrentSourceJobs<=2);
    assert.ok(complete.quality.maxObservedConcurrentSourceJobs>=0);
    assert.ok(complete.quality.peakRssMiB>0);
@@ -149,7 +173,9 @@ try{
   await persist();
   console.log("Stage 20 "+iteration+"/"+repeat+": "+
    record.coverage.analyzedTiles+"/"+record.coverage.requestedTiles+
-   " source-backed tiles, source concurrency "+scenePairConcurrency+", COG range cache "+cogRangeCacheMiB+"MiB, "+record.coverage.commonValidPixels+
+   " source-backed tiles, source concurrency "+scenePairConcurrency+
+   ", COG range cache "+cogRangeCacheMiB+"MiB / "+
+   cogMemoryMode+" target "+cogRssTargetMiB+"MiB RSS, "+record.coverage.commonValidPixels+
    " truly observed common pixels; "+record.fullRequestWallMs.toFixed(0)+
    "ms wall, "+record.metrics.peakRssMiB.toFixed(1)+
    " MiB sampled server RSS; raster cache "+record.metrics.rasterCacheHits+
