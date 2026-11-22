@@ -33,6 +33,10 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    const invalid=await fetch(origin+"/api/observations/multiyear/region.ndjson?"+
      "x=5&y=5&cols=4&rows=4&from=2023&to=2025&month=8");
    assert.equal(invalid.status,400);
+   const excessive=await fetch(origin+"/api/observations/multiyear/region.ndjson?"+
+     "x=2&y=2&cols=2&rows=2&from=2023&to=2025&month=8&rssLimitMiB=128");
+   assert.equal(excessive.status,400,
+     "Regional budget below the 256 MiB lower bound must be rejected");
    const response=await fetch(origin+"/api/observations/multiyear/region.ndjson?"+
      "x=2&y=2&cols=2&rows=2&from=2023&to=2025&month=8&cloud=50");
    assert.equal(response.status,200);
@@ -51,6 +55,11 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
      assert.equal(event.tile.status,"error");
      assert.match(event.tile.reason,/No real Sentinel catalog is cached/);
      assert.equal(event.tile.commonValidPixels,null);
+     assert.equal(event.metrics.key,event.tile.key);
+     assert.equal(event.metrics.sourceCache,"unavailable");
+     assert.ok(event.metrics.durationMs>=0);
+     assert.ok(event.metrics.rssBytes>0);
+     assert.ok(event.metrics.heapUsedBytes>0);
    }
    const finished=items[6];
    assert.equal(finished.type,"complete");
@@ -69,6 +78,22 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.match(finished.result.seamDiagnostics,/no interpolation/);
 
    assert.equal(finished.result.percentValidWithinAnalyzedTiles,null);
+   const q=finished.result.quality;
+   assert.equal(q.status,"real-sentinel-region-runtime-quality");
+   assert.equal(q.version,1);
+   assert.equal(q.requestedTiles,4);
+   assert.equal(q.measuredTileCount,4);
+   assert.equal(q.rasterCacheHits,0);
+   assert.equal(q.rasterCacheMisses,0);
+   assert.equal(q.rasterCacheUnavailable,4);
+   assert.equal(q.wholeRegionSclPixelCoveragePercent,null);
+   assert.equal(q.outcome,"no-observed-tiles");
+   assert.equal(q.analyzedTilePercent,0);
+   assert.ok(q.elapsedMs>=0);
+   assert.ok(q.peakRssMiB>0);
+   assert.ok(q.peakHeapUsedMiB>0);
+   assert.equal(q.samplingIntervalMs,100);
+   assert.equal(q.memorySoftLimitMiB,1536);
    const page=await (await fetch(origin+"/")).text();
    assert.match(page,/id="region-coverage"/);
    assert.match(page,/async function runRegionCoverage/);
