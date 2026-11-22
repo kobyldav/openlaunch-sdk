@@ -45,6 +45,10 @@ label{white-space:nowrap}
 .measure-grid>div{line-height:1.8}
 #height-profile{width:100%;max-width:850px;height:170px;background:#0b2033;border-radius:8px;margin-top:10px}
 a{color:#9cd1fc}
+
+#region-coverage{width:100%;max-width:760px;height:auto;background:#0c2335;border:1px solid #385872;border-radius:9px;display:block;margin:8px 0}
+#region-status{color:#c9e9ea}
+#region-detail{font-size:12px;color:#adcde0;line-height:1.65}
 </style>
 </head>
 <body>
@@ -138,6 +142,24 @@ a{color:#9cd1fc}
     <canvas id="multi-chart" width="900" height="165" aria-label="Roční mediány Sentinel NDVI na skutečně společných geografických pixelech" style="max-width:100%;height:165px;background:#0c2335;border-radius:7px"></canvas>
     <p class="small">Barvy: zelená růst NDVI ≥0,04 za rok, červená pokles ≤−0,04 za rok, šedá menší změna. Jde o ilustrační prahovou hodnotu. Nižší průhlednost znamená jen jedno platné měření v některém roce.</p>
   </div>
+  <div aria-label="Regionální víceroční analýza Sentinel-2">
+    <strong>Regionální pokrytí NDVI · více skutečných dlaždic</strong>
+    <p class="small">Prověří 2×2 až 4×4 sousedních přibližně 0,7km dlaždic kolem středu kamery. Každá dlaždice má samostatně ověřené zdroje, masky SCL a trend. Výsledky přicházejí průběžně; zůstávají jen malé souhrny, ne všechny rastry v paměti.</p>
+    <div class="toolbar">
+      <label>Území <select id="region-size">
+        <option value="2" selected>2×2 dlaždice (přibližně 1,4 km)</option>
+        <option value="3">3×3 dlaždice (přibližně 2,1 km)</option>
+        <option value="4">4×4 dlaždice (přibližně 2,8 km)</option>
+      </select></label>
+      <button id="region-start">Prověřit skutečné regionální pokrytí</button>
+      <button id="region-stop" disabled>Zastavit</button>
+      <button id="region-export" disabled>Pokrytí CSV</button>
+      <button id="region-geojson" disabled>Pokrytí GeoJSON</button>
+    </div>
+    <p id="region-status" class="small" aria-live="polite">Použije roky, měsíc a limit oblačnosti ze sekce víceleté analýzy výše.</p>
+    <canvas id="region-coverage" width="760" height="400" role="img" aria-label="Geografická mapa platného pokrytí dlaždic Sentinel-2 od severu k jihu"></canvas>
+    <div id="region-detail">Zelená = podíl platných pixelů ve všech letech uvnitř ověřené dlaždice; šedá = chybí úplná datová řada; oranžová = chyba zdroje. Číslo není statistická spolehlivost. Regionální průměr zahrnuje pouze skutečně doložené pixely a neúplné území není považováno za prozkoumané.</div>
+  </div>
   <p id="obs-note" class="small">Vyber výřez pohybem kamery a klikni na „Najít scény“. Stahuje se pouze jedna dlaždice (~0,7 km), nikoli celá Praha. Sentinel-2 má 10m spektrální rozlišení.</p>
   <p class="small">NDVI: tmavě zelená = vyšší vegetační aktivita, béžová = nižší, modrá = záporné hodnoty.
    Datum odpovídá skutečné scéně Sentinel-2 L2A. Oblaka, stíny a neplatné pixely jsou průhledné – pod nimi zůstává ortofoto ČÚZK.
@@ -185,6 +207,8 @@ let observationTile=null,observationActive=null,observationRequest=null;
 let comparisonData=null,trendData=null,trendSceneIds=[];
 let seasonalSelection=null,seasonalData=null;
 let multiSelection=null,multiData=null;
+let regionRun=null,regionResult=null,regionPlan=null;
+const regionTiles=new Map();
 let observationEpoch=0;
 const observationCatalog=new Map();
 const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
@@ -1233,6 +1257,190 @@ function exportMultiYear(){
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+
+/** Stage 16. 2D geographic coverage is separate from the measured 3D
+ * ČÚZK surface and never paints invented cross-tile raster data.
+ */
+function drawRegionCoverage(){
+ const c=$("region-coverage"),ctx=c?.getContext("2d");
+ if(!ctx)return;
+ const w=c.width,h=c.height;
+ ctx.fillStyle="#0c2335";ctx.fillRect(0,0,w,h);
+ ctx.fillStyle="#c3deed";ctx.font="14px system-ui";
+ if(!regionPlan){ctx.fillText("Vyber oblast a spusť ověření reálných Sentinel-2 scén.",25,42);return;}
+ const p=regionPlan,marginX=65,top=32,bottom=65;
+ const cw=(w-marginX-28)/p.cols,ch=(h-top-bottom)/p.rows;
+ ctx.fillStyle="#bfdeec";ctx.fillText("S ↑  ·  skutečné geografické dlaždice / EPSG:4326",marginX,20);
+ for(const cell of p.tiles){
+   const rx=marginX+(cell.x-p.x)*cw,ry=top+(cell.y-p.y)*ch;
+   const t=regionTiles.get(cell.key),percent=t?.commonValidPercent;
+   const color=t?.status==="analyzed"?
+     (percent>=75?"#1d8568":percent>=40?"#b3a354":"#9b7645"):
+     t?.status==="insufficient"?"#566778":
+     t?.status==="error"?"#9c573b":"#1d384e";
+   ctx.fillStyle=color;ctx.fillRect(rx+2,ry+2,cw-4,ch-4);
+   ctx.strokeStyle="#8eaac0";ctx.lineWidth=1;ctx.strokeRect(rx+2,ry+2,cw-4,ch-4);
+   ctx.fillStyle="#fff";ctx.font="bold 15px system-ui";
+   ctx.fillText(cell.key,rx+10,ry+25);
+   ctx.font="13px system-ui";
+   const title=t?.status==="analyzed"?percent.toFixed(1)+" % SCL":
+     t?.status==="insufficient"?"nedostatek dat":
+     t?.status==="error"?"chyba zdroje":"čeká na zdroje";
+   ctx.fillText(title,rx+10,ry+46);
+   if(t?.status==="analyzed"){
+     ctx.fillText(t.commonValidPixels+" px",rx+10,ry+67);
+   }
+ }
+ const first=p.tiles[0],last=p.tiles[p.tiles.length-1];
+ if(first?.bounds&&last?.bounds){
+   ctx.fillStyle="#b8d7e9";ctx.font="12px system-ui";
+   ctx.fillText("SZ: "+first.bounds.west.toFixed(5)+"° E, "+
+     first.bounds.north.toFixed(5)+"° N",marginX, h-37);
+   ctx.fillText("JV: "+last.bounds.east.toFixed(5)+"° E, "+
+     last.bounds.south.toFixed(5)+"° N",marginX,h-19);
+ }
+}
+function downloadRegion(name,mime,text){
+ const url=URL.createObjectURL(new Blob([text],{type:mime}));
+ const a=document.createElement("a");a.href=url;a.download=name;
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportRegionCsv(){
+ if(!regionResult)return;
+ const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+ const rows=[["tile","status","west","south","east","north",
+   "valid_all_years_px","analyzed_px","valid_percent_within_tile",
+   "two_valid_sources_each_year_px","mean_ndvi_slope_per_year","note"].join(",")];
+ for(const t of regionResult.tiles){
+   const b=t.bounds;
+   rows.push([t.key,t.status,b.west,b.south,b.east,b.north,
+     t.commonValidPixels,t.totalPixels,t.commonValidPercent,
+     t.robustAllYearsPixels,t.meanSlopeNdviPerYear,t.reason??""].map(quote).join(","));
+ }
+ downloadRegion("praha-sentinel-ndvi-regional-coverage-"+regionResult.fromYear+
+   "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",rows.join("\r\n")+"\r\n");
+}
+function exportRegionGeoJson(){
+ if(!regionResult)return;
+ const features=regionResult.tiles.map(t=>{
+   const b=t.bounds;
+   return {type:"Feature",properties:{key:t.key,status:t.status,
+     validAllYearsPixels:t.commonValidPixels,
+     analyzedPixels:t.totalPixels,validPercent:t.commonValidPercent,
+     robustAllYearsPixels:t.robustAllYearsPixels,
+     slopeNdviPerYear:t.meanSlopeNdviPerYear,
+     reason:t.reason??null},
+     geometry:{type:"Polygon",coordinates:[[
+       [b.west,b.north],[b.east,b.north],[b.east,b.south],
+       [b.west,b.south],[b.west,b.north]
+     ]]}}
+ });
+ downloadRegion("praha-sentinel-ndvi-regional-coverage.geojson",
+   "application/geo+json",JSON.stringify({type:"FeatureCollection",features},null,2));
+}
+async function runRegionCoverage(){
+ if(regionRun||!config)return;
+ const selected=chosenObservationTile();
+ if(!selected){$("region-status").textContent="Nejprve načti mapu.";return;}
+ const size=Number($("region-size").value);
+ const from=Number($("multi-from").value),to=Number($("multi-to").value),
+   month=Number($("multi-month").value),cloud=Number($("multi-cloud").value);
+ if(![2,3,4].includes(size)||!Number.isInteger(from)||!Number.isInteger(to)||
+   from<2017||to>2100||to-from<2||to-from>4||
+   !Number.isInteger(month)||month<1||month>12||
+   !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("region-status").textContent="Neplatný rozsah: zvol 3–5 roků, měsíc a oblačnost 0–100 %.";return;
+ }
+ const x=clamp(selected.x-Math.floor(size/2),0,config.levels[0].cols-size);
+ const y=clamp(selected.y-Math.floor(size/2),0,config.levels[0].rows-size);
+ const cells=[];
+ for(let iy=y;iy<y+size;iy++)for(let ix=x;ix<x+size;ix++){
+   const b=boundsFor(0,ix,iy);
+   cells.push({key:"0-"+ix+"-"+iy,x:ix,y:iy,
+     bounds:{west:b[0],south:b[1],east:b[2],north:b[3]}});
+ }
+ regionPlan={x,y,cols:size,rows:size,tiles:cells};
+ regionTiles.clear();regionResult=null;drawRegionCoverage();
+ const controller=new AbortController();regionRun=controller;
+ $("region-start").disabled=true;$("region-stop").disabled=false;
+ $("region-export").disabled=true;$("region-geojson").disabled=true;
+ $("region-status").textContent="Postupně ověřuji "+cells.length+
+   " skutečných dlaždic; každá vyžaduje 2 zdrojové scény za rok. Bez doplněných pixelů.";
+ try{
+   const uri="/api/observations/multiyear/region.ndjson?"+
+     new URLSearchParams({x:String(x),y:String(y),cols:String(size),rows:String(size),
+       from:String(from),to:String(to),month:String(month),cloud:String(cloud)});
+   const response=await fetch(uri,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,240));
+   if(!response.body)throw Error("Prohlížeč nepodporuje průběžné streamování výsledku");
+   const reader=response.body.getReader(),decoder=new TextDecoder();
+   let buffer="",completed=false;
+   const consume=line=>{
+     if(!line.trim())return;
+     const event=JSON.parse(line);
+     if(event.type==="tile"){
+       const t=event.tile;
+       if(!cells.some(c=>c.key===t.key)||!["analyzed","insufficient","error"].includes(t.status))
+         throw Error("Neověřená regionální dlaždice");
+       regionTiles.set(t.key,t);
+       const ok=[...regionTiles.values()].filter(t=>t.status==="analyzed").length;
+       $("region-status").textContent=event.processed+"/"+event.total+
+         " dlaždic prověřeno; úplná skutečná data: "+ok+
+         ". Nepokrytá místa zůstávají nevyplněná.";
+       drawRegionCoverage();
+     }else if(event.type==="complete"){
+       const r=event.result;
+       if(r.status!=="real-sentinel-multiyear-region-coverage"||
+         r.version!==1||r.fromYear!==from||r.toYear!==to||
+         r.month!==month||r.requestedTiles!==cells.length||
+         r.pendingTiles!==0||r.tiles.length!==cells.length)
+         throw Error("Neúplný nebo neověřený regionální přehled");
+       regionResult=r;completed=true;
+       $("region-export").disabled=false;$("region-geojson").disabled=false;
+       const mean=r.meanSlopeOnObservedPixels===null?"bez platných měření":
+         r.meanSlopeOnObservedPixels.toFixed(5)+" NDVI/rok";
+       $("region-status").textContent="Hotovo: "+r.analyzedTiles+"/"+r.requestedTiles+
+         " úplně doložených dlaždic, "+r.commonValidPixels+
+         " společných skutečných pixelů, vážený popisný trend: "+mean+
+         ". "+(r.regionFullyAnalyzed?"Všechny dlaždice doloženy.":
+         "ČÁSTEČNÉ ÚZEMÍ – nedoložené dlaždice nejsou ve výpočtu!")+
+         " Pokrytí v doložených dlaždicích: "+
+         (r.percentValidWithinAnalyzedTiles===null?"—":
+           r.percentValidWithinAnalyzedTiles.toFixed(1)+" %")+".";
+       $("region-detail").textContent=r.years.map(y=>y.year+": "+
+         (y.meanNdviOnObservedPixels===null?"bez dat":
+           y.meanNdviOnObservedPixels.toFixed(4))+" NDVI").join(" | ")+
+         ". Průměry jsou vážené pouze pixely doloženými ve všech letech v úspěšných dlaždicích. "+
+         "Nehodnotí se příčina změny ani statistická průkaznost.";
+     }
+   };
+   while(true){
+     const {value,done}=await reader.read();
+     if(done)break;
+     buffer+=decoder.decode(value,{stream:true});
+     let pos;
+     while((pos=buffer.indexOf("\n"))>=0){
+       consume(buffer.slice(0,pos));buffer=buffer.slice(pos+1);
+     }
+     if(buffer.length>131072)throw Error("Příliš velký proud regionálních metadat");
+   }
+   buffer+=decoder.decode();
+   if(buffer.trim())consume(buffer);
+   if(!completed)throw Error("Server nedokončil regionální zdrojovou analýzu");
+ }catch(error){
+   if(controller.signal.aborted){
+     $("region-status").textContent="Regionální analýza zastavena. Nedokončená oblast nemá výsledek.";
+   }else{
+     $("region-status").textContent="Regionální analýza nebyla dokončena: "+
+       String(error.message||error).slice(0,220);
+   }
+ }finally{
+   if(regionRun===controller)regionRun=null;
+   $("region-start").disabled=false;$("region-stop").disabled=true;
+ }
+}
+
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
@@ -1604,6 +1812,10 @@ $("season-export").onclick=exportSeasonal;
 $("multi-search").onclick=searchMultiYear;
 $("multi-load").onclick=loadMultiYear;
 $("multi-export").onclick=exportMultiYear;
+$("region-start").onclick=runRegionCoverage;
+$("region-stop").onclick=()=>regionRun?.abort();
+$("region-export").onclick=exportRegionCsv;
+$("region-geojson").onclick=exportRegionGeoJson;
 $("obs-mode").onchange=requestDraw;
 $("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
 $("buildings").onclick=()=>{
