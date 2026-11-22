@@ -798,17 +798,19 @@ async function streamRegionalMultiyear(req,res,params){
          width:doc.width,height:doc.height,
          slopePerYear:slopes,years:doc.years
        });
-       aggregate.addResult(spec.key,bounds,doc);
-       edgeCache.set(spec.key,strips);
-       // Current row-major tile has at most two previously measured neighbors.
-       // Compare ONLY original adjacent pixel-center slopes; no blending.
+       // Calculate seams before committing this tile, so corrupted source
+       // edge QA cannot leave an already-committed tile in a duplicate state.
+       const adjacent=[];
        for(const key of ["0-"+(spec.x-1)+"-"+spec.y,
          "0-"+spec.x+"-"+(spec.y-1)]){
          const neighbor=edgeCache.get(key);
-         if(!neighbor)continue;
-         const seam=compareSentinelRegionSeamEdges(neighbor,strips);
+         if(neighbor)adjacent.push(compareSentinelRegionSeamEdges(neighbor,strips));
+       }
+       aggregate.addResult(spec.key,bounds,doc);
+       edgeCache.set(spec.key,strips);
+       for(const seam of adjacent){
          seams.push(seam);
-         if(!res.destroyed)res.write(JSON.stringify({type:"seam",seam})+"\\n");
+         emit({type:"seam",seam});
        }
      }catch(err){
        const reason=String(err?.message??err).slice(0,180);
