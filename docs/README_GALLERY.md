@@ -12,7 +12,13 @@ npm run gallery
 
 This command builds the SDK, installs the renderer into the isolated `tools/readme-gallery` folder, and runs the gallery generator.
 
-PNG files and `gallery-manifest.json` are written to `docs/images/`. The renderer is [sharp](https://sharp.pixelplumbing.com/), used only for gallery generation; it is **not** an SDK runtime dependency.
+PNG files and `gallery-manifest.json` are written to `docs/images/`.
+
+### Generate images on GitHub (without local setup)
+
+On the repository **Actions** tab, open **Generate README gallery**, select **Run workflow**, keep **offline** unchecked for the full set of six images, and optionally change the NASA date. When the run completes, download the **openlaunch-readme-gallery** artifact from the workflow run.
+
+For pull requests that change the generator, the workflow automatically tests the five offline images. The downloadable artifact contains PNGs plus the provenance manifest. GitHub workflow artifacts are temporary; save and commit selected screenshots if you want them visible in README permanently. The renderer is [sharp](https://sharp.pixelplumbing.com/), used only for gallery generation; it is **not** an SDK runtime dependency.
 
 To generate the five network-independent previews:
 
