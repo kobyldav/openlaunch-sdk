@@ -77,6 +77,11 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/id="obs-to"/);
   assert.match(page,/id="obs-scene"/);
   assert.match(page,/id="obs-mode"/);
+  assert.match(page,/id="compare-before"/);
+  assert.match(page,/id="compare-load"/);
+  assert.match(page,/id="compare-export"/);
+  assert.match(page,/value="change"/);
+  assert.match(page,/\/api\/observations\/compare\/0\//);
   assert.match(page,/observationTexture\(/);
   assert.match(page,/uOverlayMode/);
   assert.match(page,/uOverlayUv/);
@@ -152,6 +157,13 @@ test("local streaming server starts without any terrain download, accepts only v
       "/api/observations/scenes/0/3/3.json?from=2025-06-01&to=2025-09-30");
     assert.equal(noScenes.status,404,
       "Offline server never fetches an uncached Sentinel STAC catalog");
+    const noChange=await fetch(origin+
+      "/api/observations/compare/0/3/3/S2A_OLD_20250806/S2B_NEW_20250825.json");
+    assert.equal(noChange.status,404,
+      "No real cached pair means no invented temporal change");
+    const invalidChange=await fetch(origin+
+      "/api/observations/compare/0/99/3/S2A_OLD_20250806/S2B_NEW_20250825.json");
+    assert.equal(invalidChange.status,400);
     const noSpectral=await fetch(origin+
       "/api/observations/0/3/3/S2B_33UVR_20250812_1_L2A.rgb.png");
     assert.equal(noSpectral.status,404,
