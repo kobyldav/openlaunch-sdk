@@ -218,10 +218,63 @@ try{
      "base terrain GPU test still passed, no building geometry fabricated.");
  }
 
+ // Stage 11: ONLY inspect real, verified Sentinel STAC/COG cached products.
+ // If the upstream source was unavailable, never substitute generated pixels.
+ let actualSentinelView=null;
+ try{
+   const realReport=JSON.parse(await readFile(join(cache,"observations-live-report.json"),"utf8"));
+   const sceneId=realReport.sceneId;
+   assert.match(sceneId,/^[A-Za-z0-9_-]{5,120}$/);
+   const prefix=origin+"/api/observations/0/3/3/"+sceneId;
+   const metaResponse=await fetch(prefix+".json");
+   assert.equal(metaResponse.status,200);
+   const meta=await metaResponse.json();
+   assert.equal(meta.sceneId,sceneId);
+   assert.equal(meta.qa.sclMask,true);
+   await evalJs(c.send,'(()=>{const p=tileCenter(0,3,3);'+
+     'panX=p[0];panNorth=p[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;$("obs-mode").value="ortho";'+
+     'update();return true;})()');
+   const baseline=await evalJs(c.send,inspectPixels);
+   await evalJs(c.send,'(()=>{observationTile=planner.tileLevels[0]'+
+     '.find(t=>t.key==="0-3-3");'+
+     'observationCatalog.set('+JSON.stringify(sceneId)+',{id:'+JSON.stringify(sceneId)+'});'+
+     '$("obs-scene").replaceChildren(new Option('+JSON.stringify(sceneId)+','+
+     JSON.stringify(sceneId)+'));return true;})()');
+   await evalJs(c.send,'loadObservation()');
+   await until(async()=>await evalJs(c.send,
+     '!!observationActive&&observationActive.sceneId==='+JSON.stringify(sceneId)),
+     "real Sentinel data uploaded to Edge WebGL1",20000);
+   await evalJs(c.send,'(()=>{$("obs-mode").value="rgb";requestDraw();return true;})()');
+   const observedRgb=await evalJs(c.send,inspectPixels);
+   assert.equal(observedRgb.glError,0);
+   assert.notEqual(observedRgb.checksum,baseline.checksum,
+     "True Sentinel RGB must change actual terrain GPU pixels");
+   const rgbBytes=await capture("prague-real-sentinel-rgb.png");
+   await evalJs(c.send,'(()=>{$("obs-mode").value="ndvi";requestDraw();return true;})()');
+   const observedNdvi=await evalJs(c.send,inspectPixels);
+   assert.equal(observedNdvi.glError,0);
+   assert.notEqual(observedNdvi.checksum,observedRgb.checksum,
+     "Calibrated Sentinel NDVI must alter actual rendered terrain colors");
+   const ndviBytes=await capture("prague-real-sentinel-ndvi.png");
+   actualSentinelView={sceneId,acquiredAt:meta.acquiredAt,
+     statistic:meta.statistics,
+     orthoChecksum:baseline.checksum,rgbChecksum:observedRgb.checksum,
+     ndviChecksum:observedNdvi.checksum,rgbBytes,ndviBytes};
+   console.log("PASS real Sentinel-2 GPU RGB+NDVI overlay: "+sceneId+
+     " ("+meta.acquiredAt+"), distinct RGB and NDVI WebGL pixel checksums "+
+     baseline.checksum+" => "+observedRgb.checksum+" => "+observedNdvi.checksum+
+     ", actual Edge screenshot PNGs");
+ }catch(error){
+   if(existsSync(join(cache,"observations-live-report.json")))throw error;
+   console.log("NOTICE Sentinel source COG test unavailable; no satellite screenshots "+
+     "are fabricated; existing real ČÚZK GPU regression still passed.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,
+   actualBuildingView,actualSentinelView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
