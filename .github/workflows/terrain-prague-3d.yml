@@ -35,6 +35,8 @@ jobs:
         run: node --test tests/terrain-sentinel-region.test.mjs tests/terrain-prague-region-stream.test.mjs
       - name: Stage 17 validate source-locked regional GPU tile selection and no-data handling
         run: node --test tests/terrain-prague-region-webgl.test.mjs
+      - name: Stage 18 validate native Sentinel cross-tile edge comparisons and NoData
+        run: node --test tests/terrain-sentinel-region-seams.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
