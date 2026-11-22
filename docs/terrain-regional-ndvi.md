@@ -163,3 +163,77 @@ It verifies the renderer without falsely claiming a live four-tile
 data run. Multi-tile live source coverage is still dependent on
 actual historical STAC/COG access and must be separately observed
 before claiming all four tiles were validated end-to-end.
+
+## Stage 18 — genuine adjacent source-pixel seam diagnostics
+
+Regional processing now reports the seam between every pair of adjacent
+**successfully verified** Sentinel-2 NDVI tiles. Each seam uses **only the
+native neighboring edge pixel centers** and original Theil–Sen NDVI/year
+slopes — never an invented center, a smoothed gap, a stitched raster or
+interpolated source data.
+
+- A new pure SDK API `captureSentinelRegionSeamEdges()` retains only four
+  slim native edge strips, metadata, georeferencing and real source IDs,
+  while `compareSentinelRegionSeamEdges()` computes descriptive
+  neighboring-pixel diagnostics without holding region-wide rasters.
+- The server streams optional `type:"seam"` NDJSON events for already
+  validated neighboring tiles, and a final `result.seams` array.
+  Missing source tiles produce **no fake edge pair**.
+- A numerical comparison is produced **only if annual source scene IDs
+  and timestamps match**, pixel rows/columns actually align in
+  EPSG:3857, and both original edge pixels are SCL-valid.
+  Otherwise it returns a descriptive status:
+  `different-acquisitions`, `unaligned-grid`, or
+  `insufficient-edge-data`; numerical differences remain null.
+- The user sees exact shared-edge indicators in the north-up regional
+  coverage map. Orange is a warning (different acquisitions, native
+  grid mismatch, missing paired edge pixels, or mean absolute difference
+  above the **illustrative 0.08 NDVI/year threshold**), green means
+  two source-compatible native edges were compared. A new
+  **Kontrola hranic CSV** action exports all measured diagnostics.
+- The WebGL1 shader explicitly rejects satellite texture sampling
+  **outside each terrain tile's native UV domain**, including extra
+  edge-apron triangles. This prevents graphical spreading of a valid
+  source pixel beyond the source tile; it does not blend or change
+  the actual observed colors at neighboring pixel centers.
+
+### Strict real two-tile test
+
+After the existing 3-year live source test, the Windows workflow
+attempts the new strict
+`scripts/terrain-prague-region-live-smoke.mjs` test for two adjacent
+Prague tiles **0-3-3** and **0-4-3**:
+
+1. Both must genuinely produce 3–5-year calibrated Sentinel L2A
+   COG-based NDVI slopes, with original annual SCL support, source IDs
+   and numeric original pixel rasters.
+2. Their one shared edge must emit a properly sourced seam event with
+   honest measured/native-grid/scene-comparability diagnostics.
+3. The second tile must also have original ČÚZK DMP OK Bpv
+   geometry and orthophoto in the local source cache.
+4. Only when that proof exists, the actual Edge WebGL1 browser test
+   requires both original source-backed regional textures to render
+   at once on those real DSM tiles, captures an authentic PNG and
+   verifies the GPU textures are released.
+
+Output files (only when genuine sources are available):
+
+- `test-results/terrain-prague-stream-ci/region-adjacent-live-report.json`
+- `test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-two-real-tiles.png`
+
+The remote-network two-tile verification is marked
+`continue-on-error` in Windows CI: a remote STAC/COG outage
+does not invalidate offline deterministic calculations, but neither
+does CI success by itself prove that the two genuine tiles passed.
+**Always check the reported Stage 18 live step and its source report.**
+
+### Limitations
+
+Even with compatible source scenes, adjacent pixel centers are not the
+same ground location. A strong slope difference can be real vegetation
+heterogeneity, seasonal radiometric differences or original scene
+quality effects. It is **not** automatic proof of a visual seam bug,
+construction, deforestation or statistical significance. The 0.08
+warning threshold is for triage only. Stage 18 does not invent
+higher-resolution Sentinel data, impose zero values on missing
+pixels, or smooth away actual observed differences.
