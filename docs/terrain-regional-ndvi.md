@@ -516,3 +516,99 @@ same speedup on every machine, cloud host, region or date.
 
 Original benchmark artifact (all raw audits and individual source
 times): [Stage 21 A/B artifact](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45069045054/artifacts/14772189284).
+
+
+## Stage 22 — original COG HTTPS Range caching under strict source identity
+
+Stage 21 improved cold loading by overlapping the two authentic satellite
+acquisitions per year. However, the Stage 11 TIFF reader still requested
+the same COG metadata header and overlapping compressed TIFF blocks
+**again for each separate neighboring Prague tile**, even when all
+tiles refer to an identical source STAC asset URL.
+
+Stage 22 adds an **opt-in-use per-server, source-version-pinned, bounded
+in-memory HTTP byte-range cache** to the SDK `readCogWindowUrl()` path.
+It is enabled by default **only in the Prague real-data server**; the
+ordinary SDK reader remains unchanged unless explicitly given a
+`CogRangeCache` instance:
+
+- `src/eo/cog-range-cache.ts` exports `CogRangeCache`, whose entries
+  are indexed by the **entire original HTTPS asset URL, requested
+  byte start and requested byte length**, never by scene name or
+  approximate geographic coordinates. Different scene dates and COG
+  bands cannot share an entry.
+- Only successful, strictly validated **HTTP 206 / Content-Range
+  byte responses with a strong HTTP ETag** enter this LRU cache.
+  Missing or weak ETags disable reuse for the affected COG.
+  On a new range for a previously seen source, the reader sends
+  `If-Range: "<original strong ETag>"`. If its contents or size
+  change, or a server returns an untrustworthy 200 or a mismatched
+  ETag, the source read fails closed rather than assembling
+  reflectance from different versions of the same COG object.
+- The cache is **process-local and bounded to 16 MiB** by default,
+  at most 128 ranges and 128 pinned original source validators;
+  safe old entries are evicted under memory pressure.
+  A fresh Node server starts with no in-memory COG ranges.
+  It is not a persistent disk cache and does not store user data.
+- Cached content contains **the original compressed TIFF bytes**,
+  not fake images or gap-filled NDVI. Every read still uses the original
+  SDK TIFF block decoder, original STAC calibration, original SCL mask,
+  exact EPSG:3857 grid, and source-locked annual scenes.
+  The original ČÚZK geometry and original 3D textures remain unchanged.
+- Regional runtime `result.quality.cogRangeCache` now reports actual
+  COG HTTP range requests, physical TIFF bytes downloaded,
+  reused original bytes, verified cache hits/misses, the LRU resident
+  bytes and eviction count. These are not guessed from COG file size.
+  The browser displays them and includes them in the exported quality
+  JSON.
+
+### Switches and reproducible cold source benchmark
+
+```powershell
+npm run build
+
+# Original reader: no COG byte range reuse (counts real HTTP requests)
+node scripts/terrain-prague-stream.mjs --cog-range-cache-mib 0
+
+# Source-ETag-pinned in-memory COG cache (default in Prague server)
+node scripts/terrain-prague-stream.mjs --cog-range-cache-mib 16
+
+# Test ETag changes, URL separation, byte-for-byte authentic LZW TIFF samples
+node --test tests/terrain-cog-range-cache.test.mjs tests/lzw-geotiff.test.mjs tests/utm-cog.test.mjs
+
+# True 4x4 2023–2025 original Sentinel-2 L2A A/B:
+# independent EMPTY source caches for 0 MiB and 16 MiB treatments
+node scripts/terrain-prague-region-range-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50
+```
+
+The separate
+`.github/workflows/terrain-prague-stage22-range-ab.yml`
+Actions workflow runs the **same strict real-source experiment** on
+Windows, including two fresh Node server processes (cold and actual
+source disk-cache replay) for each A/B treatment. It rejects incomplete
+original 16-tile coverage, mismatched STAC scene IDs, any different
+numeric/source scientific SHA-256 fingerprint, or missing proven
+source byte reuse. It produces a separate JSON report containing
+actual HTTP 206 counts and measured network-body bytes.
+
+### Limitations and expected trade-offs
+
+- The shared in-memory cache can increase Node RSS up to its configured
+  16 MiB resident limit, plus transient copies of compressed TIFF
+  bytes and decompression buffers. Stage 20's soft memory ceiling is
+  not a hard upper bound during active source reads.
+- Only **strong ETag-validated original range contents** are reused.
+  Some COG providers have no strong version validator; these providers
+  will continue to make remote requests. The server must not assume
+  every source supports reuse or advertise a guaranteed speedup.
+- The cache does not combine adjacent byte ranges, change request
+  order, alter TIFF compression, or bypass HTTP 206 validation.
+  Reusing headers/blocks reduces redundant transfer and request
+  overhead only when original source metadata genuinely overlaps.
+- HTTP byte counts represent **actual received response-body bytes**
+  inside this SDK COG reader; they do not include STAC metadata requests,
+  TCP/TLS overhead, retransmissions, ČÚZK downloads or browser GPU.
+- A source-quality run can be numerically identical but slower when
+  network latency, CDN throttling, or cache-eviction patterns differ.
+  Original measured A/B evidence must be consulted before concluding
+  any cold-download speedup.
