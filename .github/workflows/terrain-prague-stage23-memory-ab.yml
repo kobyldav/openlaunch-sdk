@@ -1,3 +1,4 @@
+# Stage 23 calibrated true-RSS-excess policy; 300ms-spaced recovery; 0MiB ETag continuity.
 name: Prague real Sentinel 4x4 adaptive COG memory A/B (Stage 23)
 on:
   push:
