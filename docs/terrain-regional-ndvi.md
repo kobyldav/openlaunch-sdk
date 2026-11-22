@@ -684,15 +684,21 @@ block buffers when other applications or the process need memory.
 - The normal Prague server defaults to `--cog-memory-mode adaptive`
   with a **512 MiB soft RSS target**, and retains a **48 MiB Node RSS
   safety reserve** plus a **512 MiB host-free-memory reserve**.
-  The allowed cache budget is limited by both remaining headrooms
-  and quantized downward to 4 MiB. The region's existing
-  `rssLimitMiB` limit can lower the effective adaptive target, but
-  cannot silently raise the CLI target.
+  The allowed cache budget charges **only the amount by which
+  observed whole-process RSS exceeds the 48 MiB safety margin** against
+  the original immutable 64 MiB cache ceiling. It does NOT charge the
+  same already-released cache allocations repeatedly while Node's RSS
+  allocator awaits garbage collection. Host free RAM separately limits
+  the cache budget. The result is rounded down to 4 MiB increments.
+  The region's existing `rssLimitMiB` can lower the effective
+  adaptive target, but cannot silently raise the CLI target.
 - **Pressure relief is immediate** on the next actual sample or
-  original COG read. Expansion is slow: **three consecutive healthy
-  measurements**, then at most **16 MiB** restored per step.
-  This hysteresis avoids repeated allocations and evictions around
-  a marginal host free-memory threshold.
+  original COG read. Expansion requires **three consecutive healthy
+  samples separated by at least 300 ms** (monotonic Node clock),
+  then at most **16 MiB** restored per step. Multiple HTTP callbacks
+  within a few milliseconds cannot masquerade as independent healthy
+  samples. This hysteresis avoids repeated allocations and evictions
+  around a marginal host free-memory threshold.
 - A source-loading window is still bound to **two original
   Sentinel-2 acquisitions** at a time, **one regional source
   tile at a time**. The original 206/Content-Range/strong ETag +
