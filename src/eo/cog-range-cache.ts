@@ -11,7 +11,7 @@ export interface CogRangeCacheStats{
  verifiedObjects:number;rangeCacheHits:number;rangeCacheMisses:number;
  reusedBytes:number;httpRequests:number;httpBytesRead:number;evictions:number;
 }
-type RangeEntry={bytes:Uint8Array;total:number;etag:string;url:string};
+type RangeEntry={bytes:Uint8Array;total:number;etag:string;url:string;metadata:boolean};
 const STRONG_ETAG=/^"[^"\r\n]{1,256}"$/;
 export class CogRangeCache{
  private readonly ranges=new Map<string,RangeEntry>();
@@ -19,11 +19,11 @@ export class CogRangeCache{
  private resident=0;
  private hits=0;private misses=0;private reused=0;
  private requests=0;private fetched=0;private evicted=0;
- constructor(readonly maxResidentBytes=16*1024*1024,readonly maxEntries=128){
+ constructor(readonly maxResidentBytes=64*1024*1024,readonly maxEntries=256){
    if(!Number.isSafeInteger(maxResidentBytes)||maxResidentBytes<0||
-     maxResidentBytes>32*1024*1024||
+     maxResidentBytes>128*1024*1024||
      !Number.isInteger(maxEntries)||maxEntries<1||maxEntries>1024)
-     throw new RangeError("COG in-process cache must be 0..32 MiB and 1..1024 ranges");
+     throw new RangeError("COG in-process cache must be 0..128 MiB and 1..1024 ranges");
  }
  private key(url:string,start:number,length:number){
    return JSON.stringify([url,start,length]);
@@ -78,12 +78,24 @@ export class CogRangeCache{
    const k=this.key(url,start,length);
    const existing=this.ranges.get(k);
    if(existing){this.resident-=existing.bytes.byteLength;this.ranges.delete(k);}
-   this.ranges.set(k,{url,bytes:bytes.slice(),total,etag});
+   // The TIFF header is tiny compared with compressed raster blocks, but
+   // required for EVERY independently verified AOI. Protect it from the
+   // large-block LRU churn that otherwise evicts all 30 original STAC
+   // band headers before the next regional tile starts.
+   this.ranges.set(k,{url,bytes:bytes.slice(),total,etag,
+     metadata:start===0&&length<=2*1024*1024});
    this.resident+=bytes.byteLength;
    while(this.resident>this.maxResidentBytes||this.ranges.size>this.maxEntries){
-     const oldest=this.ranges.keys().next().value!;
-     const old=this.ranges.get(oldest)!;
-     this.ranges.delete(oldest);this.resident-=old.bytes.byteLength;this.evicted++;
+     // Evict the oldest non-header first; preserve the tiny TIFF directory
+     // against repeat 0..64KiB GET requests. If necessary, headers are also
+     // evicted to respect the hard cache-size bound.
+     let oldest:string|undefined;
+     for(const [key,entry] of this.ranges)if(!entry.metadata){
+       oldest=key;break;
+     }
+     oldest??=this.ranges.keys().next().value;
+     const old=this.ranges.get(oldest!)!;
+     this.ranges.delete(oldest!);this.resident-=old.bytes.byteLength;this.evicted++;
    }
  }
  snapshot():CogRangeCacheStats{
