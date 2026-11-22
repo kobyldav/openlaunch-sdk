@@ -530,3 +530,31 @@ not an auto-updating full-city mosaic; SCL cloud masking is a coarse
 classification, not a quality guarantee. This is deliberately the first
 reusable SDK integration, to be expanded to time series and multiple
 tiles only after source-provenance and GPU tests pass.
+
+### SDK consumer integration (no built-in WebGL dependency)
+
+```ts
+import { OpenLaunch, bbox } from "openlaunch-sdk";
+
+const sdk = new OpenLaunch();
+const area = bbox(14.427, 50.088, 14.433, 50.094);
+const catalog = await sdk.terrain.discoverObservations({
+  area, from: "2025-08-01", to: "2025-08-31", maxCloudPercent: 35,
+});
+const selected = catalog.items[0];
+if (selected) {
+  const layer = await sdk.terrain.observeSentinel2({
+    area, scene: selected, resolutionM: 10,
+  });
+  console.log(layer.acquiredAt, layer.statistics.ndviMean);
+  console.log(layer.rgbRgba, layer.ndviRgba);
+}
+```
+
+The two returned RGBA arrays are original-data-derived **georeferenced
+2D overlays**: their HTML/WebGL renderer is not required to consume
+these reusable values from the SDK. For rigorous comparative science,
+also review the SCL classes, actual scene processing baseline, scale
+and offset QA and temporal consistency; Stage 11 is not a fully
+atmospherically cross-calibrated time-series or a certified urban
+vegetation survey.

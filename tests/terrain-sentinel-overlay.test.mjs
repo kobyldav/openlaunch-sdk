@@ -7,7 +7,7 @@ import {
 } from "../dist/terrain/sentinel-overlay.js";
 import {bbox} from "../dist/geo/types.js";
 import {lonLatToGridCrs} from "../dist/eo/raster.js";
-import {OpenLaunch} from "../dist/index.js";
+import {OpenLaunch,discoverSentinelTerrainScenes as directDiscover,loadSentinelTerrainOverlay as directObserve} from "../dist/index.js";
 
 const area=bbox(14.425,50.093,14.427,50.095);
 const host="https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/";
@@ -109,6 +109,8 @@ test("actual SDK routine reads exactly same qualified scene RGB/NIR/SCL and mask
  assert.equal(result.ndviRgba.filter((_,i)=>i%4===3&&result.ndviRgba[i]===255).length,
    result.statistics.validPixels);
  assert.equal(typeof new OpenLaunch().terrain.observeSentinel2,"function");
+ assert.equal(directDiscover instanceof Function,true);
+ assert.equal(directObserve instanceof Function,true);
  assert.equal(typeof new OpenLaunch().terrain.discoverObservations,"function");
 });
 test("bad or zero reflectance and missing masks cannot create NDVI measurements",async()=>{
