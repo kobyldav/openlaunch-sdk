@@ -255,7 +255,7 @@ async function ndviImage(o){
        red.transform.some((v,i)=>Math.abs(v-nir.transform[i])>1e-7))
       throw Error("RED and NIR inputs must have the same projection, transform and dimensions");
     w=red.width;h=red.height;rgb=new Uint8Array(w*h*3);
-    const valid=Array.from(red.values).filter(Number.isFinite),max=Math.max(1,...valid.slice(0,100000));
+    const max=red.values.reduce((best,v)=>Number.isFinite(v)?Math.max(best,v):best,1);
     for(let i=0;i<w*h;i++){const v=clamp(red.values[i]/max*255,0,255);rgb.set([v,v,v],i*3);}
     source="USER GEOTIFF RED/NIR BANDS / CALIBRATION MUST BE VERIFIED";
   }else{
