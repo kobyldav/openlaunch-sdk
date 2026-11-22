@@ -761,3 +761,56 @@ changes or disappears, the analysis fails closed. Never describe
 cache shrinkage as evidence of all-year SCL coverage or changed
 ecological significance. Stage 23 only manages memory, not the
 original calibrated Sentinel observations or ČÚZK heights.
+
+
+### Stage 23 verified genuine Sentinel 16-tile low-RAM A/B — 2026-11-22
+
+The calibrated adaptive 48MiB safety-margin + time-separated recovery
+policy completed a **STRICT ORIGINAL** Sentinel-2 L2A real-source A/B:
+[GitHub Actions run 45074777903](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45074777903).
+For 2023–2025 August, both cold source treatments used **separate empty
+STAC/COG source disk caches**, all **16/16** original-source Prague
+tiles and **62,504** truly common SCL-qualified NDVI pixels, plus
+independent full cache replays in fresh Node processes. The original
+annual STAC scene IDs, Theil–Sen results and native seam diagnostics
+matched EXACTLY across treatments, including SHA-256
+`f538be31b4cc079a67e2080bd10b837e4c00f97fad75b1d9bf7e20991984649b`.
+
+| Genuine Windows 4×4 original-source measurement | Fixed 64 MiB | Adaptive max 64 MiB, soft 320MiB RSS |
+|---|---:|---:|
+| Cold wall time (including fresh server) | 26,183 ms | 26,557 ms |
+| 100ms-sampled whole-Node-process RSS peak | 308.9 MiB | **285.9 MiB** |
+| Received authentic TIFF HTTP 206 response-body bytes | 166,600,289 | 211,408,365 |
+| Real verified HTTP 206 byte-range requests | 160 | 205 |
+| Original compressed source byte range cache hits | 920 | 875 |
+| Actual source LRU shrink events | 0 | **3** |
+| Actual LRU recovery events | 0 | 4 |
+| Minimum original compressed byte-range cache budget | 64 MiB | **48 MiB** |
+| Original SCL-qualified common NDVI pixels | 62,504 | 62,504 |
+
+Result at this deliberately restrictive soft RSS target:
+**23.05 MiB / 7.5% lower sampled Node RSS peak**, costing only
+**374 ms / 1.4% additional cold source time** and
+**44,808,076 bytes / 26.9% more original TIFF body transfer** than
+the fixed 64 MiB configuration. The adaptive treatment still
+saved **72.3% actual TIFF transfer bytes** and **81.0% original
+HTTP 206 requests** compared with the earlier Stage 22 no-range-cache
+4×4 baseline (763,213,144 bytes, 1,080 original Range requests).
+No original source pixels or science were sacrificed.
+
+The *first* 320MiB adaptive policy experiment was intentionally
+rejected as over-aggressive: 149 shrinking and 139 growing events,
+730,458,491 transferred TIFF bytes, and 255.3MiB sampled RSS versus
+the contemporaneous fixed baseline 310.7MiB. Its repeated pressure
+subtraction and untimed recovery lost most of the network benefit.
+The revised policy uses a fixed configured ceiling for RSS excess,
+an evidence-based 48MiB decompression reserve, and 300ms-spaced
+healthy samples. Its final 4×4 genuine-source benchmark above
+demonstrates 3 real shrinking events and only 45 additional Range
+requests. This is a measured improvement, not a guessed performance
+claim.
+
+[Download original Stage 23 Windows A/B JSON evidence](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45074777903/artifacts/14774882463).
+All process RSS measurements exclude browser/GPU memory and are
+samples rather than guaranteed maxima. Soft-target results and
+external CDN traffic rates may vary across hosts and dates.
