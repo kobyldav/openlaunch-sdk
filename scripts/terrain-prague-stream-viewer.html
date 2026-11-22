@@ -1022,6 +1022,217 @@ function exportSeasonal(){
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+/** Real annual scene catalog: one bounded source tile, two distinct dated
+ * acquisitions per calendar month/year. No guessed annual observations.
+ */
+async function searchMultiYear(){
+ const tile=chosenObservationTile();
+ if(!tile){$("multi-summary").textContent="Nejprve načti mapu Prahy.";return;}
+ const from=Number($("multi-from").value),
+   to=Number($("multi-to").value),
+   month=Number($("multi-month").value),cloud=Number($("multi-cloud").value);
+ if(!Number.isInteger(from)||!Number.isInteger(to)||from<2017||to>2100||
+    to-from<2||to-from>4||!Number.isInteger(month)||month<1||month>12||
+    !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("multi-summary").textContent="Vyber 3–5 po sobě jdoucích let, měsíc 1–12 a oblačnost 0–100 %.";
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ multiSelection=null;multiData=null;
+ $("multi-load").disabled=true;$("multi-export").disabled=true;
+ $("multi-search").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();drawMultiYearChart();
+ $("multi-scenes").textContent="Vyhledávám skutečné STAC scény pro "+(to-from+1)+" let…";
+ $("multi-summary").textContent="Dokud nejsou získaná původní data, žádný víceletý trend se nezobrazuje.";
+ try{
+   const uri="/api/observations/multiyear/scenes/0/"+tile.x+"/"+tile.y+
+     ".json?"+new URLSearchParams({
+       from:String(from),to:String(to),month:String(month),cloud:String(cloud)});
+   const response=await fetch(uri,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,230));
+   const data=await response.json();
+   if(data.status!=="real-sentinel-multiyear-catalog"||data.key!==tile.key||
+      data.from!==from||data.to!==to||data.month!==month||
+      !Array.isArray(data.seasons)||data.seasons.length!==to-from+1||
+      !data.seasons.every((season,i)=>season.year===from+i&&
+        season.scenes.length===2&&
+        season.scenes.every(scene=>validSceneId(scene.id)&&
+          Number.isFinite(Date.parse(scene.acquiredAt)))))
+     throw Error("Katalog neobsahuje ověřené dvě skutečné scény v každém roce");
+   if(epoch!==observationEpoch)return;
+   multiSelection={tile,from,to,month,cloud,catalog:data};
+   $("multi-scenes").textContent="Ověřené původní scény: "+
+     data.seasons.map(year=>year.year+": "+
+       year.scenes.map(s=>s.acquiredAt.slice(0,10)+" ("+
+         (s.cloudPercent??"?")+" % celé scény)").join(", ")).join(" | ");
+   $("multi-load").disabled=false;
+   $("multi-summary").textContent="Nalezeno "+data.seasons.length*2+
+     " skutečných pozorování. Analýza načte jejich kalibrované spektrální pixely a použije společnou SCL masku všech let.";
+   observationMessage("Nalezeno "+data.seasons.length+
+     " skutečných sezón Sentinel-2; bez uměle doplněných roků.");
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("multi-scenes").textContent="Zvolená úplná časová řada nebyla doložena.";
+   $("multi-summary").textContent="Nelze získat původní roky: "+
+     String(error.message||error).slice(0,250)+
+     ". Zvol jiný měsíc, rozsah let nebo limit oblačnosti.";
+ }finally{
+   if(observationRequest===controller)observationRequest=null;
+   $("multi-search").disabled=false;
+ }
+}
+function drawMultiYearChart(){
+ const canvas=$("multi-chart"),ctx=canvas?.getContext("2d");
+ if(!ctx)return;
+ const w=canvas.width,h=canvas.height;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle="#0c2335";ctx.fillRect(0,0,w,h);
+ ctx.fillStyle="#bbd4e4";ctx.font="12px system-ui";
+ const seasons=multiData?.meta?.years??[];
+ if(seasons.length<3){ctx.fillText("Čekám na ověřené roční zdrojové mediány…",20,35);return;}
+ const left=65,right=30,top=24,bottom=31;
+ const values=seasons.map(s=>s.meanNdviOnCommon);
+ const min=Math.min(...values),max=Math.max(...values),
+   pad=Math.max(.035,(max-min)*.2),low=Math.max(-1,min-pad),
+   high=Math.min(1,max+pad),denom=Math.max(.001,high-low);
+ const x=i=>left+(w-left-right)*i/(seasons.length-1);
+ const y=v=>top+(h-top-bottom)*(high-v)/denom;
+ ctx.strokeStyle="#3b5a6e";ctx.beginPath();
+ ctx.moveTo(left,top);ctx.lineTo(left,h-bottom);ctx.lineTo(w-right,h-bottom);ctx.stroke();
+ ctx.fillStyle="#b8e5df";ctx.fillText("NDVI · pouze stejné společné platné pixely",left,14);
+ ctx.fillText(high.toFixed(3),10,top+6);
+ ctx.fillText(low.toFixed(3),10,h-bottom);
+ ctx.lineWidth=2.5;ctx.strokeStyle="#85dba8";ctx.beginPath();
+ for(let i=0;i<seasons.length;i++){
+   if(i===0)ctx.moveTo(x(i),y(values[i]));else ctx.lineTo(x(i),y(values[i]));
+ }
+ ctx.stroke();
+ for(let i=0;i<seasons.length;i++){
+   const xx=x(i),yy=y(values[i]);
+   ctx.fillStyle="#b4f1d6";ctx.beginPath();ctx.arc(xx,yy,4,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle="#e6f5f1";ctx.fillText(values[i].toFixed(3),
+     Math.max(65,Math.min(w-75,xx-22)),Math.max(24,yy-12));
+   ctx.fillStyle="#a9cadb";ctx.fillText(String(seasons[i].year),xx-14,h-9);
+ }
+}
+async function loadMultiYear(){
+ const selected=multiSelection;
+ if(!selected)return;
+ const {tile,from,to,month,cloud}=selected;
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ multiData=null;$("multi-load").disabled=true;$("multi-export").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();drawMultiYearChart();
+ $("multi-summary").textContent="Načítám původní kalibrované NDVI a ověřuji stejné platné pixely ve "+
+   (to-from+1)+" letech. Bez chybějících roků a interpolací.";
+ let texture=null;
+ try{
+   const prefix="/api/observations/multiyear/0/"+tile.x+"/"+tile.y+"/"+
+     from+"/"+to+"/"+month+".";
+   const params="?cloud="+cloud;
+   const response=await fetch(prefix+"json"+params,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,240));
+   const meta=await response.json();
+   const sceneMatches=Array.isArray(meta.years)&&
+     meta.years.length===selected.catalog.seasons.length&&
+     meta.years.every((annual,i)=>annual.year===selected.catalog.seasons[i].year&&
+       annual.scenes.length===2&&
+       annual.scenes.every((scene,j)=>{
+         const actual=selected.catalog.seasons[i].scenes[j];
+         return scene.sceneId===actual.id&&scene.acquiredAt===actual.acquiredAt;
+       }));
+   if(meta.status!=="real-sentinel-multiyear-seasonal-trend"||meta.version!==1||
+      meta.key!==tile.key||meta.month!==month||!sceneMatches||
+      meta.statistics?.firstYear!==from||meta.statistics?.lastYear!==to||
+      meta.qa?.allSourceSclMasked!==true||meta.qa?.allSameGrid!==true||
+      meta.qa?.fixedCommonPixelPopulation!==true||
+      meta.qa?.leaveOneYearOutSensitivity!==true||
+      meta.terrainElevationUnchanged!==true||meta.grid?.crs!=="EPSG:3857"||
+      !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+      meta.width<2||meta.height<2||meta.width*meta.height>50000||
+      !Number.isInteger(meta.statistics?.commonValidPixels)||
+      meta.statistics.commonValidPixels<16)
+     throw Error("Víceletý výsledek nemá průkazné původní zdroje nebo shodnou mřížku");
+   const slope=binary(meta.slopeF32LE,Float32Array),
+     low=binary(meta.loF32LE,Float32Array),
+     high=binary(meta.hiF32LE,Float32Array),
+     robust=binary(meta.robustB64,Uint8Array);
+   const n=meta.width*meta.height;
+   if([slope,low,high,robust].some(v=>v.length!==n)||
+      slope.filter(Number.isFinite).length!==meta.statistics.commonValidPixels||
+      robust.some(v=>v!==0&&v!==1)||
+      slope.some((v,i)=>Number.isFinite(v)&&(
+        !Number.isFinite(low[i])||!Number.isFinite(high[i])||low[i]>high[i]))||
+      slope.some((v,i)=>Number.isNaN(v)&&(
+        !Number.isNaN(low[i])||!Number.isNaN(high[i])||robust[i]!==0)))
+     throw Error("Číselná roční NDVI data nebo citlivost jsou poškozené");
+   const png=await fetch(prefix+"png"+params,{signal:controller.signal});
+   if(!png.ok)throw Error("Skutečná víceletá WebGL vrstva chybí");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     texture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   observationActive={key:tile.key,meta,multiTexture:texture};
+   texture=null;multiData={meta,slope,low,high,robust};
+   observationTile=tile;
+   $("multi-export").disabled=false;
+   $("obs-mode").value="multiyear";
+   const st=meta.statistics;
+   $("multi-summary").textContent=from+"–"+to+": "+
+     st.commonValidPixels+" platných pixelů ve všech letech ("+
+     st.commonValidPercent.toFixed(1)+" %). Dvě skutečná měření každý rok: "+
+     st.robustAllYearsPixels+". Theil–Sen "+
+     st.meanSlopeNdviPerYear.toFixed(4)+" NDVI/rok. Citlivost znaménka na "+
+     "vynechání roku: "+st.signSensitivePixels+" pixelů. "+
+     (st.lowCoverageWarning?"POZOR: nízké prostorové pokrytí. ":"")+
+     (st.dateShiftWarning?"POZOR: roční mediány jsou z různých dnů měsíce. ":"")+
+     "Nejde o interval statistické spolehlivosti ani předpověď.";
+   observationMessage("Skutečný víceletý NDVI trend je promítnut na původní "+
+     "3D ČÚZK terén. Původní výšky Bpv jsou nezměněné.");
+   drawMultiYearChart();requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("multi-summary").textContent="Víceletou analýzu nelze doložit: "+
+     String(error.message||error).slice(0,260)+
+     ". Výsledek z neplatných zdrojů nevytvářím.";
+ }finally{
+   if(texture)gl?.deleteTexture(texture);
+   if(observationRequest===controller)observationRequest=null;
+   $("multi-load").disabled=!multiSelection;
+ }
+}
+function exportMultiYear(){
+ if(!multiData)return;
+ const {meta,slope,low,high,robust}=multiData,t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const rows=["type,year,longitude_deg,latitude_deg,mean_ndvi_same_pixels,ndvi_slope_per_year,leave_year_out_low,leave_year_out_high,two_valid_sources_every_year,valid_all_years"];
+ for(const year of meta.years)
+   rows.push(["annual",year.year,"","",year.meanNdviOnCommon.toFixed(7),"","","","",""].join(","));
+ const R=6378137;
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const i=row*meta.width+col;
+   const x=t[0]+t[1]*(col+.5)+t[2]*(row+.5),
+     y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const lon=x/R*180/Math.PI,lat=(2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI;
+   const valid=Number.isFinite(slope[i]);
+   rows.push(["pixel","",lon.toFixed(8),lat.toFixed(8),"",
+     valid?slope[i].toFixed(7):"",valid?low[i].toFixed(7):"",
+     valid?high[i].toFixed(7):"",valid?robust[i]:"",valid?1:0].join(","));
+ }
+ const url=URL.createObjectURL(new Blob([rows.join("\r\n")+"\r\n"],{
+   type:"text/csv;charset=utf-8"}));
+ const link=document.createElement("a");link.href=url;
+ link.download="praha-sentinel-ndvi-vicelety-trend-"+meta.statistics.firstYear+"-"+meta.statistics.lastYear+".csv";
+ document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
