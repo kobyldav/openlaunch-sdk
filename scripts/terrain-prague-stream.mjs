@@ -881,13 +881,29 @@ async function streamRegionalMultiyear(req,res,params){
      from,to,month,cloud,x,y,cols,rows,
      tiles:specs.map(t=>({key:t.key,x:t.x,y:t.y,
        bounds:{west:t.west,south:t.south,east:t.east,north:t.north}}))});
+   // One region-wide catalog replaces independent per-tile date ranking.
+   // Even when selection fails, return honest tile NoData events.
+   let lock=null,lockError=null;
+   try{
+     lock=await selectRegionSourceLock(specs,from,to,month,cloud);
+     emit({type:"source-lock",status:"real-sentinel-region-shared-scenes",
+       id:lock.id,from,to,month,cloud,seasons:lock.seasons});
+   }catch(error){
+     lockError=error;
+     emit({type:"source-lock",status:"unavailable",
+       reason:String(error?.message??error).slice(0,180)});
+   }
    for(const spec of specs){
      if(res.destroyed)break;
      const bounds={west:spec.west,south:spec.south,east:spec.east,north:spec.north};
      try{
        // The same genuine Stage 15 STAC/COG/SCL pipeline; no alternate raster sources.
-       const product=await obtainMultiyear(spec,from,to,month,cloud);
+       if(!lock)throw lockError??Error("No shared Sentinel scene catalog available");
+       const product=await obtainMultiyear(spec,from,to,month,cloud,lock);
        const doc=JSON.parse(product.json.toString("utf8"));
+       if(doc.sourceLockId!==lock.id||doc.regionSourceLocked!==true||
+         !verifySharedSentinelRegionSourceYears(doc.years,lock))
+         throw Error("Regional tile did not use the one verified shared scene selection");
        const bytes=Buffer.from(doc.slopeF32LE??"","base64");
        if(bytes.byteLength!==doc.width*doc.height*4)
          throw Error("Regional seam refuses malformed numeric source NDVI/year");
@@ -925,6 +941,9 @@ async function streamRegionalMultiyear(req,res,params){
    }
    if(!res.destroyed){
      emit({type:"complete",result:{...aggregate.finish(),
+       sourceLockId:lock?.id??null,
+       sourceSelectionStatus:lock?"shared":"unavailable",
+       lockedSourceYears:lock?.seasons??[],
        seams,seamWarningCount:seams.filter(s=>s.warning).length,
        seamDiagnostics:"Native adjacent source pixel centers; no interpolation, no seam blending, not proof of terrain or ecological change."}});
      res.end();
@@ -990,7 +1009,13 @@ const server=createServer(async(req,res)=>{
       const from=Number(multiResult[3]),to=Number(multiResult[4]);
       const month=Number(multiResult[5]);
       const cloud=Number(incoming.searchParams.get("cloud")??"50");
-      const data=await obtainMultiyear(spec,from,to,month,cloud);
+      const id=incoming.searchParams.get("lock");
+      const lock=id===null?null:await loadRegionSourceLock(id);
+      if(lock&&(!lock.tiles.includes(spec.key)||
+        lock.from!==from||lock.to!==to||
+        lock.month!==month||lock.cloud!==cloud))
+        throw new RangeError("Selected tile or years do not match the shared Sentinel source lock");
+      const data=await obtainMultiyear(spec,from,to,month,cloud,lock);
       send(res,200,multiResult[6]==="json"?data.json:data.png,
         multiResult[6]==="json"?"application/json; charset=utf-8":"image/png");
       return;
