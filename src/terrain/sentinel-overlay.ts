@@ -199,7 +199,7 @@ export async function loadSentinelTerrainOverlay(o:SentinelTerrainLoadOptions):
  const [red,green,blue,nir,scl]=products.map(product=>{
    validateRaster(product.raster);
    return reprojectRasterTo(product.raster,target,"nearest");
- });
+ }) as [RasterGrid,RasterGrid,RasterGrid,RasterGrid,RasterGrid];
  const n=target.width*target.height;
  const reflectance=(raw:number,band:keyof typeof calibration)=>{
    const v=raw*calibration[band].scale+calibration[band].offset;
@@ -230,7 +230,7 @@ export async function loadSentinelTerrainOverlay(o:SentinelTerrainLoadOptions):
  const valid=good.reduce((a,b)=>a+b,0);
  if(valid<4)throw Error("Selected Sentinel scene has no cloud-free calibrated RGB/NIR pixels");
  const stretches={red:stretch(rr.red),green:stretch(rr.green),blue:stretch(rr.blue)};
- const aligned=key=>({...target,values:Float64Array.from(bands[key],(v,i)=>good[i]?v:NaN)});
+ const aligned=(key:keyof typeof bands):RasterGrid=>({...target,values:Float64Array.from(bands[key],(v,i)=>good[i]?v:NaN)});
  const resultNdvi=ndviRaster(aligned("red"),aligned("nir"));
  const stats=rasterStatistics(resultNdvi);
  if(stats.valid!==valid||stats.min===null||stats.max===null||
