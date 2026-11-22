@@ -32,7 +32,16 @@ jobs:
         run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
       - name: Install Chromium
         run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Download verified NASA Blue Marble texture (mirrored unchanged)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test-results/showcase-assets
+          gh api repos/Depal-Jakub/orbital-bloom/contents/public/assets/earth-day-2048.jpg --jq '.content' | base64 -d > test-results/showcase-assets/nasa-blue-marble.jpg
+          test $(stat -c%s test-results/showcase-assets/nasa-blue-marble.jpg) -gt 80000
       - name: Render real SDK scenes in Chromium
+        env:
+          OPENLAUNCH_EARTH_TEXTURE: test-results/showcase-assets/nasa-blue-marble.jpg
         run: node scripts/generate-sdk-showcase.mjs
       - name: Import already-tested measured Prague terrain screenshot
         env:
