@@ -1556,6 +1556,19 @@ async function runRegionCoverage(){
          !Number.isFinite(q.cogRangeCache.residentMiB)||
          q.cogRangeCache.residentMiB<0||
          q.cogRangeCache.residentMiB>q.cogRangeCache.maxResidentMiB||
+         !Number.isFinite(q.cogRangeCache.activeBudgetMiB)||
+         q.cogRangeCache.activeBudgetMiB<0||
+         q.cogRangeCache.activeBudgetMiB>q.cogRangeCache.maxResidentMiB||
+         q.cogRangeCache.residentMiB>q.cogRangeCache.activeBudgetMiB||
+         !q.cogMemory||
+         !["adaptive","fixed"].includes(q.cogMemory.mode)||
+         !Number.isFinite(q.cogMemory.activeBudgetMiB)||
+         q.cogMemory.activeBudgetMiB!==q.cogRangeCache.activeBudgetMiB||
+         !Number.isInteger(q.cogMemory.checks)||q.cogMemory.checks<0||
+         !Number.isInteger(q.cogMemory.shrinkEvents)||
+         q.cogMemory.shrinkEvents<0||
+         !Number.isInteger(q.cogMemory.recoveryEvents)||
+         q.cogMemory.recoveryEvents<0||
          !Number.isInteger(q.cogRangeCache.httpRequests)||
          q.cogRangeCache.httpRequests<0||
          !Number.isInteger(q.cogRangeCache.httpBytesRead)||
@@ -1572,7 +1585,7 @@ async function runRegionCoverage(){
          throw Error("Skutečné provozní údaje regionu nejsou úplné nebo odpovídající zdrojům");
        regionResult=r;completed=true;
        $("region-quality-export").disabled=false;
-       $("region-quality").textContent="ETAPY 20–22 · "+
+       $("region-quality").textContent="ETAPY 20–23 · "+
          r.analyzedTiles+"/"+cells.length+" doložených dlaždic ("+
          q.analyzedTilePercent.toFixed(1)+" %) · "+
          q.elapsedMs.toFixed(0)+" ms serverový výpočet · špička Node RSS "+
@@ -1589,6 +1602,14 @@ async function runRegionCoverage(){
          (q.cogRangeCache.reusedBytes/1048576).toFixed(2)+
          " MiB · cache "+q.cogRangeCache.residentMiB.toFixed(1)+
          "/"+q.cogRangeCache.maxResidentMiB.toFixed(0)+" MiB · "+
+         "Adaptivní ochrana RAM: "+q.cogMemory.mode+
+         ", aktuální strop "+q.cogMemory.activeBudgetMiB.toFixed(1)+
+         " MiB / cílová RSS "+q.cogMemory.effectiveRssTargetMiB+
+         " MiB; omezení "+q.cogMemory.shrinkEvents+
+         "×, návrat "+q.cogMemory.recoveryEvents+
+         "×, skutečně uvolněno "+
+         (q.cogMemory.freedFromCacheBytes/1048576).toFixed(2)+
+         " MiB · "+
          "Celoregionální SCL pokrytí: "+
          (q.wholeRegionSclPixelCoveragePercent===null?
            "nelze spočítat – chybí skutečné dlaždice":
