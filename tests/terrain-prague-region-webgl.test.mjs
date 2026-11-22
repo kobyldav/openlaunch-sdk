@@ -18,19 +18,28 @@ const mockDate=year=>({year,scenes:[5,19].map((day,i)=>({
  sceneId:"S2A_"+year+"08"+String(day).padStart(2,"0")+"_"+i+"_L2A",
  acquiredAt:year+"-08-"+String(day).padStart(2,"0")+"T10:00:00Z"
 }))});
+const geoBounds={west:14.40,south:50.09,east:14.41,north:50.10};
+function mercator(lon,lat){
+ const r=6378137;return [r*lon*Math.PI/180,r*Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))];
+}
+const box={key:"0-3-3",cell:{bounds:geoBounds}};
 const bins=values=>Buffer.from(values.buffer,values.byteOffset,values.byteLength).toString("base64");
 function fixture(){
  const years=[2023,2024,2025].map(mockDate);
  const report={status:"analyzed",key:"0-3-3",
    commonValidPixels:3,robustAllYearsPixels:2,
    sourceScenes:years};
+ const [left,top]=mercator(geoBounds.west,geoBounds.north),
+   [right,bottom]=mercator(geoBounds.east,geoBounds.south);
  const meta={status:"real-sentinel-multiyear-seasonal-trend",
    version:1,key:"0-3-3",month:8,
    width:2,height:2,terrainElevationUnchanged:true,
    qa:{allSourceSclMasked:true,allSameGrid:true,
      fixedCommonPixelPopulation:true,noGapFilling:true,
      leaveOneYearOutSensitivity:true},
-   grid:{crs:"EPSG:3857"},
+   area:[geoBounds.west,geoBounds.south,geoBounds.east,geoBounds.north],
+   grid:{crs:"EPSG:3857",transform:[
+     left,(right-left)/2,0,top,0,(bottom-top)/2]},
    statistics:{firstYear:2023,lastYear:2025,totalPixels:4,
      commonValidPixels:3,robustAllYearsPixels:2},
    years,slopeF32LE:bins(Float32Array.from([.1,.1,NaN,-.1])),
@@ -51,7 +60,7 @@ function createHarness(){
    selection:{coarse:[],finer:[]},
    gl:{deleteTexture:x=>deletions.push(x)},
    config:{},$:(key)=>dom[key]??null,
-   nearTile:(_z,x,y)=>x+y,
+   nearTile:(_z,x,y)=>x+y,merc:mercator,
    requestDraw:()=>{},
    binary:(base64,Type)=>{
      const b=Buffer.from(base64,"base64");
@@ -69,10 +78,14 @@ test("Stage 17: active regional source matches real per-year IDs, SCL counts and
  const {ctx,api}=createHarness();
  const f=fixture();
  ctx.regionTiles.set("0-3-3",f.report);
- assert.equal(api.validateRegionSource(f.meta,{key:"0-3-3"}),true);
+ assert.equal(api.validateRegionSource(f.meta,box),true);
  for(const patch of [
    {version:9},{month:7},{key:"0-3-4"},{terrainElevationUnchanged:false},
-   {grid:{crs:"EPSG:4326"}},{qa:{...f.meta.qa,allSourceSclMasked:false}},
+   {grid:{crs:"EPSG:4326"}},
+   {area:[14.50,50.09,14.51,50.10]},
+   {grid:{...f.meta.grid,transform:[
+     f.meta.grid.transform[0]+30,...f.meta.grid.transform.slice(1)]}},
+   {qa:{...f.meta.qa,allSourceSclMasked:false}},
    {statistics:{...f.meta.statistics,commonValidPixels:4}},
    {statistics:{...f.meta.statistics,robustAllYearsPixels:3}},
    {slopeF32LE:bins(Float32Array.from([.1,.1,.3,-.1]))},
@@ -80,8 +93,8 @@ test("Stage 17: active regional source matches real per-year IDs, SCL counts and
    {years:f.meta.years.map((y,i)=>i===1?{...y,
      scenes:y.scenes.map((s,j)=>j===0?{...s,sceneId:"wrong_source"}:s)}:y)}
  ]){
-   assert.throws(()=>api.validateRegionSource({...f.meta,...patch},{key:"0-3-3"}),
-     /zdrojově|nesouhlasí/, "Must reject different genuine source provenance");
+   assert.throws(()=>api.validateRegionSource({...f.meta,...patch},box),
+     /zdrojově|nesouhlasí|geografickou|posunutou/, "Must reject different genuine source provenance");
  }
  ctx.regionTiles.get("0-3-3").status="insufficient";
  assert.throws(()=>api.validateRegionSource(f.meta,{key:"0-3-3"}),/zdrojově/);
