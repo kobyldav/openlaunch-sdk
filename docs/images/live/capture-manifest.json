@@ -1,6 +1,6 @@
 {
   "site": "https://www.kobylkadavid.cz",
-  "capturedAt": "2026-11-22T14:19:39.408Z",
+  "capturedAt": "2026-11-22T14:23:55.867Z",
   "kind": "actual-browser-screenshots",
   "technicalSource": "MyWeb web application consuming OpenLaunch SDK",
   "selected": [
@@ -18,13 +18,13 @@
     {
       "file": "sentinel2-real-ui.png",
       "provider": "Sentinel-2 RGB",
-      "loadedImages": 2,
+      "loadedImages": 1,
       "requestedDate": null
     },
     {
       "file": "ndvi-real-ui.png",
       "provider": "Sentinel-2 NDVI",
-      "loadedImages": 2,
+      "loadedImages": 1,
       "requestedDate": null
     }
   ],
