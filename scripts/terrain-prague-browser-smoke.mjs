@@ -399,10 +399,84 @@ try{
      "no fabricated time-series graph or screenshot generated.");
  }
 
+ // Stage 14: draw the interannual source median only when four real
+ // previously validated COG/SCL source scenes exist. No fixture imagery.
+ let actualSeasonalView=null;
+ try{
+   const report=JSON.parse(await readFile(join(cache,"seasonal-live-report.json"),"utf8"));
+   assert.equal(report.status,"real-sentinel-seasonal-verified");
+   const {before,after,selection}=report;
+   assert.equal(before.scenes.length,2);assert.equal(after.scenes.length,2);
+   await evalJs(c.send,'(()=>{const center=tileCenter(0,3,3);'+
+     'panX=center[0];panNorth=center[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;'+
+     '$("obs-mode").value="ortho";update();return true;})()');
+   const baseline=await evalJs(c.send,inspectPixels);
+   const catalog={
+     before:{year:before.year,scenes:before.scenes.map(x=>({
+       id:x.sceneId,acquiredAt:x.acquiredAt,cloudPercent:null}))},
+     after:{year:after.year,scenes:after.scenes.map(x=>({
+       id:x.sceneId,acquiredAt:x.acquiredAt,cloudPercent:null}))}
+   };
+   const setup='(()=>{seasonalSelection={tile:planner.tileLevels[0]'+
+     '.find(t=>t.key==="0-3-3"),beforeYear:'+before.year+
+     ',afterYear:'+after.year+',month:'+before.month+
+     ',cloud:'+selection.cloud+',catalog:'+JSON.stringify(catalog)+'};'+
+     '$("season-before").value='+JSON.stringify(String(before.year))+';'+
+     '$("season-after").value='+JSON.stringify(String(after.year))+';'+
+     '$("season-month").value='+JSON.stringify(String(before.month))+';'+
+     '$("season-cloud").value='+JSON.stringify(String(selection.cloud))+';'+
+     '$("season-scenes").textContent='+JSON.stringify(
+       [...before.scenes,...after.scenes].map(x=>x.acquiredAt.slice(0,10)+" · "+x.sceneId).join(" | "))+ ';return true;})()';
+   await evalJs(c.send,setup);
+   await evalJs(c.send,'loadSeasonal()');
+   await until(async()=>await evalJs(c.send,
+     '!!seasonalData&&!!observationActive?.seasonalTexture&&'+
+     '$("obs-mode").value==="seasonal"'),
+     "genuine four-source interannual NDVI in Edge WebGL1",30000);
+   const observed=await evalJs(c.send,inspectPixels);
+   assert.equal(observed.glError,0);
+   assert.equal(observed.loaded,true);
+   assert.notEqual(observed.checksum,baseline.checksum,
+     "Same-month source SCL-masked four-image NDVI must change framebuffer");
+   const ui=await evalJs(c.send,
+     '({pixels:seasonalData.meta.statistics.overlapPixels,'+
+     'values:seasonalData.delta.filter(Number.isFinite).length,'+
+     'robust:seasonalData.meta.statistics.robustTwoPerYearPixels,'+
+     'before:seasonalData.meta.before.year,after:seasonalData.meta.after.year,'+
+     'csvEnabled:!$("season-export").disabled,'+
+     'sourceLabel:$("season-scenes").textContent,'+
+     'qualityLabel:$("season-summary").textContent})');
+   assert.equal(ui.pixels,report.statistics.overlapPixels);
+   assert.equal(ui.values,report.statistics.overlapPixels);
+   assert.equal(ui.robust,report.statistics.robustTwoPerYearPixels);
+   assert.equal(ui.before,before.year);assert.equal(ui.after,after.year);
+   assert.equal(ui.csvEnabled,true);
+   assert.match(ui.qualityLabel,/platných pixelů/);
+   assert.match(ui.sourceLabel,/Sentinel|S2[A-C]/);
+   await evalJs(c.send,'(()=>{window.scrollTo(0,'+
+     'Math.max(0,$("season-summary").getBoundingClientRect().top+window.scrollY-100));'+
+     'return true;})()');
+   const screenshotBytes=await capture("prague-real-sentinel-ndvi-seasonal-interannual.png");
+   actualSeasonalView={before,after,statistics:report.statistics,
+     source:report.source,checksum:observed.checksum,
+     terrainChecksum:baseline.checksum,screenshotBytes};
+   console.log("PASS genuine same-month "+before.year+"/"+after.year+
+     " Sentinel-2 interannual ΔNDVI in actual Edge WebGL1: "+
+     ui.pixels+" source-coincident valid pixels, "+
+     ui.robust+" with >=2 clear measurements in both years, "+
+     baseline.checksum+" -> "+observed.checksum+
+     ", "+screenshotBytes+" source screenshot PNG bytes");
+ }catch(error){
+   if(existsSync(join(cache,"seasonal-live-report.json")))throw error;
+   console.log("NOTICE actual multi-year Sentinel source data unavailable; "+
+     "no interannual screenshot or derived scientific claim fabricated.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,
+   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
