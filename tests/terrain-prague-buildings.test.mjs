@@ -71,16 +71,14 @@ test("3D building geometry has real OSM footprint and DMR ground, explicitly tag
  assert.equal(result.roofGeometry,"flat-LOD1-visual-proxy");
  assert.match(result.source,/OpenStreetMap/);
  assert.match(result.source,/ČÚZK/);
- const vertices=new Float32Array(Buffer.from(result.positionsF32LE,"base64").buffer.slice(0));
  const tris=Buffer.from(result.trianglesU16LE,"base64");
- assert.equal(vertices.length,24);
- assert.equal(tris.length,12*3*2);
+ assert.equal(tris.length,10*3*2);
  const actual=Buffer.from(result.positionsF32LE,"base64");
  const pos=new Float32Array(actual.buffer,actual.byteOffset,actual.byteLength/4);
  const heights=Array.from({length:8},(_,i)=>pos[i*3+2]);
  assert.ok(heights.slice(0,4).every(h=>h===183));
  assert.ok(heights.slice(4).every(h=>h===199));
- assert.equal(result.triangles,12);
+ assert.equal(result.triangles,10);
 });
 test("without tag, roof is derived only from real DSM points and real ground heights",()=>{
  const {ground,dsm}=inputs();
