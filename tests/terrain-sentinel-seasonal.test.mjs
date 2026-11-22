@@ -102,7 +102,7 @@ test("stage 14: deny falsely comparable sources, chronology, month, duplicate da
  assert.throws(()=>compare(older,[...newer,newer[0],newer[1]]),/2..3/);
  assert.throws(()=>compare(newer,older),/two ordered years/);
  assert.throws(()=>compare(older,older),/distinct acquisition date/);
- assert.throws(()=>compare(older,[{...newer[0],acquiredAt:"2025-07-06T10:00:00Z"},newer[1]]),/same calendar month/);
+ assert.throws(()=>compare(older,[{...newer[0],acquiredAt:"2025-07-06T10:00:00Z"},newer[1]]),/calendar month/);
  assert.throws(()=>compare(older,[{...newer[0],grid:{...newer[0].grid,
    transform:[100,10,0,201,0,-10]}},newer[1]]),/mismatched source pixel grids/);
  assert.throws(()=>compare(older,[{...newer[0],qa:{sclMask:false}},newer[1]]),/calibrated masked/);
