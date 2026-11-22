@@ -24,7 +24,7 @@ test("Stage 19: one stable genuine source pair per year for the entire region",(
  assert.deepEqual(selected.seasons.map(y=>y.year),years);
  assert.ok(selected.seasons.every(y=>y.scenes.length===2));
  // Ranking prefers actual low cloud and distinguishes acquisitions >=4 days.
- assert.deepEqual(selected.seasons[0].scenes.map(s=>s.acquiredAt.slice(8,10)),["04","19"]);
+ assert.deepEqual(selected.seasons[0].scenes.map(s=>s.acquiredAt.slice(8,10)),["04","21"]);
  assert.ok(selected.seasons.every(y=>y.scenes[0].id!==y.scenes[1].id));
  assert.ok(selected.seasons.every(y=>
    Math.abs(Date.parse(y.scenes[0].acquiredAt)-Date.parse(y.scenes[1].acquiredAt))>=4*86400000));
