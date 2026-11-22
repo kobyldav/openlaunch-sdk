@@ -17,6 +17,7 @@ const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+
 const port=Number(getArg("port","8765"));
 if(!Number.isInteger(port)||port<0||port>65535)throw Error("--port must be 0..65535");
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
+const offline=args.includes("--offline");
 await mkdir(cacheRoot,{recursive:true});
 const viewport=await readFile(new URL("./terrain-prague-stream-viewer.html",import.meta.url),"utf8");
 const visibilityScript=await readFile(new URL("./terrain-prague-stream-visibility.js",import.meta.url),"utf8");
@@ -72,6 +73,11 @@ async function storedPair(spec){
 async function generate(spec){
   const cached=await storedPair(spec);
   if(cached)return cached;
+  if(offline){
+    const error=new Error("This tile has not yet been downloaded; offline mode forbids source requests.");
+    error.code="TILE_NOT_CACHED";
+    throw error;
+  }
   console.log("Fetching measured ČÚZK tile "+spec.key+" ("+
     spec.demResolutionM+"m DEM / "+spec.textureResolutionM+"m ortho)");
   const area=bbox(spec.west,spec.south,spec.east,spec.north);
@@ -161,7 +167,7 @@ const server=createServer(async(req,res)=>{
       send(res,200,visibilityScript,"application/javascript; charset=utf-8");return;
     }
     if(pathname==="/api/config"){
-      send(res,200,JSON.stringify(pragueStreamManifest()),"application/json; charset=utf-8");return;
+      send(res,200,JSON.stringify({...pragueStreamManifest(),offlineMode:offline}),"application/json; charset=utf-8");return;
     }
     const match=/^\/api\/tiles\/([01])\/([0-9]{1,2})\/([0-9]{1,2})\.(json|png)$/.exec(pathname);
     if(match){
@@ -176,7 +182,7 @@ const server=createServer(async(req,res)=>{
   }catch(err){
     console.error("Tile error:",String(err));
     const message=String(err?.message??err).slice(0,250);
-    send(res,err instanceof RangeError?400:503,
+    send(res,err?.code==="TILE_NOT_CACHED"?404:err instanceof RangeError?400:503,
       JSON.stringify({error:message,syntheticFallback:false}),
       "application/json; charset=utf-8");
   }
@@ -187,6 +193,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
+  if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
     const cmd=spawn("cmd",["/c","start","",url],{windowsHide:true,detached:true,stdio:"ignore"});
     cmd.unref();
