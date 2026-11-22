@@ -31,6 +31,8 @@ jobs:
         run: node --test tests/terrain-sentinel-seasonal.test.mjs
       - name: Validate 3-5 annual same-month Sentinel source NDVI, Theil-Sen, leave-year-out instability and all-year masks
         run: node --test tests/terrain-sentinel-multiyear.test.mjs
+      - name: Stage 16 source-proven bounded regional coverage and offline NDJSON stream
+        run: node --test tests/terrain-sentinel-region.test.mjs tests/terrain-prague-region-stream.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
