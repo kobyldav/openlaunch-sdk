@@ -1,0 +1,57 @@
+name: Real OpenLaunch SDK 3D showcase
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/generate-sdk-showcase.mjs
+      - tools/readme-gallery/showcase-viewer.html
+      - tools/readme-gallery/package.json
+      - .github/workflows/readme-sdk-showcase.yml
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
+      - run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Download public NASA Blue Marble texture from verified GitHub mirror
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test-results/showcase-assets
+          gh api repos/Depal-Jakub/orbital-bloom/contents/public/assets/earth-day-2048.jpg --jq '.content' | base64 -d > test-results/showcase-assets/nasa-blue-marble.jpg
+          test $(stat -c%s test-results/showcase-assets/nasa-blue-marble.jpg) -gt 80000
+      - name: Render actual SDK WebGL views
+        env:
+          OPENLAUNCH_EARTH_TEXTURE: test-results/showcase-assets/nasa-blue-marble.jpg
+        run: node scripts/generate-sdk-showcase.mjs
+      - name: Validate generated images
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['sdk-orbit-3d.png','sdk-launch-3d.png']:
+              data=(Path('docs/images/live')/name).read_bytes()
+              assert data[:8]==bytes((137,80,78,71,13,10,26,10)) and len(data)>30000,name
+              print(name,len(data))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: openlaunch-sdk-webgl-showcase
+          path: |
+            docs/images/live/sdk-orbit-3d.png
+            docs/images/live/sdk-launch-3d.png
+            docs/images/live/sdk-showcase-provenance.json
+          if-no-files-found: warn

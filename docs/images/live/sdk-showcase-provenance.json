@@ -1,0 +1,14 @@
+{
+  "generatedAt": "2026-11-22T14:19:51.927Z",
+  "dataSources": [
+    "Historical June 2019 TLE from SDK regression fixtures / SGP4 propagated positions",
+    "SDK generic two-stage 3DOF model, not actual launch telemetry",
+    "NASA/GSFC, Reto Stöckli (Blue Marble 2002)"
+  ],
+  "blueMarble": "https://raw.githubusercontent.com/Depal-Jakub/orbital-bloom/main/public/assets/earth-day-2048.jpg",
+  "figureTypes": [
+    "3D orbit rendering",
+    "3D local launch model"
+  ],
+  "limits": "Visual demonstration of SDK results; not live orbit, flight telemetry or photorealistic spacecraft"
+}
