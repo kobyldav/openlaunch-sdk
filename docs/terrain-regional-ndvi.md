@@ -99,3 +99,67 @@ node --test tests/terrain-sentinel-region.test.mjs tests/terrain-prague-region-s
 The offline integration test uses a genuinely empty cache and must report
 no observations rather than inventing test pixels. Real multi-tile Sentinel
 coverage additionally requires live access to source STAC/COG services.
+
+
+## Stage 17 — original multi-year pixels projected on several 3D tiles
+
+After finishing the Stage 16 real regional coverage analysis, click
+**Zobrazit regionální trend ve 3D**. The **Regionální NDVI trend** dropdown
+option controls the same layer. Switch back to ČÚZK orthophoto to hide it.
+
+- Every successfully analyzed region tile reuses its own Stage 15
+  source-verified annual medians and **the corresponding calibrated
+  SCL-masked trend PNG**. No guessed data or region-wide color mosaic
+  is rendered; pixels missing from any required year remain transparent.
+- Before a tile is uploaded, the browser independently checks its
+  3–5 genuine source IDs/acquisition times, annual month and years,
+  total/common/robust pixel counts, numeric NaN masks, original WGS84
+  bounds and EPSG:3857 pixel grid against the Stage 16 regional
+  coverage report. Invalid or shifted raster data is refused.
+- Only **currently render-selected coarse tile parents** can receive an
+  overlay. Their finer z=1 measured DSM meshes reuse the *same*
+  source raster with the correct quadrant UV transform, without
+  inventing higher-resolution satellite pixels.
+- The overlay uses the **existing WebGL1 shader and original ČÚZK Bpv
+  vertex coordinates**. It does not affect height profiles,
+  elevation, photographs or original building geometry.
+- A separate GPU cache retains **at most 6 source-verified raster
+  textures**, each of at most 50,000 pixels. It fetches one at a
+  time, prioritizes nearest visible tiles, releases out-of-view
+  textures and cancels work on toggles, new regions or lost GPU context.
+  The separate original measured terrain cache remains independent.
+- Failed image requests or changed data do not generate a colored
+  tile; the underlying ČÚZK ortho remains visible.
+- **Important limitation:** this is a *patchwork of independently
+  observed tiles*, not a seam-blended, full-resolution 3D NDVI mosaic.
+  A tile boundary may show a difference in per-tile source quality,
+  acquisition dates or cloud coverage. It does not establish
+  physical discontinuities in vegetation.
+
+### Stage 17 verification
+
+~~~powershell
+npm run build
+node --test tests/terrain-prague-region-webgl.test.mjs
+~~~
+
+The unit test invokes the **actual embedded viewer** source check and
+visible-tile planner (with small explicit QA fixtures, not fabricated
+satellite images), including rejection of shifted source grids.
+
+The Windows browser smoke test has a **real-source regional GPU
+regression** using the same authentic six-scene, three-year Prague tile
+as Stage 15. It checks actual rendered Edge WebGL pixel differences,
+source-count integrity, GPU texture cleanup and records a genuine
+screenshot in:
+
+~~~text
+test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-one-source-tile.png
+~~~
+
+This particular strict browser regression covers **one genuinely
+verified region tile and three explicitly unavailable neighbors**.
+It verifies the renderer without falsely claiming a live four-tile
+data run. Multi-tile live source coverage is still dependent on
+actual historical STAC/COG access and must be separately observed
+before claiming all four tiles were validated end-to-end.
