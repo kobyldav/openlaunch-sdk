@@ -115,8 +115,8 @@ test("Stage 22: strong ETag inconsistency with HTTP 206 must also fail closed",a
  await assert.rejects(read(url,c,wrong),/ETag|source size changed/);
 });
 test("Stage 22: bounds, eviction and stored-byte defensive copies",()=>{
- assert.throws(()=>new CogRangeCache(-1),/0..32 MiB/);
- assert.throws(()=>new CogRangeCache(33*1048576),/0..32 MiB/);
+ assert.throws(()=>new CogRangeCache(-1),/0..128 MiB/);
+ assert.throws(()=>new CogRangeCache(129*1048576),/0..128 MiB/);
  const c=new CogRangeCache(4,1),original=Uint8Array.from([1,2,3]);
  c.accept(url,0,3,original,100,'"strong"');
  original[0]=99;
@@ -125,7 +125,9 @@ test("Stage 22: bounds, eviction and stored-byte defensive copies",()=>{
  assert.equal(c.snapshot().entries,1);
  assert.ok(c.snapshot().residentBytes<=4);
  assert.equal(c.snapshot().evictions,1);
- assert.equal(c.get(url,0,3),null);
- assert.deepEqual(Array.from(c.get(url,3,3).bytes),[4,5,6]);
+ assert.deepEqual(Array.from(c.get(url,0,3).bytes),[1,2,3],
+   "Original verified TIFF header must survive large compressed block LRU churn");
+ assert.equal(c.get(url,3,3),null,
+   "Larger nonmetadata block is evicted first under hard byte limit");
  assert.throws(()=>c.accept(url,6,1,Uint8Array.of(7),101,'"changed"'),/ETag|size changed/);
 });
