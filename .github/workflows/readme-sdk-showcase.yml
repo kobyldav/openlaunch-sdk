@@ -1,0 +1,73 @@
+name: Real SDK 3D README showcase
+
+on:
+  push:
+    branches: [feature/readme-sdk-showcase-v2]
+    paths:
+      - scripts/generate-sdk-showcase.mjs
+      - tools/readme-gallery/showcase-viewer.html
+      - tools/readme-gallery/package.json
+      - .github/workflows/readme-sdk-showcase.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install SDK
+        run: npm ci --no-audit --no-fund
+      - name: Compile SDK
+        run: npm run build
+      - name: Install browser renderer
+        run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
+      - name: Install Chromium
+        run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Render real SDK scenes in Chromium
+        run: node scripts/generate-sdk-showcase.mjs
+      - name: Import already-tested measured Prague terrain screenshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p test-results/terrain-evidence
+          gh run download 45026036824 --repo kobyldav/openlaunch-sdk --name terrain-prague-real-3d --dir test-results/terrain-evidence
+          test -s test-results/terrain-evidence/terrain-prague-browser-ci/prague-real-3d-with-buildings.png
+          cp test-results/terrain-evidence/terrain-prague-browser-ci/prague-real-3d-with-buildings.png docs/images/live/terrain-prague-real-3d.png
+      - name: Verify screenshot output bytes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          for name in ['sdk-orbit-3d.png','sdk-launch-3d.png','terrain-prague-real-3d.png']:
+              f=Path('docs/images/live')/name
+              data=f.read_bytes()
+              assert data[:8]==bytes([137,80,78,71,13,10,26,10]) and len(data)>30000,(name,len(data))
+              print(name,len(data))
+          PY
+      - name: Commit validated 3D images to the showcase branch
+        if: github.event_name == 'push'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/images/live/sdk-orbit-3d.png docs/images/live/sdk-launch-3d.png docs/images/live/terrain-prague-real-3d.png docs/images/live/sdk-showcase-provenance.json
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m "docs: add actual SDK-derived 3D WebGL screenshots"
+          git push origin HEAD:feature/readme-sdk-showcase-v2
+      - name: Upload verifiable showcase artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openlaunch-sdk-real-3d-showcase
+          path: |
+            docs/images/live/sdk-*.png
+            docs/images/live/terrain-prague-real-3d.png
+            docs/images/live/sdk-showcase-provenance.json
+          if-no-files-found: warn
