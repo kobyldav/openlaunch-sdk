@@ -11,6 +11,8 @@ import {OpenLaunch} from "../dist/index.js";
 import {bbox} from "../dist/geo/types.js";
 import {tileSpec,tileOriginOffset,pragueStreamManifest} from "./terrain-prague-stream-grid.mjs";
 import {buildSeamMesh,TERRAIN_SEAM_VERSION} from "./terrain-prague-stream-seams.mjs";
+import {fetchOsmFootprints,fetchGroundDmr,buildBuildings,BUILDING_LAYER_VERSION}
+  from "./terrain-prague-buildings.mjs";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -23,6 +25,7 @@ const viewport=await readFile(new URL("./terrain-prague-stream-viewer.html",impo
 const visibilityScript=await readFile(new URL("./terrain-prague-stream-visibility.js",import.meta.url),"utf8");
 const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.js",import.meta.url),"utf8");
 const sdk=new OpenLaunch();
+const buildingTasks=new Map();
 const tasks=new Map();
 let active=0;const queued=[];
 const MAX_SIMULTANEOUS=2,MAX_QUEUE=12;
@@ -140,6 +143,45 @@ function obtain(spec){
   tasks.set(key,promise);
   return promise;
 }
+async function generateBuildings(spec){
+ const file=join(cacheRoot,"buildings-v"+BUILDING_LAYER_VERSION+"-"+spec.key+".json");
+ try{
+   const cached=JSON.parse(await readFile(file,"utf8"));
+   if(cached.status==="real-source-buildings"&&cached.key===spec.key)
+     return Buffer.from(JSON.stringify(cached));
+ }catch{}
+ if(offline){
+   const error=Error("Building tile has not been downloaded; offline mode forbids requests.");
+   error.code="TILE_NOT_CACHED";throw error;
+ }
+ // Source DSM raster must be genuine and georeferenced, not imagined building heights.
+ const pair=await obtain(spec);
+ const data=JSON.parse(pair.json.toString("utf8"));
+ if(data.status!=="real-data"||data.verticalDatum!=="Bpv (Baltic 1957)"||
+    data.seam?.version!==2)throw Error("Building roof DSM source failed provenance check");
+ // Buffer.byteOffset must be respected when creating typed arrays.
+ const raw=Buffer.from(data.positionsF32LE,"base64");
+ const measured=new Float32Array(raw.buffer,raw.byteOffset,raw.byteLength/4);
+ const [elements,ground]=await Promise.all([
+   fetchOsmFootprints(spec),fetchGroundDmr(spec)
+ ]);
+ const result=buildBuildings(spec,elements,ground,{
+   positions:measured,width:data.width,height:data.height,
+   originMeters:data.originMeters,verticalDatum:data.verticalDatum
+ });
+ const bytes=Buffer.from(JSON.stringify(result));
+ const temporary=file+"."+process.pid+"-"+Date.now()+".tmp";
+ await writeFile(temporary,bytes);await rename(temporary,file);
+ console.log("Real building layer "+spec.key+": "+result.buildings+" (OSM height "+
+   result.heightMethods.explicitOsmHeight+", DMP/DMR derived "+
+   result.heightMethods.estimatedDsmMinusDmr+")");
+ return bytes;
+}
+function obtainBuildings(spec){
+ if(buildingTasks.has(spec.key))return buildingTasks.get(spec.key);
+ const promise=generateBuildings(spec).finally(()=>buildingTasks.delete(spec.key));
+ buildingTasks.set(spec.key,promise);return promise;
+}
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -169,6 +211,12 @@ const server=createServer(async(req,res)=>{
     if(pathname==="/api/config"){
       send(res,200,JSON.stringify({...pragueStreamManifest(),offlineMode:offline}),"application/json; charset=utf-8");return;
     }
+    const buildingMatch=/^\/api\/buildings\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
+    if(buildingMatch){
+      const spec=tileSpec(0,Number(buildingMatch[1]),Number(buildingMatch[2]));
+      const bytes=await obtainBuildings(spec);
+      send(res,200,bytes,"application/json; charset=utf-8");return;
+    }
     const match=/^\/api\/tiles\/([01])\/([0-9]{1,2})\/([0-9]{1,2})\.(json|png)$/.exec(pathname);
     if(match){
       const spec=tileSpec(Number(match[1]),Number(match[2]),Number(match[3]));
@@ -192,6 +240,7 @@ server.listen(port,"127.0.0.1",()=>{
   const url="http://127.0.0.1:"+actual+"/";
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
+  console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
