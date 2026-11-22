@@ -108,7 +108,7 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.equal(q.cogMemory.mode,"adaptive");
    assert.equal(q.cogMemory.configuredRssTargetMiB,512);
    assert.equal(q.cogMemory.effectiveRssTargetMiB,512);
-   assert.equal(q.cogMemory.rssSafetyReserveMiB,96);
+   assert.equal(q.cogMemory.rssSafetyReserveMiB,48);
    assert.equal(q.cogMemory.systemSafetyReserveMiB,512);
    assert.ok(q.cogMemory.checks>=0);
    assert.ok(q.cogMemory.shrinkEvents>=0);
