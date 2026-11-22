@@ -94,6 +94,11 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.ok(q.peakHeapUsedMiB>0);
    assert.equal(q.samplingIntervalMs,100);
    assert.equal(q.memorySoftLimitMiB,1536);
+   assert.equal(q.scenePairConcurrency,2);
+   assert.equal(q.maxObservedConcurrentSourceJobs,0,
+     "Offline absent-source region cannot have fabricated active Sentinel reads");
+   assert.match(q.sourceLoadPolicy,/two genuine source acquisitions/);
+
    const page=await (await fetch(origin+"/")).text();
    assert.match(page,/id="region-coverage"/);
    assert.match(page,/async function runRegionCoverage/);
