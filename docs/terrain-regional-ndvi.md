@@ -261,6 +261,9 @@ problem **before any per-tile NDVI calculation**:
   includes `sourceLockId`, `sourceSelectionStatus` and
   `lockedSourceYears` in the final regional report.
   The browser shows the **actual selected acquisition dates**.
+  The regional coverage and native-edge CSV exports now include that exact
+  source-lock ID, and regional GeoJSON retains original annual scene IDs,
+  timestamps, source-selection status and partial-coverage status.
 - Every tile is computed through the same original Stage 15
   STAC/COG/reflectance/SCL pipeline, but with the **shared** scene
   selections. Both uncached calculations and cached results are checked
