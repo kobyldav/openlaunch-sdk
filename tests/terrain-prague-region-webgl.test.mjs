@@ -163,4 +163,8 @@ test("Stage 19: actual 3D source validator refuses an absent or different region
  assert.match(html,/regionPlan\.sourceLockId=event\.id/);
  assert.match(html,/lock:params\.sourceLockId/);
  assert.match(html,/id="region-source-status"/);
+ assert.match(html,/\["source_lock_id","tile","status"/);
+ assert.match(html,/\["source_lock_id","tile_a","tile_b"/);
+ assert.match(html,/originalAnnualScenes:regionResult\.lockedSourceYears/);
+
 });
