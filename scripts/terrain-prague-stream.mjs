@@ -27,11 +27,15 @@ import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js"
 import {selectSharedSentinelRegionSources,verifySharedSentinelRegionSourceYears}
   from "../dist/terrain/sentinel-region-catalog.js";
 import {assessSentinelRegionQuality} from "../dist/terrain/sentinel-region-quality.js";
+import {loadSentinelSourcePair} from "../dist/terrain/sentinel-source-pair.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
 const port=Number(getArg("port","8765"));
 if(!Number.isInteger(port)||port<0||port>65535)throw Error("--port must be 0..65535");
+const scenePairConcurrency=Number(getArg("scene-pair-concurrency","2"));
+if(![1,2].includes(scenePairConcurrency))
+ throw RangeError("--scene-pair-concurrency must be 1 (baseline) or 2 (bounded original COG pair)");
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
 const offline=args.includes("--offline");
 await mkdir(cacheRoot,{recursive:true});
@@ -43,6 +47,7 @@ const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
 const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map(),multiYearTasks=new Map();
 const MAX_OBSERVATION_JOBS=2;
+let peakObservationJobs=0;
 const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
 let active=0;const queued=[];
@@ -320,7 +325,9 @@ function obtainObservation(spec,sceneId){
    e.code="OBSERVATION_BUSY";throw e;
  }
  const task=generateObservation(spec,sceneId).finally(()=>observationTasks.delete(key));
- observationTasks.set(key,task);return task;
+ observationTasks.set(key,task);
+ peakObservationJobs=Math.max(peakObservationJobs,observationTasks.size);
+ return task;
 }
 
 /** Cached pairwise change requires TWO real source observations, both
@@ -783,8 +790,11 @@ async function generateMultiyear(spec,from,to,month,cloud,lock=null){
  }catch{}
  const seasons=[];
  for(const sourceYear of catalog.seasons){
-   const observations=[];
-   for(const scene of sourceYear.scenes){
+   // Stage 21: both independently authenticated original acquisitions for
+   // this year can load concurrently. Promise.all preserves the exact
+   // selected chronological order, even if the newer COG finishes first.
+   // The global source scheduler still limits active scenes to two.
+   const observations=await loadSentinelSourcePair(sourceYear.scenes,async scene=>{
      const product=await obtainObservation(spec,scene.id);
      const doc=JSON.parse(product.json.toString("utf8"));
      if(doc.status!=="real-sentinel2-observation"||
@@ -799,9 +809,9 @@ async function generateMultiyear(spec,from,to,month,cloud,lock=null){
      const bytes=Buffer.from(doc.ndviF32LE,"base64");
      if(bytes.byteLength!==doc.width*doc.height*4)
        throw Error("Numeric annual NDVI raster has invalid actual source length");
-     observations.push({...doc,ndviValues:new Float32Array(
-       bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength))});
-   }
+     return {...doc,ndviValues:new Float32Array(
+       bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength))};
+   },scenePairConcurrency);
    seasons.push({year:sourceYear.year,observations});
  }
  const product=sdk.terrain.analyzeSentinelMultiYear(seasons,{
@@ -880,6 +890,7 @@ async function streamRegionalMultiyear(req,res,params){
    from,to,month,specs.map(t=>t.key));
  // Only source edge strips (not 16 whole rasters) remain in RAM.
  const edgeCache=new Map(),seams=[];
+ peakObservationJobs=observationTasks.size;
  // Stage 20 observes the REAL local Node process, not browser GPU memory.
  const beganAt=performance.now(),startedMemory=process.memoryUsage(),
    samplingIntervalMs=100;
@@ -988,6 +999,9 @@ async function streamRegionalMultiyear(req,res,params){
        catalogCacheHitYears,tileMeasurements
      });
      quality.memorySoftLimitMiB=rssLimitMiB;
+     quality.scenePairConcurrency=scenePairConcurrency;
+     quality.maxObservedConcurrentSourceJobs=peakObservationJobs;
+     quality.sourceLoadPolicy="two genuine source acquisitions may overlap only within one year and one original source tile";
      quality.memorySoftLimitExceeded=peakRssBytes>rssLimitMiB*1048576;
      emit({type:"complete",result:{...coverage,quality,
        sourceLockId:lock?.id??null,
@@ -1147,6 +1161,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
+  console.log("Sentinel source pair concurrency: "+scenePairConcurrency+" (one regional tile at a time, maximum two simultaneous original acquisitions).");
   console.log("Sentinel-2 analytics: actual dated RGB/NDVI, two-date change, three-date series, two-year medians and 3..5-year same-month observational trend with leave-one-year-out sensitivity.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
