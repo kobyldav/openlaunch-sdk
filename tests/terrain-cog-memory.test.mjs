@@ -138,3 +138,40 @@ test("Stage 23: independent authentic TIFF pixel values survive cache shrink, re
  await assert.rejects(()=>read(cache,changed),/HTTP 206 Partial Content|ETag|source size/);
  assert.equal(cache.snapshot().verifiedObjects,1);
 });
+
+
+test("Stage 23: even ZERO cached bytes retain a pinned source version within one original TIFF read",async()=>{
+ const cache=new CogRangeCache(0);
+ const old=source('"old-strong-ETag"'),next=source('"new-strong-ETag"');
+ let ranges=0;
+ const mixed={
+   fetch:(url,opts)=>{
+     ranges++;
+     return ranges===1?old.fetch(url,opts):next.fetch(url,opts);
+   }
+ };
+ await assert.rejects(()=>read(cache,mixed),/206 Partial Content|ETag|source size changed/);
+ assert.equal(ranges,2);
+ assert.equal(cache.snapshot().entries,0);
+ assert.equal(cache.snapshot().rangeCacheHits,0);
+});
+test("Stage 23: shrinking a COG cache between original TIFF header and block cannot mix ETag versions",async()=>{
+ const cache=new CogRangeCache(64*M);
+ const old=source('"original-ETag"'),changed=source('"changed-ETag"');
+ let parts=0;
+ const mixed={
+   fetch:async(url,opts)=>{
+     parts++;
+     if(parts===1){
+       const response=await old.fetch(url,opts);
+       cache.resizeBudgetBytes(0);
+       return response;
+     }
+     return changed.fetch(url,opts);
+   }
+ };
+ await assert.rejects(()=>read(cache,mixed),/206 Partial Content|ETag/);
+ assert.equal(parts,2);
+ assert.equal(cache.maxResidentBytes,0);
+ assert.equal(cache.snapshot().residentBytes,0);
+});
