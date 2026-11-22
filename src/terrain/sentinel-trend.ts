@@ -96,8 +96,8 @@ export function analyzeSentinelNdviTimeSeries(
      throw new RangeError("Temporal scenes must have distinct, strictly increasing acquisitions");
    if(s.width!==reference.width||s.height!==reference.height||
       s.groundSamplingM!==reference.groundSamplingM||
-      s.area.some((n,k)=>n!==reference.area[k])||
-      s.grid.transform.some((n,k)=>n!==reference.grid.transform[k]))
+      s.area.some((n:number,k:number)=>n!==reference.area[k])||
+      s.grid.transform.some((n:number,k:number)=>n!==reference.grid.transform[k]))
      throw new RangeError("Source NDVI time series must share exact pixel grid / extent");
  }
  const dates=scenes.map(s=>Date.parse(s.acquiredAt)/DAY_MS);
