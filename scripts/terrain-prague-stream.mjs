@@ -26,6 +26,7 @@ import {captureSentinelRegionSeamEdges,compareSentinelRegionSeamEdges}
 import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js";
 import {selectSharedSentinelRegionSources,verifySharedSentinelRegionSourceYears}
   from "../dist/terrain/sentinel-region-catalog.js";
+import {assessSentinelRegionQuality} from "../dist/terrain/sentinel-region-quality.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -212,6 +213,7 @@ async function observationScenes(spec,from,to,maxCloud){
    raw=JSON.parse(await readFile(file,"utf8"));
    if(!Array.isArray(raw.items)||!Array.isArray(raw.scenes))raw=null;
  }catch{}
+ const catalogCacheHit=!!raw;
  if(!raw){
    if(offline){
      const e=Error("No real Sentinel catalog is cached for this date range.");
@@ -234,6 +236,7 @@ async function observationScenes(spec,from,to,maxCloud){
  return {status:"real-sentinel-catalog",key:spec.key,
    from,to,maxCloud,retrievedAt:raw.retrievedAt,
    source:raw.source,scenes:raw.scenes,
+   cacheHit:catalogCacheHit,
    note:"Scene-wide cloud fraction is not local cloud-free proof; SCL pixel QA is applied during reading."};
 }
 function observationPath(spec,sceneId){
@@ -647,9 +650,11 @@ function rememberRegionLock(lock){
 }
 async function selectRegionSourceLock(specs,from,to,month,cloud){
  const area=regionCatalogSpec(specs),yearCatalogs=[];
+ let catalogCacheHitYears=0;
  for(let year=from;year<=to;year++){
    const [start,end]=seasonalDates(year,month);
    const result=await observationScenes(area,start,end,cloud);
+   if(result.cacheHit)catalogCacheHitYears++;
    yearCatalogs.push({year,scenes:result.scenes});
  }
  const selected=selectSharedSentinelRegionSources(from,to,month,cloud,yearCatalogs);
@@ -658,6 +663,7 @@ async function selectRegionSourceLock(specs,from,to,month,cloud){
  const id=regionLockDigest(payload),lock={id,...payload};
  await writeFile(join(cacheRoot,"region-sources-v1-"+id+".json"),
    JSON.stringify(lock));
+ Object.defineProperty(lock,"catalogCacheHitYears",{value:catalogCacheHitYears,enumerable:false});
  rememberRegionLock(lock);
  return lock;
 }
@@ -713,7 +719,7 @@ function reportWithSourceLock(product,lock){
  const doc=JSON.parse(product.json.toString("utf8"));
  if(!verifySharedSentinelRegionSourceYears(doc.years,lock))
    throw Error("Tile contains different Sentinel scenes from the locked regional selection");
- return {json:Buffer.from(JSON.stringify({...doc,sourceLockId:lock.id,
+ return {...product,json:Buffer.from(JSON.stringify({...doc,sourceLockId:lock.id,
    regionSourceLocked:true})),png:product.png};
 }
 
@@ -773,7 +779,7 @@ async function generateMultiyear(spec,from,to,month,cloud,lock=null){
       Buffer.from(doc.robustB64??"","base64").byteLength===doc.width*doc.height&&
       png.byteLength>100&&
       (!lock||verifySharedSentinelRegionSourceYears(doc.years,lock)))
-     return reportWithSourceLock({json,png},lock);
+     return reportWithSourceLock({json,png,cacheHit:true},lock);
  }catch{}
  const seasons=[];
  for(const sourceYear of catalog.seasons){
@@ -829,7 +835,7 @@ async function generateMultiyear(spec,from,to,month,cloud,lock=null){
    from+".."+to+": "+product.statistics.commonValidPixels+" common pixels, "+
    product.statistics.robustAllYearsPixels+" with 2 genuine sources per year, "+
    "Theil-Sen "+product.statistics.meanSlopeNdviPerYear.toFixed(5)+" NDVI/year");
- return reportWithSourceLock({json,png},lock);
+ return reportWithSourceLock({json,png,cacheHit:false},lock);
 }
 function obtainMultiyear(spec,from,to,month,cloud,lock=null){
  multiyearArguments(from,to,month,cloud);
@@ -858,8 +864,11 @@ async function streamRegionalMultiyear(req,res,params){
  const x=numeric("x",2),y=numeric("y",2),
    cols=numeric("cols",2),rows=numeric("rows",2),
    from=numeric("from",2023),to=numeric("to",2025),
-   month=numeric("month",8),cloud=numeric("cloud",50);
+   month=numeric("month",8),cloud=numeric("cloud",50),
+   rssLimitMiB=numeric("rssLimitMiB",1536);
  multiyearArguments(from,to,month,cloud);
+ if(!Number.isInteger(rssLimitMiB)||rssLimitMiB<256||rssLimitMiB>8192)
+   throw RangeError("Regional soft RSS memory ceiling must be 256..8192 MiB");
  if(![x,y,cols,rows].every(Number.isInteger)||
    x<0||y<0||cols<1||rows<1||cols>4||rows>4||
    cols*rows>16||x+cols>6||y+rows>6)
@@ -871,6 +880,20 @@ async function streamRegionalMultiyear(req,res,params){
    from,to,month,specs.map(t=>t.key));
  // Only source edge strips (not 16 whole rasters) remain in RAM.
  const edgeCache=new Map(),seams=[];
+ // Stage 20 observes the REAL local Node process, not browser GPU memory.
+ const beganAt=performance.now(),startedMemory=process.memoryUsage(),
+   samplingIntervalMs=100;
+ let peakRssBytes=startedMemory.rss,peakHeapUsedBytes=startedMemory.heapUsed;
+ const sampleMemory=()=>{
+   const m=process.memoryUsage();
+   peakRssBytes=Math.max(peakRssBytes,m.rss);
+   peakHeapUsedBytes=Math.max(peakHeapUsedBytes,m.heapUsed);
+   return m;
+ };
+ const sampler=setInterval(sampleMemory,samplingIntervalMs);
+ sampler.unref?.();
+ const tileMeasurements=[];
+ let sourceSelectionMs=0,catalogCacheHitYears=0;
  regionalJobActive=true;
  try{
    res.writeHead(200,{"Content-Type":"application/x-ndjson; charset=utf-8",
@@ -884,19 +907,30 @@ async function streamRegionalMultiyear(req,res,params){
    // One region-wide catalog replaces independent per-tile date ranking.
    // Even when selection fails, return honest tile NoData events.
    let lock=null,lockError=null;
+   const selectionBeganAt=performance.now();
    try{
      lock=await selectRegionSourceLock(specs,from,to,month,cloud);
+     catalogCacheHitYears=lock.catalogCacheHitYears??0;
      emit({type:"source-lock",status:"real-sentinel-region-shared-scenes",
        id:lock.id,from,to,month,cloud,seasons:lock.seasons});
    }catch(error){
      lockError=error;
      emit({type:"source-lock",status:"unavailable",
        reason:String(error?.message??error).slice(0,180)});
+   }finally{
+     sourceSelectionMs=Math.round((performance.now()-selectionBeganAt)*1000)/1000;
+     sampleMemory();
    }
    for(const spec of specs){
      if(res.destroyed)break;
      const bounds={west:spec.west,south:spec.south,east:spec.east,north:spec.north};
+     const tileBeganAt=performance.now();
+     let measuredCache="unavailable";
      try{
+       if(sampleMemory().rss>rssLimitMiB*1048576){
+         const e=Error("Regional process RSS exceeded the soft memory ceiling; further tiles were not fetched");
+         e.code="REGION_RESOURCE_LIMIT";throw e;
+       }
        // The same genuine Stage 15 STAC/COG/SCL pipeline; no alternate raster sources.
        if(!lock)throw lockError??Error("No shared Sentinel scene catalog available");
        const product=await obtainMultiyear(spec,from,to,month,cloud,lock);
@@ -923,6 +957,7 @@ async function streamRegionalMultiyear(req,res,params){
          if(neighbor)adjacent.push(compareSentinelRegionSeamEdges(neighbor,strips));
        }
        aggregate.addResult(spec.key,bounds,doc);
+       measuredCache=product.cacheHit?"hit":"miss";
        edgeCache.set(spec.key,strips);
        for(const seam of adjacent){
          seams.push(seam);
@@ -935,12 +970,26 @@ async function streamRegionalMultiyear(req,res,params){
        aggregate.addUnavailable(spec.key,bounds,
          insufficient?"insufficient":"error",reason);
      }
-     const snapshot=aggregate.snapshot();
+     const snapshot=aggregate.snapshot(),mem=sampleMemory();
+     const metrics={key:spec.key,
+       durationMs:Math.round((performance.now()-tileBeganAt)*1000)/1000,
+       rssBytes:mem.rss,heapUsedBytes:mem.heapUsed,sourceCache:measuredCache};
+     tileMeasurements.push(metrics);
      emit({type:"tile",tile:snapshot.tiles[snapshot.tiles.length-1],
-       processed:snapshot.processedTiles,total:snapshot.requestedTiles});
+       processed:snapshot.processedTiles,total:snapshot.requestedTiles,metrics});
    }
    if(!res.destroyed){
-     emit({type:"complete",result:{...aggregate.finish(),
+     const coverage=aggregate.finish();
+     sampleMemory();
+     const quality=assessSentinelRegionQuality(coverage,{
+       elapsedMs:Math.round((performance.now()-beganAt)*1000)/1000,
+       sourceSelectionMs,initialRssBytes:startedMemory.rss,
+       peakRssBytes,peakHeapUsedBytes,samplingIntervalMs,
+       catalogCacheHitYears,tileMeasurements
+     });
+     quality.memorySoftLimitMiB=rssLimitMiB;
+     quality.memorySoftLimitExceeded=peakRssBytes>rssLimitMiB*1048576;
+     emit({type:"complete",result:{...coverage,quality,
        sourceLockId:lock?.id??null,
        sourceSelectionStatus:lock?"shared":"unavailable",
        lockedSourceYears:lock?.seasons??[],
@@ -948,7 +997,7 @@ async function streamRegionalMultiyear(req,res,params){
        seamDiagnostics:"Native adjacent source pixel centers; no interpolation, no seam blending, not proof of terrain or ecological change."}});
      res.end();
    }
- }finally{regionalJobActive=false;}
+ }finally{clearInterval(sampler);regionalJobActive=false;}
 }
 
 function send(res,status,data,contentType){
