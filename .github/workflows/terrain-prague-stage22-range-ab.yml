@@ -1,3 +1,4 @@
+# Stage 22 64MiB source-ETag COG range A/B, metadata-priority LRU.
 name: Prague Sentinel-2 original COG 206 Range cache A/B (Stage 22)
 on:
   push:
