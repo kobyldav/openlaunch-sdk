@@ -11,7 +11,7 @@ import {decodeTerrainTiff,TiffDirectory} from "../dist/eo/geotiff.js";
 import {mercatorFromLonLat,PRAGUE_STREAM_REGION} from "./terrain-prague-stream-grid.mjs";
 export const BUILDING_LAYER_VERSION=1;
 export const CUZK_DMR_5G="https://ags.cuzk.gov.cz/arcgis/rest/services/3D/dmr5g_wm/ImageServer";
-export const OVERPASS_ENDPOINT="https://overpass-api.de/api/interpreter";
+export const OVERPASS_ENDPOINT="https://overpass.private.coffee/api/interpreter";
 const LAT=PRAGUE_STREAM_REGION.centerLatitudeDeg*Math.PI/180;
 const SCALE=Math.cos(LAT);
 const C=mercatorFromLonLat((PRAGUE_STREAM_REGION.west+PRAGUE_STREAM_REGION.east)/2,
@@ -59,6 +59,7 @@ export async function fetchOsmFootprints(spec,{fetchImpl=fetch,timeoutMs=35000}=
  const body=new URLSearchParams({data:overpassQuery(spec)});
  const res=await fetchImpl(OVERPASS_ENDPOINT,{
    method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded",
+     "User-Agent":"OpenLaunchSDK-PragueTerrain/1.0 (github.com/kobyldav/openlaunch-sdk)",
      Accept:"application/json"},
    body:body.toString(),signal:AbortSignal.timeout(timeoutMs)
  });
