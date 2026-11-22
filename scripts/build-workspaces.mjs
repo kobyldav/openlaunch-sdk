@@ -8,7 +8,7 @@
  * and its existing imports/API untouched during v1.1 adoption.
  */
 import { mkdir, readFile, writeFile, rm } from "node:fs/promises";
-import { posix as path } from "node:path";
+import { posix as path, dirname as fsDirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 const root = fileURLToPath(new URL("../", import.meta.url));
@@ -112,7 +112,7 @@ async function build(pkg) {
         return full;
       });
       const outfile = distOutput(pkg,kind,mod);
-      await mkdir(path.dirname(outfile),{recursive:true});
+      await mkdir(fsDirname(outfile),{recursive:true});
       await writeFile(outfile,code);
       sum+=Buffer.byteLength(code);
     }
