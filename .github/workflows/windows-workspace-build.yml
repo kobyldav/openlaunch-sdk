@@ -1,0 +1,35 @@
+name: Windows workspace build smoke
+
+on:
+  pull_request:
+    paths:
+      - scripts/build-workspaces.mjs
+      - .github/workflows/windows-workspace-build.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Build SDK and workspace packages
+        run: npm run build
+      - name: Validate nested workspace output
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "packages/core/dist/esm/resources/base.js")) {
+            throw "Nested core workspace resource missing"
+          }
+          if (-not (Test-Path "packages/core/dist/cjs/resources/base.js")) {
+            throw "Nested core CommonJS resource missing"
+          }
