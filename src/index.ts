@@ -11,6 +11,8 @@ export * from "./providers/index.js";
 export * from "./science/index.js";
 export * from "./geo/index.js";
 export * from "./eo/index.js";
+// Stage 11: reusable single-scene satellite RGB/NDVI overlay APIs for any SDK client.
+export * from "./terrain/sentinel-overlay.js";
 export * from "./intelligence/index.js";
 export * from "./orbit/index.js";
 export * from "./traffic/index.js";
