@@ -156,8 +156,10 @@ a{color:#9cd1fc}
       <button id="region-stop" disabled>Zastavit</button>
       <button id="region-export" disabled>Pokrytí CSV</button>
       <button id="region-geojson" disabled>Pokrytí GeoJSON</button>
+      <button id="region-seam-export" disabled>Kontrola hranic CSV</button>
       <button id="region-3d" disabled>Zobrazit regionální trend ve 3D</button>
     </div>
+    <p id="region-seam-note" class="small" aria-live="polite">Hranice dlaždic: zatím bez porovnání původních pixelů. Oranžové hranice znamenají nesrovnatelná měření nebo výraznější rozdíl mezi sousedními pixelovými středy – nikoli automaticky chybu terénu.</p>
     <p id="region-3d-status" class="small" aria-live="polite">3D vrstva: vypnutá. Po dokončení skutečné regionální analýzy lze promítnout ověřené pixely na původní ČÚZK terén. Načítají se jen právě potřebné textury (nejvýše 6 v GPU).</p>
     <p id="region-status" class="small" aria-live="polite">Použije roky, měsíc a limit oblačnosti ze sekce víceleté analýzy výše.</p>
     <canvas id="region-coverage" width="760" height="400" role="img" aria-label="Geografická mapa platného pokrytí dlaždic Sentinel-2 od severu k jihu"></canvas>
@@ -215,6 +217,7 @@ let regionRun=null,regionResult=null,regionPlan=null;
 const MAX_REGION_GPU=6,regionGpu=new Map(),regionFailed=new Map();
 let regionTextureLoading=null,regionEpoch=0;
 const regionTiles=new Map();
+let regionSeams=[];
 let observationEpoch=0;
 const observationCatalog=new Map();
 const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
@@ -1297,6 +1300,30 @@ function drawRegionCoverage(){
      ctx.fillText(t.commonValidPixels+" px",rx+10,ry+67);
    }
  }
+ // Only annotate the actual shared edge. Never interpolate missing spectral
+ // pixels or invent a gradient between independently sourced observations.
+ const byKey=new Map(p.tiles.map(t=>[t.key,t]));
+ for(const seam of regionSeams){
+   const a=byKey.get(seam.tileA),b=byKey.get(seam.tileB);
+   if(!a||!b)continue;
+   let x1,y1,x2,y2;
+   if(seam.orientation==="east-west"&&a.y===b.y&&Math.abs(a.x-b.x)===1){
+     x1=marginX+(Math.max(a.x,b.x)-p.x)*cw;
+     y1=top+(a.y-p.y)*ch;x2=x1;y2=y1+ch;
+   }else if(seam.orientation==="north-south"&&a.x===b.x&&Math.abs(a.y-b.y)===1){
+     y1=top+(Math.max(a.y,b.y)-p.y)*ch;
+     x1=marginX+(a.x-p.x)*cw;x2=x1+cw;y2=y1;
+   }else continue;
+   ctx.save();ctx.beginPath();ctx.setLineDash(seam.warning?[6,4]:[]);
+   ctx.lineWidth=seam.warning?3:2;
+   ctx.strokeStyle=seam.warning?"#ffbc76":"#a7f0d0";
+   ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+   if(seam.warning){
+     ctx.font="bold 18px system-ui";ctx.fillStyle="#ffe0aa";
+     ctx.fillText("!",(x1+x2)/2+5,(y1+y2)/2-5);
+   }
+   ctx.restore();
+ }
  const first=p.tiles[0],last=p.tiles[p.tiles.length-1];
  if(first?.bounds&&last?.bounds){
    ctx.fillStyle="#b8d7e9";ctx.font="12px system-ui";
@@ -1327,6 +1354,22 @@ function exportRegionCsv(){
  downloadRegion("praha-sentinel-ndvi-regional-coverage-"+regionResult.fromYear+
    "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",rows.join("\r\n")+"\r\n");
 }
+function exportRegionSeamsCsv(){
+ if(!regionResult?.seams)return;
+ const quote=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
+ const lines=[["tile_a","tile_b","orientation","source_comparable","state",
+   "paired_real_pixel_centers","edge_pixels",
+   "mean_absolute_ndvi_year_difference","max_absolute_ndvi_year_difference",
+   "signed_b_minus_a_ndvi_year","warning","interpretation"].join(",")];
+ for(const s of regionResult.seams)lines.push([
+   s.tileA,s.tileB,s.orientation,s.comparableSources,s.state,
+   s.pairedPixels,s.sourceEdgePixels,
+   s.meanAbsDifferenceNdviPerYear,s.maxAbsDifferenceNdviPerYear,
+   s.meanSignedBMinusANdviPerYear,s.warning,s.note].map(quote).join(","));
+ downloadRegion("praha-sentinel-ndvi-overene-hranice-"+regionResult.fromYear+
+   "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",
+   lines.join("\r\n")+"\r\n");
+}
 function exportRegionGeoJson(){
  if(!regionResult)return;
  const features=regionResult.tiles.map(t=>{
@@ -1336,7 +1379,9 @@ function exportRegionGeoJson(){
      analyzedPixels:t.totalPixels,validPercent:t.commonValidPercent,
      robustAllYearsPixels:t.robustAllYearsPixels,
      slopeNdviPerYear:t.meanSlopeNdviPerYear,
-     reason:t.reason??null},
+     reason:t.reason??null,
+     neighboringSeamWarnings:(regionResult.seams??[]).filter(s=>
+       s.warning&&(s.tileA===t.key||s.tileB===t.key)).length},
      geometry:{type:"Polygon",coordinates:[[
        [b.west,b.north],[b.east,b.north],[b.east,b.south],
        [b.west,b.south],[b.west,b.north]
@@ -1370,7 +1415,9 @@ async function runRegionCoverage(){
  if($("obs-mode").value==="region")$("obs-mode").value="ortho";
  $("region-3d").disabled=true;$("region-3d").textContent="Zobrazit regionální trend ve 3D";
  regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud};
- regionTiles.clear();regionResult=null;drawRegionCoverage();
+ regionTiles.clear();regionSeams=[];regionResult=null;drawRegionCoverage();
+ $("region-seam-export").disabled=true;
+ $("region-seam-note").textContent="Kontroluji nativní okraje každé dvojice sousedních skutečných Sentinel dlaždic. Žádné mezery automaticky nevyhlazuji.";
  const controller=new AbortController();regionRun=controller;
  $("region-start").disabled=true;$("region-stop").disabled=false;
  $("region-export").disabled=true;$("region-geojson").disabled=true;
@@ -1398,6 +1445,22 @@ async function runRegionCoverage(){
          " dlaždic prověřeno; úplná skutečná data: "+ok+
          ". Nepokrytá místa zůstávají nevyplněná.";
        drawRegionCoverage();
+     }else if(event.type==="seam"){
+       const seam=event.seam;
+       if(seam?.status!=="real-sentinel-region-seam-check"||
+         seam.version!==1||
+         !cells.some(c=>c.key===seam.tileA)||
+         !cells.some(c=>c.key===seam.tileB)||
+         !["comparable","different-acquisitions","unaligned-grid",
+           "insufficient-edge-data"].includes(seam.state)||
+         !Number.isInteger(seam.pairedPixels)||seam.pairedPixels<0||
+         regionSeams.some(s=>s.tileA===seam.tileA&&s.tileB===seam.tileB))
+         throw Error("Neověřená diagnostika hranice skutečných družicových dat");
+       regionSeams.push(seam);drawRegionCoverage();
+       const flagged=regionSeams.filter(s=>s.warning).length;
+       $("region-seam-note").textContent="Ověřeno "+regionSeams.length+
+         " sousedních hranic, upozornění "+flagged+
+         ". Porovnávám jen přímo sousední původní pixely při shodných zdrojích, bez interpolace.";
      }else if(event.type==="complete"){
        const r=event.result;
        if(r.status!=="real-sentinel-multiyear-region-coverage"||
@@ -1405,7 +1468,15 @@ async function runRegionCoverage(){
          r.month!==month||r.requestedTiles!==cells.length||
          r.pendingTiles!==0||r.tiles.length!==cells.length)
          throw Error("Neúplný nebo neověřený regionální přehled");
+       if(!Array.isArray(r.seams)||r.seams.length!==regionSeams.length||
+         r.seamWarningCount!==regionSeams.filter(s=>s.warning).length)
+         throw Error("Regionální kontrola skutečných hranic není úplná");
        regionResult=r;completed=true;
+       $("region-seam-export").disabled=r.seams.length===0;
+       $("region-seam-note").textContent="Mezi "+r.analyzedTiles+
+         " doloženými dlaždicemi porovnáno "+r.seams.length+
+         " přímých hranic; upozornění "+r.seamWarningCount+
+         ". Zelené = srovnatelné původní sousední pixely, oranžové = jiné zdroje, neshodná mřížka, chybějící okraj nebo výraznější rozdíl. Nenahrazuje se žádný pixel.";
        $("region-3d").disabled=r.analyzedTiles===0;
        $("region-export").disabled=false;$("region-geojson").disabled=false;
        const mean=r.meanSlopeOnObservedPixels===null?"bez platných měření":
@@ -1688,9 +1759,12 @@ function startGpu(){
    " if(uPass==0 && uFade>=threshold)discard;",
    " vec4 rgba=texture2D(uTexture,vUv);",
    " if(uOverlayMode==1){",
-   "   vec4 observation=texture2D(uOverlayTexture,vUv*uOverlayUv.zw+uOverlayUv.xy);",
-   "   if(observation.a>0.01){",
-   "     rgba=vec4(mix(rgba.rgb,observation.rgb,observation.a),max(rgba.a,observation.a));",
+   "   // Reject measured source sampling outside each tile, even on LOD skirts.",
+   "   if(vUv.x>=0.0 && vUv.x<=1.0 && vUv.y>=0.0 && vUv.y<=1.0){",
+   "     vec4 observation=texture2D(uOverlayTexture,vUv*uOverlayUv.zw+uOverlayUv.xy);",
+   "     if(observation.a>0.01){",
+   "       rgba=vec4(mix(rgba.rgb,observation.rgb,observation.a),max(rgba.a,observation.a));",
+   "     }",
    "   }",
    " }",
    " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
@@ -1986,6 +2060,7 @@ $("region-start").onclick=runRegionCoverage;
 $("region-stop").onclick=()=>regionRun?.abort();
 $("region-export").onclick=exportRegionCsv;
 $("region-geojson").onclick=exportRegionGeoJson;
+$("region-seam-export").onclick=exportRegionSeamsCsv;
 $("region-3d").onclick=toggleRegion3d;
 $("obs-mode").onchange=()=>{
  if($("obs-mode").value!=="region"){
