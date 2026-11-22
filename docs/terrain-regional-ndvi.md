@@ -490,3 +490,29 @@ parallelism adjustment to enforce a cap during an active COG read.
 Missing SCL pixels, source scenes or tile coverage are still not
 inferred or replaced. Browser GPU residency remains separately
 limited to six measured regional textures.
+
+
+### Stage 21 controlled live A/B result — 2026-11-22
+
+A dedicated real 16-tile Windows run **succeeded** with two separate
+original Sentinel-2 L2A STAC/COG cold source caches and 2023–2025 August
+seasons: [GitHub Actions run 45069045054](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45069045054).
+
+| Verified measurement | Original serial pair=1 | New bounded pair=2 |
+|---|---:|---:|
+| Cold original 16-tile run (including fresh server) | **43,037 ms** | **34,992 ms** |
+| Sampled peak Node process RSS, cold | **215.1 MiB** | **232.9 MiB** |
+| Subsequent full source-cache replay | 344 ms | 340 ms |
+| Genuine shared annual SCL-qualified NDVI pixels | 62,504 | 62,504 |
+| First-run genuine raster cache hits | 0/16 | 0/16 |
+| Source-backed output coverage | 16/16 tiles | 16/16 tiles |
+| Scientific SHA-256 output fingerprint | `f538be31b4cc079a…` | `f538be31b4cc079a…` |
+
+Measured cold-time reduction: **8,045 ms / 18.7%**, with **17.8 MiB
+more sampled peak Node RSS**. This trade-off is bounded to two original
+acquisitions per year and a single regional tile in flight. A/B results
+are individual external-network measurements, not a guarantee of the
+same speedup on every machine, cloud host, region or date.
+
+Original benchmark artifact (all raw audits and individual source
+times): [Stage 21 A/B artifact](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45069045054/artifacts/14772189284).
