@@ -50,7 +50,7 @@ test("Stage 23: measured process RSS pressure shrinks source cache immediately; 
    mode:"adaptive",processLimitBytes:512*M,recoverySamples:3,recoveryStepBytes:16*M
  });
  assert.equal(controller.observe(sample(200,4096)).activeBudgetMiB,64);
- const forced=controller.observe(sample(460,4096));
+ const forced=controller.observe(sample(540,4096));
  assert.equal(forced.activeBudgetMiB,0);
  assert.equal(forced.decreases,1);
  assert.equal(forced.lastConstraint,"process-rss");
@@ -118,7 +118,7 @@ test("Stage 23: independent authentic TIFF pixel values survive cache shrink, re
  assert.deepEqual([...first.raster.values],[4,8,9,3,11,6]);
  const originalFetches=remote.hits;
  assert.equal(originalFetches,2);
- controller.observe(sample(450,4096));
+ controller.observe(sample(540,4096));
  assert.equal(cache.maxResidentBytes,0);
  const shrunk=await read(cache,remote);
  assert.deepEqual([...shrunk.raster.values],[...first.raster.values]);
@@ -174,4 +174,41 @@ test("Stage 23: shrinking a COG cache between original TIFF header and block can
  assert.equal(parts,2);
  assert.equal(cache.maxResidentBytes,0);
  assert.equal(cache.snapshot().residentBytes,0);
+});
+
+
+test("Stage 23: identical sustained measured RSS no longer repeatedly shrinks source cache after one memory reclaim",()=>{
+ const cache=new CogRangeCache(64*M);
+ const controller=new AdaptiveCogRangeMemory(cache,{
+   mode:"adaptive",processLimitBytes:320*M
+ });
+ const moderate=sample(310,4096);
+ assert.equal(controller.observe(moderate).activeBudgetMiB,24,
+   "The 48MiB safety margin charges 38MiB of real RSS pressure against 64MiB ORIGINAL configured budget");
+ for(let i=0;i<60;i++)
+   assert.equal(controller.observe(moderate).activeBudgetMiB,24,
+     "The same Node RSS after releasing cached TIFF bytes must NOT repeatedly subtract the same pressure");
+ assert.equal(controller.snapshot().decreases,1);
+ assert.equal(controller.snapshot().increases,0);
+ assert.equal(controller.snapshot().processReserveMiB,48);
+});
+
+test("Stage 23: bursty scene requests do not fake THREE time-separated healthy recovery samples",()=>{
+ const c=new CogRangeCache(64*M);
+ const policy=new AdaptiveCogRangeMemory(c,{
+   mode:"adaptive",processLimitBytes:320*M,recoverySamples:3
+ });
+ policy.observe({...sample(310,4096),sampledAtMs:0});
+ assert.equal(c.maxResidentBytes,24*M);
+ policy.observe({...sample(120,4096),sampledAtMs:10});
+ policy.observe({...sample(120,4096),sampledAtMs:10.5});
+ policy.observe({...sample(120,4096),sampledAtMs:11});
+ assert.equal(c.maxResidentBytes,24*M);
+ policy.observe({...sample(120,4096),sampledAtMs:330});
+ assert.equal(c.maxResidentBytes,24*M);
+ policy.observe({...sample(120,4096),sampledAtMs:680});
+ assert.equal(c.maxResidentBytes,40*M);
+ assert.equal(policy.snapshot().increases,1);
+ policy.observe({...sample(120,4096),sampledAtMs:681});
+ assert.equal(c.maxResidentBytes,40*M);
 });
