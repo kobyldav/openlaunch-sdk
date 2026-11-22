@@ -1547,6 +1547,10 @@ async function runRegionCoverage(){
        if(q?.status!=="real-sentinel-region-runtime-quality"||q.version!==1||
          q.requestedTiles!==cells.length||q.measuredTileCount!==cells.length||
          q.analyzedTiles!==r.analyzedTiles||
+         ![1,2].includes(q.scenePairConcurrency)||
+         !Number.isInteger(q.maxObservedConcurrentSourceJobs)||
+         q.maxObservedConcurrentSourceJobs<0||
+         q.maxObservedConcurrentSourceJobs>2||
          !Number.isFinite(q.elapsedMs)||q.elapsedMs<0||
          !Number.isFinite(q.peakRssMiB)||q.peakRssMiB<=0||
          !Number.isFinite(q.peakHeapUsedMiB)||q.peakHeapUsedMiB<=0||
@@ -1557,7 +1561,7 @@ async function runRegionCoverage(){
          throw Error("Skutečné provozní údaje regionu nejsou úplné nebo odpovídající zdrojům");
        regionResult=r;completed=true;
        $("region-quality-export").disabled=false;
-       $("region-quality").textContent="ETAPA 20 · "+
+       $("region-quality").textContent="ETAPY 20–21 · "+
          r.analyzedTiles+"/"+cells.length+" doložených dlaždic ("+
          q.analyzedTilePercent.toFixed(1)+" %) · "+
          q.elapsedMs.toFixed(0)+" ms serverový výpočet · špička Node RSS "+
@@ -1565,6 +1569,8 @@ async function runRegionCoverage(){
          q.peakHeapUsedMiB.toFixed(1)+" MiB · zdrojová cache "+
          q.rasterCacheHits+"× hit / "+q.rasterCacheMisses+"× miss / "+
          q.rasterCacheUnavailable+"× nedostupné · "+
+         "Načítání původních scén: "+q.scenePairConcurrency+
+         " současně (pozorováno max. "+q.maxObservedConcurrentSourceJobs+") · "+
          "Celoregionální SCL pokrytí: "+
          (q.wholeRegionSclPixelCoveragePercent===null?
            "nelze spočítat – chybí skutečné dlaždice":
