@@ -237,3 +237,74 @@ construction, deforestation or statistical significance. The 0.08
 warning threshold is for triage only. Stage 18 does not invent
 higher-resolution Sentinel data, impose zero values on missing
 pixels, or smooth away actual observed differences.
+
+## Stage 19 — one historical Sentinel acquisition calendar for the entire region
+
+The previous region pipeline selected the two Sentinel-2 L2A acquisitions
+independently for every tile. Even valid per-tile results could therefore
+compare different historical dates. Stage 19 fixes that source comparability
+problem **before any per-tile NDVI calculation**:
+
+- The server performs **one region-wide actual Element84 STAC discovery
+  per historical year** for the original WGS84 area enclosing the selected
+  tiles (3–5 consecutive years, same month and scene-wide cloud limit).
+  All tiles are assigned **exactly the same two source scene IDs and
+  acquisition timestamps per year**. Selection requires truly distinct
+  acquisition dates separated by at least four days.
+- A stable, 32-hex-character source-selection digest binds the exact
+  geographic tile list, year/month/cloud parameters and original
+  scene IDs/timestamps. A small source manifest is stored on disk as
+  `region-sources-v1-<digest>.json`, without client-provided scene URLs.
+  It remains usable after a local server restart (subject to retaining
+  the original STAC cache and source products).
+- The region NDJSON API now emits an explicit `source-lock` event and
+  includes `sourceLockId`, `sourceSelectionStatus` and
+  `lockedSourceYears` in the final regional report.
+  The browser shows the **actual selected acquisition dates**.
+- Every tile is computed through the same original Stage 15
+  STAC/COG/reflectance/SCL pipeline, but with the **shared** scene
+  selections. Both uncached calculations and cached results are checked
+  against the locked IDs, timestamps and annual selection. An old
+  cached tile with different scenes cannot silently count as shared.
+- The regional 3D overlay fetches its real per-tile JSON and PNG
+  with the identical `lock=<digest>` query. The server verifies that
+  the requested tile, period and cloud limit belong to that source
+  manifest; the browser additionally rejects an unbound or mismatched
+  regional raster. The separate single-tile Stage 15 mode still
+  works independently.
+- If the chosen original scenes have insufficient SCL-valid overlapping
+  pixels or missing COG coverage in any tile, that tile remains marked
+  unavailable. If no two region-wide scenes can be verified for a
+  required year, **the whole analysis fails closed to unavailable
+  coverage**, rather than selecting different dates per tile.
+
+### Tests and evidence
+
+```powershell
+npm run build
+node --test tests/terrain-sentinel-region-catalog.test.mjs
+node --test tests/terrain-prague-region-stream.test.mjs
+```
+
+The CI live proof `scripts/terrain-prague-region-live-smoke.mjs`
+now validates that **both original neighboring Prague tiles use the
+same locked source selection**, that the digest is attached to every
+region JSON tile, and that genuine PNG sources and ČÚZK geometry are
+present. The offline real Edge WebGL regression reopens the persisted
+manifest in a **fresh server process** to verify that the same scene
+selection still governs the actual rendered satellite texture.
+
+### Methodological limitations
+
+The common STAC catalog is not proof that a source image contains
+cloud-free, valid measured spectra at every geographical pixel.
+Per-tile original COG sampling and SCL masks are still mandatory.
+Using the same calendar of observations makes regional NDVI
+comparisons **more comparable**, but does not remove differences due
+to land cover, clouds, shadows, topography, or sensor radiometry.
+A shared source selection is **not statistical significance** and
+does not justify filling gaps or inferring causes of vegetation change.
+
+For reproducibility, preserve both the source manifest and original
+source caches; a digest is a reproducible content identifier, not a
+cryptographic signature of scientific correctness.
