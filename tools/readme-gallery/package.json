@@ -2,8 +2,9 @@
   "private": true,
   "name": "openlaunch-real-demo-capture",
   "version": "1.0.0",
-  "description": "Real browser screenshots of MyWeb powered by OpenLaunch SDK",
+  "description": "Capture real web application plus OpenLaunch SDK model-powered WebGL scenes",
   "dependencies": {
-    "playwright": "1.55.0"
+    "playwright": "1.55.0",
+    "three": "0.180.0"
   }
 }
