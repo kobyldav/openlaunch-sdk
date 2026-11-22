@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-22T14:16:52.113Z",
+  "generatedAt": "2026-11-22T14:19:51.927Z",
   "dataSources": [
     "Historical June 2019 TLE from SDK regression fixtures / SGP4 propagated positions",
     "SDK generic two-stage 3DOF model, not actual launch telemetry",
