@@ -43,6 +43,8 @@ jobs:
         run: node --test tests/terrain-sentinel-region-quality.test.mjs tests/terrain-prague-region-benchmark.test.mjs
       - name: Stage 21 source-safe original acquisition pair scheduling and chronology
         run: node --test tests/terrain-sentinel-source-pair.test.mjs
+      - name: Stage 22 reuse genuine TIFF byte ranges only under matching strong original source ETag
+        run: node --test tests/terrain-cog-range-cache.test.mjs tests/utm-cog.test.mjs tests/lzw-geotiff.test.mjs
       - name: Stage 20 preserve actual offline 4x4 times and Node RSS in benchmark artifact
         run: node scripts/terrain-prague-region-benchmark.mjs --x 1 --y 1 --cols 4 --rows 4 --repeat 2 --cache test-results/terrain-prague-stream-ci --output test-results/terrain-prague-stream-ci/region-4x4-offline-audit.json
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
