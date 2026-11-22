@@ -73,6 +73,15 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/inspector\.profile\(/);
   assert.match(page,/webglcontextlost/);
   assert.match(page,/id="buildings"/);
+  assert.match(page,/id="obs-from"/);
+  assert.match(page,/id="obs-to"/);
+  assert.match(page,/id="obs-scene"/);
+  assert.match(page,/id="obs-mode"/);
+  assert.match(page,/observationTexture\(/);
+  assert.match(page,/uOverlayMode/);
+  assert.match(page,/uOverlayUv/);
+  assert.match(page,/\/api\/observations\/scenes\/0\//);
+  assert.match(page,/\/api\/observations\/0\//);
   assert.match(page,/id="building-count"/);
   assert.match(page,/\/api\/buildings\/0\//);
   assert.match(page,/buildingsEnabled/);
@@ -135,6 +144,18 @@ test("local streaming server starts without any terrain download, accepts only v
     assert.equal(manifest.offlineMode,true);
     assert.match(manifest.caveat,/no vertical facades/);
     assert.equal(root.status,200);
+    assert.equal((await fetch(origin+
+      "/api/observations/scenes/0/99/0.json?from=2025-06-01&to=2025-09-30")).status,400);
+    assert.equal((await fetch(origin+
+      "/api/observations/scenes/0/3/3.json?from=2025-01-02&to=2024-01-02")).status,400);
+    const noScenes=await fetch(origin+
+      "/api/observations/scenes/0/3/3.json?from=2025-06-01&to=2025-09-30");
+    assert.equal(noScenes.status,404,
+      "Offline server never fetches an uncached Sentinel STAC catalog");
+    const noSpectral=await fetch(origin+
+      "/api/observations/0/3/3/S2B_33UVR_20250812_1_L2A.rgb.png");
+    assert.equal(noSpectral.status,404,
+      "Offline server never invents absent Sentinel RGB data");
     assert.equal((await fetch(origin+"/api/buildings/0/99/0.json")).status,400,
       "Building API must reject out-of-bounds paths");
     assert.match(await root.text(),/OpenLaunch SDK.*Praha 3D/);

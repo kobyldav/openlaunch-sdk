@@ -25,6 +25,8 @@ jobs:
         run: node --test tests/terrain-prague-stream-inspect.test.mjs
       - name: Validate measured OSM footprints and ČÚZK building LOD1 geometry without external sources
         run: node --test tests/terrain-prague-buildings.test.mjs
+      - name: Validate SDK single-scene Sentinel-2 calibrated reflectance, NDVI and SCL masks (deterministic fixtures)
+        run: node --test tests/terrain-sentinel-overlay.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server

@@ -36,7 +36,9 @@ function reader({masked=false,zero=false}={}){
    const values=new Float64Array(width*height);
    values.fill(zero?0:band==="red"?2000:band==="nir"?6000:
      band==="green"?3000:band==="blue"?2500:4);
-   if(band==="scl"&&masked)values[0]=9;
+   if(band==="scl"&&masked)
+     for(let row=0;row<12;row++)for(let col=0;col<width;col++)
+       values[row*width+col]=9;
    return {raster:{width,height,values,crs:"EPSG:3857",
      transform:[left,(right-left)/width,0,top,0,-(top-bottom)/height]}};
  };

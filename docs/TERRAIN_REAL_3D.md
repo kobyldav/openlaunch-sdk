@@ -471,3 +471,62 @@ a **bounded small-area** request to the official OSM map API and accepts
 only original referenced OSM node coordinates and closed building ways.
 No bulk download or city-wide prefetch occurs. Both services can fail;
 a missing building layer never silently becomes synthetic geometry.
+
+## Stage 11 — Earth Intelligence, date-scoped real Sentinel-2 analysis (experimental)
+
+The 3D Prague streamer now exposes a satellite observation panel with a
+bounded date interval, maximum scene-wide cloud percentage, actual
+Sentinel-2 L2A STAC scene selector and RGB / NDVI / unchanged ČÚZK orthophoto
+texture toggle. The crosshair is the 3D camera's map center: click
+**Najít scény pro střed mapy** to select exactly one nearby coarse tile
+(typically ~0.7 km), choose a real scene acquisition date, then click
+**Načíst RGB + NDVI**. This does not automatically download the entire
+4×4 km area or change the underlying DEM.
+
+### Reusable SDK methods
+
+- `new OpenLaunch().terrain.discoverObservations({area,from,to,maxCloudPercent})`
+  returns **actual** matching STAC scene metadata plus trusted source items
+  for server-side reuse, from Element84 Earth Search `sentinel-2-l2a`.
+- `new OpenLaunch().terrain.observeSentinel2({area,scene,resolutionM:10})`
+  reads **red, green, blue, NIR and SCL** COG windows from the **same**
+  qualified scene. Returns independent RGBA RGB/NDVI buffers, real
+  georeference/ground spacing, source metadata, scene ID/timestamp, cloud
+  percentage, per-band scale/offset, SCL mask, mean/min/max/valid-pixel
+  statistics and explicit caveats.
+
+NDVI is computed from **calibrated surface reflectance** after validating
+STAC `raster:bands.scale`/`.offset`. The Element84
+`earthsearch:boa_offset_applied` flag prevents double application of the
+Sentinel-2 processing-baseline offset. Missing calibration **fails closed**
+instead of reporting vegetation values computed from raw DN.
+Pixels are kept only for **SCL 4/5/6/7** (vegetation, non-vegetated,
+water, unclassified); all other SCL classes including clouds/shadows/snow
+and invalid or near-zero reflectance are transparent. Underlying true
+ČÚZK ortho remains visible through those holes; no synthetic imagery
+or enhanced native source resolution is claimed.
+
+**Important:** Sentinel-2 RGB/NDVI are ~10m spectral observations,
+not per-roof photographs or building heights. The unchanged 2m ČÚZK
+height model and A/B surface measurements remain Bpv. RGB contrast
+is a visualization; the NDVI color palette is a visual classification
+of calibrated measurements, not measured visible RGB colors.
+Scene-wide cloud percentages are **not** AOI clear-sky guarantees.
+
+### Bounded local API and caching
+
+- `/api/observations/scenes/0/X/Y.json?from=YYYY-MM-DD&to=YYYY-MM-DD&cloud=35`
+  queries or reuses the real STAC catalog for one coarse tile.
+- `/api/observations/0/X/Y/SCENE_ID.json`, `.rgb.png`, `.ndvi.png`
+  serve the selected scene, with strict source provenance.
+- `test-results/terrain-prague-stream-cache/observations-v1-*` stores
+  the real output metadata and PNG pairs. Cache entries are written
+  atomically with metadata last. Offline mode uses genuine cached results
+  only; without prior downloads the server explicitly returns HTTP 404.
+  Only two distinct observation requests may run concurrently.
+
+**Known limitations:** coverage limited to one selected coarse tile,
+not an auto-updating full-city mosaic; SCL cloud masking is a coarse
+classification, not a quality guarantee. This is deliberately the first
+reusable SDK integration, to be expanded to time series and multiple
+tiles only after source-provenance and GPU tests pass.
