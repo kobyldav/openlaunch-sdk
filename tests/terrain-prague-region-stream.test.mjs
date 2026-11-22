@@ -57,6 +57,11 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.equal(finished.result.requestedTiles,4);
    assert.equal(finished.result.pendingTiles,0);
    assert.equal(finished.result.meanSlopeOnObservedPixels,null);
+   assert.deepEqual(finished.result.seams,[],
+     "No edge metrics may be invented if all source rasters are missing");
+   assert.equal(finished.result.seamWarningCount,0);
+   assert.match(finished.result.seamDiagnostics,/no interpolation/);
+
    assert.equal(finished.result.percentValidWithinAnalyzedTiles,null);
    const page=await (await fetch(origin+"/")).text();
    assert.match(page,/id="region-coverage"/);
