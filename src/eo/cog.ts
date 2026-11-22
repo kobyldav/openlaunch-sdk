@@ -1,4 +1,5 @@
 import { decodeTiffLzw } from "./tiff-lzw.js";
+import type { CogRangeCache } from "./cog-range-cache.js";
 import type { AreaOfInterest } from "../geo/types.js";
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import {
@@ -22,6 +23,8 @@ export interface CogReadOptions {
   maxBlocks?: number;
   /** Bound each compressed or expanded tile; default 16 MiB. */
   maxBlockBytes?: number;
+  /** Optional shared, bounded cache of exact strong-ETag-verified source bytes. */
+  rangeCache?: CogRangeCache;
 }
 export interface CogReadResult {
   raster: RasterGrid;
@@ -70,10 +73,26 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
     const fetchRange=async(start:number,length:number):Promise<Uint8Array>=>{
       if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(length)||length<1||length>maxBlockBytes)
         throw new RangeError("Invalid or oversized HTTP TIFF byte range");
+      const sourceUrl=parsed.toString();
+      const hit=options.rangeCache?.get(sourceUrl,start,length);
+      if(hit){
+        if(totalSourceBytes&&hit.total!==totalSourceBytes)
+          throw new RangeError("Cached COG source length differs from previously validated TIFF data");
+        totalSourceBytes=hit.total;
+        return hit.bytes;
+      }
       const end=start+length-1;
-      const response=await fetchImpl(parsed.toString(),{
-        method:"GET",redirect:"error",signal:controller.signal,
-        headers:{Range:`bytes=${start}-${end}`,Accept:"application/octet-stream,image/tiff;q=0.9"},
+      // If-Range with a STRONG source validator guarantees that a later
+      // version cannot be combined with bytes from the previously cached one.
+      // A source change normally yields HTTP 200, which fails closed below.
+      const pinned=options.rangeCache?.validatorFor(sourceUrl);
+      const headers:Record<string,string>={
+        Range:`bytes=${start}-${end}`,
+        Accept:"application/octet-stream,image/tiff;q=0.9"
+      };
+      if(pinned)headers["If-Range"]=pinned;
+      const response=await fetchImpl(sourceUrl,{
+        method:"GET",redirect:"error",signal:controller.signal,headers,
       });
       if(response.status!==206)throw new RangeError("Remote COG requires HTTP 206 Partial Content; server ignored Range request");
       const header=response.headers.get("content-range");
@@ -88,7 +107,10 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       const declared=response.headers.get("content-length");
       if(declared!==null && Number(declared)>length)throw new RangeError("COG range exceeds requested length");
       const bytes=new Uint8Array(await response.arrayBuffer());
-      if(bytes.length!==last-first+1||bytes.length>length)throw new RangeError("Incorrect HTTP COG ranged response length");
+      if(bytes.length!==last-first+1||bytes.length>length)
+        throw new RangeError("Incorrect HTTP COG ranged response length");
+      options.rangeCache?.accept(sourceUrl,start,length,bytes,total,
+        response.headers.get("etag"));
       return bytes;
     };
 
