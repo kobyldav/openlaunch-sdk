@@ -545,8 +545,8 @@ ordinary SDK reader remains unchanged unless explicitly given a
   change, or a server returns an untrustworthy 200 or a mismatched
   ETag, the source read fails closed rather than assembling
   reflectance from different versions of the same COG object.
-- The cache is **process-local and bounded to 16 MiB** by default,
-  at most 128 ranges and 128 pinned original source validators;
+- The cache is **process-local and bounded to 64 MiB** by default,
+  at most 256 ranges and 128 pinned original source validators;
   safe old entries are evicted under memory pressure.
   A fresh Node server starts with no in-memory COG ranges.
   It is not a persistent disk cache and does not store user data.
@@ -571,13 +571,13 @@ npm run build
 node scripts/terrain-prague-stream.mjs --cog-range-cache-mib 0
 
 # Source-ETag-pinned in-memory COG cache (default in Prague server)
-node scripts/terrain-prague-stream.mjs --cog-range-cache-mib 16
+node scripts/terrain-prague-stream.mjs --cog-range-cache-mib 64
 
 # Test ETag changes, URL separation, byte-for-byte authentic LZW TIFF samples
 node --test tests/terrain-cog-range-cache.test.mjs tests/lzw-geotiff.test.mjs tests/utm-cog.test.mjs
 
 # True 4x4 2023–2025 original Sentinel-2 L2A A/B:
-# independent EMPTY source caches for 0 MiB and 16 MiB treatments
+# independent EMPTY source caches for 0 MiB and 64 MiB treatments
 node scripts/terrain-prague-region-range-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50
 ```
 
@@ -594,7 +594,7 @@ actual HTTP 206 counts and measured network-body bytes.
 ### Limitations and expected trade-offs
 
 - The shared in-memory cache can increase Node RSS up to its configured
-  16 MiB resident limit, plus transient copies of compressed TIFF
+  64 MiB resident limit, plus transient copies of compressed TIFF
   bytes and decompression buffers. Stage 20's soft memory ceiling is
   not a hard upper bound during active source reads.
 - Only **strong ETag-validated original range contents** are reused.
