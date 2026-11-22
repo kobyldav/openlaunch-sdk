@@ -682,7 +682,7 @@ block buffers when other applications or the process need memory.
     RSS and `os.freemem()` by the Prague server. The SDK never fakes
     process RSS or silently probes host resources in the library.
 - The normal Prague server defaults to `--cog-memory-mode adaptive`
-  with a **512 MiB soft RSS target**, and retains a **96 MiB Node RSS
+  with a **512 MiB soft RSS target**, and retains a **48 MiB Node RSS
   safety reserve** plus a **512 MiB host-free-memory reserve**.
   The allowed cache budget is limited by both remaining headrooms
   and quantized downward to 4 MiB. The region's existing
