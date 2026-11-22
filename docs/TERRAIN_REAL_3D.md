@@ -362,3 +362,56 @@ Verification: `node --test tests/terrain-prague-stream-inspect.test.mjs`
 no picking on visual skirts, WGS84 orientation, nullable profile,
 height exaggeration invariance) and a live ČÚZK tile HTTP integration
 checking the original measured triangle's interpolated Bpv height.
+
+## Stage 9 — actual browser 3D screenshots, accelerated navigation
+
+**Why:** earlier tests compiled the GLSL and verified real source pixels,
+but did not prove that the Edge GPU rendered textured 3D terrain.
+
+After the live `terrain-prague-stream-smoke.mjs` obtains actual ČÚZK
+tile `0-3-3`, the Windows workflow now launches the **real streamed viewer**
+in headless Microsoft Edge/SwiftShader and uses its Chrome DevTools Protocol
+to check the actual GPU framebuffer. This test fails unless the real cached
+terrain generates more than 500 non-background pixel samples and at least
+4,000 displayed triangles. It then orbits the camera, confirms that GPU
+pixel checksums change, simulates 60 rapid camera positions and checks
+that the original terrain reappears on returning. Screenshots from the
+actual Edge browser are stored as PNGs in the CI artifact together with
+a JSON report of image pixels, geometry counts, and flight queue limits.
+Unlike standalone shader tests, this is a full browser+server+texture
+rendering gate; it is still not a certification of every user GPU driver.
+
+### Performance and offline mode
+
+The viewer now aborts active **browser** tile fetches and texture loads
+when the camera no longer needs them, releasing the three in-flight
+client slots for visible tiles. Invalidated downloads do not create
+GPU resources or mark source data as corrupted. Server-side ČÚZK
+requests already started can continue to finish and populate disk cache;
+so cancellation limits wasted browser work rather than guaranteeing
+network-source cancellation.
+
+To explore already-downloaded ČÚZK tiles without Internet access:
+
+```cmd
+cd /d "%USERPROFILE%\Desktop\openlaunch-terrain"
+npm run example:terrain-prague-stream -- --offline
+```
+
+The server binds to localhost as before, serves real `v2-*.json`/PNG
+tiles found in `test-results/terrain-prague-stream-cache/`, and
+**returns HTTP 404 for any uncached tile** instead of contacting ČÚZK or
+inventing geometry. Use normal online streaming mode to fill your cache.
+
+Verification command (Windows, after the real ČÚZK tile smoke populated
+`test-results/terrain-prague-stream-ci/`):
+
+```cmd
+node scripts/terrain-prague-browser-smoke.mjs
+```
+
+**Limitations:** browser screenshot tests use Edge software WebGL (SwiftShader)
+on Windows CI; local hardware drivers and performance still differ.
+Offline mode only shows previously visited regions; uncached regions
+remain missing and the viewer reports the absence of data. Historical
+cached v1 files are not silently treated as current v2 tiles.

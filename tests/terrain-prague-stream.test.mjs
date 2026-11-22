@@ -74,6 +74,9 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/webglcontextlost/);
   assert.match(page,/webglcontextrestored/);
   assert.match(page,/graphicsEpoch/);
+  assert.match(page,/controllers=new Map/);
+  assert.match(page,/controller\.abort\(\)/);
+  assert.match(page,/signal:controller\.signal/);
   assert.match(page,/inspectorTiles\(/);
   assert.match(page,/elevationM===null/);
   assert.match(page,/d\.seam\?\.version!==2/);
@@ -95,7 +98,7 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
 test("local streaming server starts without any terrain download, accepts only valid paths",async()=>{
   const cache=await mkdtemp(join(tmpdir(),"openlaunch-terrain-stream-test-"));
   const script=fileURLToPath(new URL("../scripts/terrain-prague-stream.mjs",import.meta.url));
-  const child=spawn(process.execPath,[script,"--port","0","--no-open","--cache",cache],
+  const child=spawn(process.execPath,[script,"--port","0","--no-open","--offline","--cache",cache],
     {stdio:["ignore","pipe","pipe"],windowsHide:true});
   let stdout="",stderr="";
   child.stderr.on("data",buf=>{stderr+=buf.toString();});
@@ -119,11 +122,15 @@ test("local streaming server starts without any terrain download, accepts only v
     assert.equal(config.status,200);
     const manifest=await config.json();
     assert.equal(manifest.levels[1].demResolutionM,2);
+    assert.equal(manifest.offlineMode,true);
     assert.match(manifest.caveat,/no vertical facades/);
     assert.equal(root.status,200);
     assert.match(await root.text(),/OpenLaunch SDK.*Praha 3D/);
     assert.equal(notFound.status,404);
     assert.equal(invalid.status,400);
+    const unavailable=await fetch(origin+"/api/tiles/0/3/3.json");
+    assert.equal(unavailable.status,404,"Offline mode must never fetch missing ČÚZK tiles");
+    assert.match(await unavailable.text(),/offline mode forbids source requests/);
     assert.equal(visibility.status,200);
     assert.match(visibility.headers.get("content-type")??"",/javascript/);
     assert.match(await visibility.text(),/OpenLaunchTilePlanner/);
