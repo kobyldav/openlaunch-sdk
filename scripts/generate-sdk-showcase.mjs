@@ -22,7 +22,8 @@ const THREE_MODULE=join(TOOLS,"node_modules","three","build","three.module.js");
 const ISS1="1 25544U 98067A   19156.50900463  .00003075  00000-0  59442-4 0  9992";
 const ISS2="2 25544  51.6433  59.2583 0008217  16.4489 347.6017 15.51174618173442";
 const START=new Date("2019-06-05T12:00:00Z");
-const NASA_URL="https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_shallow_topo_2048.jpg";
+const NASA_URL="https://raw.githubusercontent.com/Depal-Jakub/orbital-bloom/main/public/assets/earth-day-2048.jpg";
+const NASA_ORIGINAL="https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57730/land_ocean_ice_2048.jpg";
 
 const model={
  liftoff:START,
@@ -68,13 +69,18 @@ function scenes(){
    maxSpeedMps:finite(Math.max(...flight.telemetry.map(p=>p.inertialSpeedMps))),
    source:"SDK generic two-stage 3DOF model, not actual launch telemetry",
    czmlSamples:flightPacket.position.cartesian.length/4},
-  sourceImages:{blueMarble:NASA_URL,attribution:"NASA/GSFC, Reto Stöckli (Blue Marble 2002)"}
+  sourceImages:{blueMarble:NASA_ORIGINAL,mirror:NASA_URL,attribution:"NASA/GSFC, Reto Stöckli (Blue Marble 2002)"}
  };
 }
 async function texture(){
- const response=await fetch(NASA_URL,{signal:AbortSignal.timeout(30000),headers:{"User-Agent":"OpenLaunch-SDK-readme-showcase/1.0"}});
- if(!response.ok)throw Error("NASA Blue Marble HTTP "+response.status);
- const bytes=Buffer.from(await response.arrayBuffer());
+ let bytes;
+ if(process.env.OPENLAUNCH_EARTH_TEXTURE){
+  bytes=await readFile(resolve(process.env.OPENLAUNCH_EARTH_TEXTURE));
+ }else{
+  const response=await fetch(NASA_URL,{signal:AbortSignal.timeout(30000),headers:{"User-Agent":"OpenLaunch-SDK-readme-showcase/1.0"}});
+  if(!response.ok)throw Error("NASA Blue Marble mirror HTTP "+response.status);
+  bytes=Buffer.from(await response.arrayBuffer());
+ }
  if(bytes.length<80000||bytes.length>6_000_000||bytes[0]!==0xff||bytes[1]!==0xd8)throw Error("NASA texture is not validated JPEG");
  return bytes;
 }
