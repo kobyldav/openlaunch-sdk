@@ -49,7 +49,7 @@ export function captureSentinelRegionSeamEdges(input:SentinelRegionSeamInput):
    !years.every((y,i)=>Number.isInteger(y.year)&&
      (i===0||y.year===years[i-1]!.year+1)&&
      Array.isArray(y.scenes)&&y.scenes.length===2&&
-     y.scenes.every(s=>/^[A-Za-z0-9_-]{5,120}$/.test(s.sceneId)&&
+     y.scenes.every((s:{sceneId:string;acquiredAt:string})=>/^[A-Za-z0-9_-]{5,120}$/.test(s.sceneId)&&
        finite(Date.parse(s.acquiredAt)))))
    throw new RangeError("Seam requires a source-verified georeferenced NDVI edge raster");
  const R=6378137,merc=(lon:number,lat:number):[number,number]=>
@@ -69,7 +69,7 @@ export function captureSentinelRegionSeamEdges(input:SentinelRegionSeamInput):
  for(let y=0;y<h;y++){west[y]=slopePerYear[y*w]!;east[y]=slopePerYear[y*w+w-1]!;}
  return {key:input.key,bounds:{...bounds},width:w,height:h,
    transform:[...t],years:years.map(y=>({year:y.year,
-     scenes:y.scenes.map(s=>({sceneId:s.sceneId,acquiredAt:s.acquiredAt}))})),
+     scenes:y.scenes.map((s:{sceneId:string;acquiredAt:string})=>({sceneId:s.sceneId,acquiredAt:s.acquiredAt}))})),
    north,south,west,east};
 }
 export function compareSentinelRegionSeamEdges(a:SentinelRegionSeamEdges,
