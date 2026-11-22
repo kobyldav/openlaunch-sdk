@@ -12,6 +12,14 @@ h1{font-size:18px;margin:0}main{max-width:1600px;margin:auto;padding:12px}
 button{background:#204764;border:1px solid #5b7890;color:white;border-radius:7px;padding:8px 12px;cursor:pointer}
 button:hover{background:#346382}
 input[type=range]{accent-color:#66b3ec;vertical-align:middle}
+input[type=date],input[type=number],select{background:#193952;color:#eaf3fa;border:1px solid #628099;border-radius:6px;padding:6px}
+.observations{border:1px solid #365570;border-radius:10px;background:#132b3e;
+ padding:11px 13px;margin:0 0 10px}
+.observations .toolbar{margin:8px 0;gap:10px}
+.observations .small{margin:5px 0}
+.observations strong{color:#b8f2de}
+#obs-scene{max-width:min(360px,90vw)}
+#obs-note{color:#ccebdc}
 label{white-space:nowrap}
 #map{width:100%;height:min(77vh,850px);min-height:380px;display:block;border-radius:12px;background:#112a43;touch-action:none;cursor:grab}
 #map:active{cursor:grabbing}
@@ -49,6 +57,26 @@ a{color:#9cd1fc}
   <button id="export-profile" disabled>Profil CSV</button>
   <span id="status" class="small">Připravuji mapu…</span>
  </div>
+ <section class="observations" aria-label="Družicová pozorování nad 3D terénem">
+  <strong>Earth Intelligence · skutečné scény Sentinel-2 nad 3D Prahou</strong>
+  <div class="toolbar">
+   <label>Od <input id="obs-from" type="date" value="2025-06-01"></label>
+   <label>Do <input id="obs-to" type="date" value="2025-09-30"></label>
+   <label>Max. oblačnost scény <input id="obs-cloud" type="number" min="0" max="100" value="35" style="width:64px"> %</label>
+   <button id="obs-search">Najít scény pro střed mapy</button>
+   <select id="obs-scene" aria-label="Skutečná scéna Sentinel-2" disabled><option>Nejprve vyhledej scény</option></select>
+   <button id="obs-load" disabled>Načíst RGB + NDVI</button>
+   <label>Vrstva <select id="obs-mode">
+    <option value="ortho">ČÚZK ortofoto (základ)</option>
+    <option value="rgb">Sentinel-2 RGB</option>
+    <option value="ndvi">Sentinel-2 NDVI</option>
+   </select></label>
+  </div>
+  <p id="obs-note" class="small">Vyber výřez pohybem kamery a klikni na „Najít scény“. Stahuje se pouze jedna dlaždice (~0,7 km), nikoli celá Praha. Sentinel-2 má 10m spektrální rozlišení.</p>
+  <p class="small">NDVI: tmavě zelená = vyšší vegetační aktivita, béžová = nižší, modrá = záporné hodnoty.
+   Datum odpovídá skutečné scéně Sentinel-2 L2A. Oblaka, stíny a neplatné pixely jsou průhledné – pod nimi zůstává ortofoto ČÚZK.
+   Výšky a měření A/B se nemění. © Copernicus Sentinel data, zprostředkováno Element84 Earth Search.</p>
+ </section>
  <div class="map-wrap">
   <canvas id="map" aria-label="3D interaktivní mapa Prahy načítaná po dlaždicích"></canvas>
   <span class="map-pin" id="pinA">A</span>
@@ -87,6 +115,10 @@ let selection={coarse:[],finer:[],detailActive:false};
 const transitions=new Map();
 let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
 let buildingsEnabled=true;
+let observationTile=null,observationActive=null,observationRequest=null;
+let observationEpoch=0;
+const observationCatalog=new Map();
+const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
 const buildingCache=new Map(),buildingPending=new Map(),buildingFailed=new Map();
 let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
 const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set(),controllers=new Map();
