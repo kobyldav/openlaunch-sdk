@@ -10,11 +10,17 @@ import {CogRangeCache} from "./cog-range-cache.js";
 const MiB=1048576;
 const STEP=4*MiB;
 export type CogMemoryMode="fixed"|"adaptive";
-export interface CogMemorySample{rssBytes:number;systemFreeBytes:number;}
+export interface CogMemorySample{
+ rssBytes:number;systemFreeBytes:number;
+ /** Optional real monotonic sample time: repeated observations in one
+  * network burst do not count as separate healthy recovery samples.
+  */
+ sampledAtMs?:number;
+}
 export interface CogMemoryPolicyOptions{
  mode:CogMemoryMode;
  processLimitBytes:number;
- /** Default reserve: 96MiB for active TIFF decompression and JS allocations. */
+ /** Default reserve: 48MiB for active TIFF decompression and JS allocations. */
  processReserveBytes?:number;
  /** Default reserve: 512MiB host free memory for browser, OS and other apps. */
  systemReserveBytes?:number;
@@ -47,13 +53,14 @@ export class AdaptiveCogRangeMemory{
  private sampled=0;private pressure=0;
  private downs=0;private ups=0;private stable=0;private released=0;
  private maxRss=0;private minHostFree=Infinity;
+ private lastRecoveryCheckMs=-Infinity;
  private constraint:CogMemoryPolicyStats["lastConstraint"]="none";
 
  constructor(readonly cache:CogRangeCache,options:CogMemoryPolicyOptions){
    const {mode,processLimitBytes}=options;
    if(mode!=="fixed"&&mode!=="adaptive")
      throw new RangeError("COG memory mode must be fixed or adaptive");
-   const processReserve=options.processReserveBytes??96*MiB;
+   const processReserve=options.processReserveBytes??48*MiB;
    const systemReserve=options.systemReserveBytes??512*MiB;
    const recoverySamples=options.recoverySamples??3;
    const recoveryStep=options.recoveryStepBytes??16*MiB;
@@ -78,11 +85,13 @@ export class AdaptiveCogRangeMemory{
  setProcessLimitBytes(bytes:number):void{
    if(!finiteBytes(bytes)||bytes<256*MiB||bytes>8192*MiB)
      throw new RangeError("COG process RSS target must be 256..8192 MiB");
-   this.limit=bytes;this.stable=0;
+   this.limit=bytes;this.stable=0;this.lastRecoveryCheckMs=-Infinity;
  }
  observe(sample:CogMemorySample):CogMemoryPolicyStats{
    if(!sample||!finiteBytes(sample.rssBytes)||
-     !finiteBytes(sample.systemFreeBytes))
+     !finiteBytes(sample.systemFreeBytes)||
+     (sample.sampledAtMs!==undefined&&
+       (!Number.isFinite(sample.sampledAtMs)||sample.sampledAtMs<0)))
      throw new RangeError("Adaptive COG policy requires measured finite Node RSS and free host memory");
    this.sampled++;
    this.maxRss=Math.max(this.maxRss,sample.rssBytes);
@@ -90,12 +99,22 @@ export class AdaptiveCogRangeMemory{
    if(this.mode==="fixed"||this.cache.configuredMaxResidentBytes===0){
      this.constraint="disabled";return this.snapshot();
    }
-   // Both limits are applied to the *whole actual Node process*, not
-   // just TIFF cache allocations. Retain memory for decompression and UI.
-   const rssAllowed=Math.max(0,this.limit-sample.rssBytes-this.processReserve);
+   // Crucial Stage 23 calibration: process RSS ALREADY CONTAINS
+   // previously allocated compressed TIFF cache blocks. Do not subtract
+   // the same pressure repeatedly after each eviction while Node has not
+   // yet garbage-collected those blocks: that produced 149 shrinks and
+   // 139 regrowths in the first genuine 4x4 low-memory experiment.
+   //
+   // Instead charge the actual excess RSS *against the immutable original
+   // configured cache capacity*. The allowed budget for an identical
+   // RSS sample is identical even after cache residency changes.
+   const ceiling=this.cache.configuredMaxResidentBytes;
+   const excessRss=Math.max(0,
+     sample.rssBytes+this.processReserve-this.limit);
+   const rssAllowed=sample.rssBytes>=this.limit?0:
+     Math.max(0,ceiling-excessRss);
    const systemAllowed=Math.max(0,Math.floor((sample.systemFreeBytes-
      this.systemReserve)/2));
-   const ceiling=this.cache.configuredMaxResidentBytes;
    const allowed=Math.max(0,Math.floor(Math.min(
      ceiling,rssAllowed,systemAllowed)/STEP)*STEP);
    const rssRestricts=rssAllowed<ceiling&&rssAllowed<=systemAllowed;
@@ -107,16 +126,22 @@ export class AdaptiveCogRangeMemory{
    const active=this.cache.maxResidentBytes;
    if(allowed<active){
      this.released+=this.cache.resizeBudgetBytes(allowed);
-     this.downs++;this.stable=0;
+     this.downs++;this.stable=0;this.lastRecoveryCheckMs=-Infinity;
    }else if(allowed>active){
-     // Hysteresis prevents oscillations when the host free-memory
-     // counter or process RSS fluctuates near a threshold.
-     this.stable++;
+     // A COG scene fires several reads in a few milliseconds. Healthy
+     // recovery samples must be TIME-separated, not merely counted.
+     const now=sample.sampledAtMs;
+     if(now===undefined||now-this.lastRecoveryCheckMs>=300){
+       this.stable++;
+       if(now!==undefined)this.lastRecoveryCheckMs=now;
+     }
      if(this.stable>=this.recoverySamples){
        this.cache.resizeBudgetBytes(Math.min(allowed,active+this.recoveryStep));
        this.ups++;this.stable=0;
      }
-   }else this.stable=0;
+   }else{
+     this.stable=0;this.lastRecoveryCheckMs=-Infinity;
+   }
    return this.snapshot();
  }
  snapshot():CogMemoryPolicyStats{
