@@ -1,0 +1,36 @@
+name: Prague real Sentinel 4x4 adaptive COG memory A/B (Stage 23)
+on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+    paths:
+      - .github/workflows/terrain-prague-stage23-memory-ab.yml
+  workflow_dispatch:
+jobs:
+  source-memory-ab:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Stage 23 validate adaptive RSS and host-memory guard with identical original LZW pixels
+        run: node --test tests/terrain-cog-memory.test.mjs tests/terrain-cog-range-cache.test.mjs
+      - name: Original 4x4 Sentinel fixed-versus-adaptive memory A/B with strict source fingerprints
+        timeout-minutes: 35
+        run: node scripts/terrain-prague-region-memory-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --rss-target-mib 320 --timeout-ms 1000000 --require-pressure --output test-results/terrain-prague-stage23-memory-ab-report.json
+      - name: Preserve genuine original source and measured memory evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prague-original-sentinel-adaptive-memory-stage23
+          path: |
+            test-results/terrain-prague-stage23-memory-ab-report.json
+            test-results/terrain-prague-stage23-memory-ab-cache/cold-fixed/source-report.json
+            test-results/terrain-prague-stage23-memory-ab-cache/cold-adaptive/source-report.json
+          if-no-files-found: warn
+          retention-days: 14
