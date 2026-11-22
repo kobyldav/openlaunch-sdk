@@ -621,10 +621,81 @@ try{
      ", "+screenshotBytes+" authentic PNG bytes; GPU texture released");
  }
 
+ // Stage 18: if the independent live source proof succeeded for BOTH
+ // neighboring original Sentinel tiles and BOTH ČÚZK DSM tiles, require
+ // actual GPU projection of two separate native source textures at once.
+ // It never swaps in placeholder pixels if remote COG data are absent.
+ let actualAdjacentRegional3dView=null;
+ if(existsSync(join(cache,"region-adjacent-live-report.json"))){
+   const proof=JSON.parse(await readFile(
+     join(cache,"region-adjacent-live-report.json"),"utf8"));
+   if(proof.status==="real-adjacent-two-tile-verified"){
+     assert.equal(proof.coverage.analyzedTiles,2);
+     assert.equal(proof.coverage.seams.length,1);
+     assert.ok(proof.authentic.every(x=>x.sceneIds.length>=6));
+     const baselineSetup='(()=>{clearRegionGpu();'+
+       'const left=tileCenter(0,3,3),right=tileCenter(0,4,3);'+
+       'panX=(left[0]+right[0])*.5;panNorth=(left[1]+right[1])*.5;'+
+       'yaw=0;pitch=1.22;distance=1550;enableDetail=false;buildingsEnabled=false;'+
+       '$("obs-mode").value="ortho";'+
+       'const cells=[];for(let x=3;x<=4;x++){const b=boundsFor(0,x,3);'+
+       'cells.push({key:"0-"+x+"-3",x,y:3,'+
+       'bounds:{west:b[0],south:b[1],east:b[2],north:b[3]}});}'+
+       'regionPlan={x:3,y:3,cols:2,rows:1,cloud:'+proof.selection.cloud+',tiles:cells};'+
+       'regionResult='+JSON.stringify(proof.coverage)+';'+
+       'regionTiles.clear();for(const t of regionResult.tiles)regionTiles.set(t.key,t);'+
+       'regionSeams=regionResult.seams;drawRegionCoverage();'+
+       '$("region-3d").disabled=false;update();return true;})()';
+     await evalJs(c.send,baselineSetup);
+     await until(async()=>await evalJs(c.send,
+       'cache.has("0-3-3")&&cache.has("0-4-3")'),
+       "both originally measured ČÚZK tiles resident in Edge GPU",30000);
+     const baseline=await evalJs(c.send,inspectPixels);
+     await evalJs(c.send,'toggleRegion3d()');
+     await until(async()=>await evalJs(c.send,
+       'regionGpu.has("0-3-3")&&regionGpu.has("0-4-3")&&'+
+       '$("obs-mode").value==="region"'),
+       "two genuinely source-verified adjacent Sentinel textures in Edge GPU",40000);
+     const observed=await evalJs(c.send,inspectPixels);
+     assert.equal(observed.glError,0);
+     assert.notEqual(baseline.checksum,observed.checksum,
+       "Two adjacent genuine Sentinel tiles must alter measured 3D terrain pixels");
+     const gpu=await evalJs(c.send,'({count:regionGpu.size,'+
+       'keys:[...regionGpu.keys()],max:MAX_REGION_GPU,'+
+       'visible:regionWantedTiles().map(t=>t.key)})');
+     assert.equal(gpu.count,2);
+     assert.ok(gpu.keys.includes("0-3-3")&&gpu.keys.includes("0-4-3"));
+     assert.ok(gpu.count<=gpu.max);
+     await evalJs(c.send,'(()=>{window.scrollTo(0,'+
+       'Math.max(0,$("map").getBoundingClientRect().top+window.scrollY-65));'+
+       'draw();return true;})()');
+     const screenshotBytes=await capture(
+       "prague-real-sentinel-regional-3d-two-real-tiles.png");
+     actualAdjacentRegional3dView={
+       status:"two-adjacent-original-Sentinel-and-CUZK-tiles",
+       sources:proof.authentic.map(t=>({tile:t.key,sceneIds:t.sceneIds})),
+       seam:proof.coverage.seams[0],observedPixelTotal:proof.coverage.commonValidPixels,
+       baselineChecksum:baseline.checksum,regionalChecksum:observed.checksum,
+       gpuTextures:gpu.count,screenshotBytes
+     };
+     await evalJs(c.send,'toggleRegion3d()');
+     assert.equal(await evalJs(c.send,'regionGpu.size'),0);
+     console.log("PASS Stage 18 two actual adjacent Sentinel/ČÚZK 3D tiles in "+
+       "Microsoft Edge WebGL1: "+proof.coverage.commonValidPixels+
+       " observed common pixels, seam "+proof.coverage.seams[0].state+
+       ", GPU "+gpu.count+", "+baseline.checksum+" => "+observed.checksum+
+       ", "+screenshotBytes+" genuine screenshot bytes");
+   }else{
+     console.log("NOTICE Stage 18 genuine adjacent source proof unavailable: "+
+       String(proof.reason??"incomplete").slice(0,250)+
+       ". No fictitious two-tile WebGL screenshots.");
+   }
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,actualMultiYearView,actualRegional3dView,
+   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,actualMultiYearView,actualRegional3dView,actualAdjacentRegional3dView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
