@@ -146,3 +146,21 @@ test("Stage 17: shader uses same parent georeferencing with real tile-specific t
  assert.match(html,/function validateRegionSource\(/);
  assert.doesNotThrow(()=>new Script(script));
 });
+
+test("Stage 19: actual 3D source validator refuses an absent or different regional scene lock",()=>{
+ const {ctx,api}=createHarness();
+ const f=fixture();
+ ctx.regionTiles.set("0-3-3",f.report);
+ ctx.regionResult.sourceLockId="1234567890abcdef1234567890abcdef";
+ assert.throws(()=>api.validateRegionSource(f.meta,box),/zdrojově/,
+   "Previous independent cached rasters cannot masquerade as shared-region data");
+ assert.throws(()=>api.validateRegionSource({
+   ...f.meta,sourceLockId:"abcdefabcdefabcdefabcdefabcdefab",regionSourceLocked:true
+ },box),/zdrojově/);
+ assert.equal(api.validateRegionSource({
+   ...f.meta,sourceLockId:ctx.regionResult.sourceLockId,regionSourceLocked:true
+ },box),true);
+ assert.match(html,/regionPlan\.sourceLockId=event\.id/);
+ assert.match(html,/lock:params\.sourceLockId/);
+ assert.match(html,/id="region-source-status"/);
+});
