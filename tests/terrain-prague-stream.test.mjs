@@ -77,6 +77,14 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/id="obs-to"/);
   assert.match(page,/id="obs-scene"/);
   assert.match(page,/id="obs-mode"/);
+  assert.match(page,/id="trend-scenes"/);
+  assert.match(page,/id="trend-load"/);
+  assert.match(page,/id="trend-export"/);
+  assert.match(page,/id="trend-chart"/);
+  assert.match(page,/value="trend"/);
+  assert.match(page,/\/api\/observations\/trend\/0\//);
+  assert.match(page,/loadTrend\(/);
+  assert.match(page,/drawTrendChart\(/);
   assert.match(page,/id="compare-before"/);
   assert.match(page,/id="compare-load"/);
   assert.match(page,/id="compare-export"/);
@@ -157,6 +165,12 @@ test("local streaming server starts without any terrain download, accepts only v
       "/api/observations/scenes/0/3/3.json?from=2025-06-01&to=2025-09-30");
     assert.equal(noScenes.status,404,
       "Offline server never fetches an uncached Sentinel STAC catalog");
+    const noTrend=await fetch(origin+
+      "/api/observations/trend/0/3/3/S2A_TREND_20250801,S2B_TREND_20250811,S2C_TREND_20250831.json");
+    assert.equal(noTrend.status,404,"Uncached temporal trend has no artificial offline result");
+    const invalidTrend=await fetch(origin+
+      "/api/observations/trend/0/3/3/S2A_TREND_20250801,S2A_TREND_20250801,S2A_TREND_20250801.json");
+    assert.equal(invalidTrend.status,400,"Reusing the same acquisition cannot form a trend");
     const noChange=await fetch(origin+
       "/api/observations/compare/0/3/3/S2A_OLD_20250806/S2B_NEW_20250825.json");
     assert.equal(noChange.status,404,

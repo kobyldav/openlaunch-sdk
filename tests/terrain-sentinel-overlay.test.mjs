@@ -7,7 +7,7 @@ import {
 } from "../dist/terrain/sentinel-overlay.js";
 import {bbox} from "../dist/geo/types.js";
 import {lonLatToGridCrs} from "../dist/eo/raster.js";
-import {OpenLaunch,discoverSentinelTerrainScenes as directDiscover,loadSentinelTerrainOverlay as directObserve,compareSentinelNdviScenes} from "../dist/index.js";
+import {OpenLaunch,discoverSentinelTerrainScenes as directDiscover,loadSentinelTerrainOverlay as directObserve,compareSentinelNdviScenes,analyzeSentinelNdviTimeSeries,SENTINEL_NDVI_TREND_VERSION} from "../dist/index.js";
 
 const area=bbox(14.425,50.093,14.427,50.095);
 const host="https://e84-earth-search-sentinel-data.s3.us-west-2.amazonaws.com/";
@@ -208,4 +208,87 @@ test("stage 12: source NDVI Float32 survives byte round-trip including NaN maski
  for(let i=0;i<restored.length;i++)
    assert.ok(Object.is(restored[i],result.ndviValues[i]),
      "NoData and calibrated true values must survive JSON base64");
+});
+
+test("stage 13: 3 genuine date samples calculate Theil-Sen on identical commonly clear pixels",()=>{
+ const a=evidence("2025-08-01T10:06:00Z","S2A_TREND_20250801",
+  [.2,.8,.4,.3,NaN,.6,.5,.3,.7]);
+ const b=evidence("2025-08-11T10:06:00Z","S2B_TREND_20250811",
+  [.3,.7,.4,.2,.6,.5,NaN,.3,.6]);
+ const c=evidence("2025-08-31T10:06:00Z","S2C_TREND_20250831",
+  [.5,.5,.4,.1,.4,.3,.4,NaN,.4]);
+ const result=analyzeSentinelNdviTimeSeries([c,a,b],{
+  minCommonPixels:4,thresholdNdviPer30Days:.12
+ });
+ assert.equal(SENTINEL_NDVI_TREND_VERSION,1);
+ assert.equal(result.status,"real-sentinel-ndvi-time-series");
+ assert.equal(result.scenes.length,3);
+ assert.equal(result.scenes[0].sceneId,a.sceneId);
+ assert.equal(result.scenes[2].sceneId,c.sceneId);
+ assert.equal(result.qa.fixedCommonPixelPopulation,true);
+ assert.equal(result.qa.theilSen,true);
+ assert.equal(result.statistics.totalPixels,9);
+ assert.equal(result.statistics.commonValidPixels,6);
+ assert.equal(result.statistics.excludedPixels,3);
+ assert.equal(result.statistics.increasingPixels,1);
+ assert.equal(result.statistics.decreasingPixels,4);
+ assert.equal(result.statistics.stablePixels,1);
+ assert.equal(result.slopePer30Days.length,9);
+ assert.ok(Math.abs(result.slopePer30Days[0]-.3)<.00001);
+ assert.ok(Math.abs(result.slopePer30Days[1]+.3)<.00001);
+ assert.equal(result.slopePer30Days[2],0);
+ for(const i of [4,6,7]){
+  assert.ok(Number.isNaN(result.slopePer30Days[i]));
+  assert.equal(result.trendRgba[i*4+3],0,"cloud or NoData in any date leaves transparent trend");
+ }
+ assert.equal(result.trendRgba[0*4+3],255);
+ assert.ok(Math.abs(result.scenes[0].meanNdviCommon-
+   ([.2,.8,.4,.3,.6,.7].reduce((x,y)=>x+y,0)/6))<1e-6,
+   "each scene must use the same six pixels, not changing cloud coverage");
+ assert.equal(typeof new OpenLaunch().terrain.analyzeSentinelNdviTrend,"function");
+});
+test("stage 13: masked scenes or non-registered pixel grids never generate fake trend",()=>{
+ const a=evidence("2025-08-01T10:00:00Z","S2A_TREND_20250801",
+  [.2,.4,.6,.2,.3,.1,.5,.6,.7]);
+ const b=evidence("2025-08-15T10:00:00Z","S2B_TREND_20250815",
+  [.3,.5,.6,.4,.2,.1,.7,.8,.5]);
+ const c=evidence("2025-08-31T10:00:00Z","S2C_TREND_20250831",
+  [.4,.6,.7,.6,.4,.2,.9,.7,.5]);
+ const check=(values,options={minCommonPixels:4})=>
+   analyzeSentinelNdviTimeSeries(values,options);
+ assert.throws(()=>check([a,b]),/3..6/);
+ assert.throws(()=>check([a,b,c,b,c,b,c]),/3..6/);
+ assert.throws(()=>check([a,b,b]),/distinct/);
+ assert.throws(()=>check([a,b,{...c,grid:{...c.grid,
+   transform:[101,10,0,200,0,-10]}}]),/exact pixel grid/);
+ assert.throws(()=>check([a,b,{...c,qa:{...c.qa,sclMask:false}}]),/SCL grid/);
+ assert.throws(()=>check([a,b,{...c,ndviValues:new Float32Array(5)}]),/SCL grid/);
+ assert.throws(()=>check([a,b,{...c,statistics:{...c.statistics,
+   validPixels:3}}]),/inconsistent/);
+ assert.throws(()=>check([a,b,{...c,ndviValues:Float32Array.from(
+   [Infinity,.6,.7,.6,.4,.2,.9,.7,.5])}]),/out-of-range/);
+ assert.throws(()=>check([a,b,c],{minCommonPixels:10}),/Insufficient common/);
+ assert.throws(()=>check([a,b,c],{thresholdNdviPer30Days:0}),/threshold/);
+ const tooShort=evidence("2025-08-09T10:00:00Z","S2C_SHORT_20250809",
+   [.4,.6,.7,.6,.4,.2,.9,.7,.5]);
+ assert.throws(()=>check([a,{...b,acquiredAt:"2025-08-07T10:00:00Z"},tooShort]),/shorter than 14/);
+});
+test("stage 13: uses same sampled population and robust median pairwise slope",()=>{
+ // The middle measurement is an extreme real valid outlier. Median of
+ // three distinct pairwise rates should follow the endpoints.
+ const a=evidence("2025-08-01T00:00:00Z","S2A_MEDIAN_20250801",
+  Array(9).fill(.1));
+ const b=evidence("2025-08-11T00:00:00Z","S2B_MEDIAN_20250811",
+  Array(9).fill(.9));
+ const c=evidence("2025-08-31T00:00:00Z","S2C_MEDIAN_20250831",
+  Array(9).fill(.2));
+ const r=analyzeSentinelNdviTimeSeries([a,b,c],{
+  minCommonPixels:4,thresholdNdviPer30Days:.12});
+ assert.equal(r.statistics.commonValidPixels,9);
+ assert.ok(Math.abs(r.statistics.meanSlopePer30Days-.1)<1e-6);
+ assert.ok(Math.abs(r.statistics.meanChangeNdvi-.1)<1e-6);
+ assert.equal(r.statistics.stablePixels,9);
+ assert.equal(r.statistics.increasingPixels,0);
+ assert.ok(Math.abs(r.scenes[1].meanNdviCommon-.9)<1e-5,
+  "Graph MUST expose actual anomalous mean, never smooth out measured evidence");
 });
