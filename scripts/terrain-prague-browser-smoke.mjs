@@ -331,10 +331,78 @@ try{
      "no synthetic two-date comparison or fabricated screenshot created.");
  }
 
+ // Stage 13: real >=3 observed acquisitions. Fixture, synthetic,
+ // or palette-inverted rasters are never permissible screenshot inputs.
+ let actualTrendView=null;
+ try{
+   const source=JSON.parse(await readFile(join(cache,"trends-live-report.json"),"utf8"));
+   assert.equal(source.status,"real-sentinel-trend-verified");
+   assert.ok(source.sceneIds.length>=3&&source.sceneIds.length<=6);
+   await evalJs(c.send,'(()=>{const p=tileCenter(0,3,3);'+
+     'panX=p[0];panNorth=p[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;$("obs-mode").value="ortho";'+
+     'update();return true;})()');
+   const clear=await evalJs(c.send,inspectPixels);
+   const sceneSetup='(()=>{observationTile=planner.tileLevels[0]'+
+     '.find(t=>t.key==="0-3-3");'+
+     source.scenes.map(item=>
+       'observationCatalog.set('+JSON.stringify(item.sceneId)+',{id:'+
+       JSON.stringify(item.sceneId)+',acquiredAt:'+
+       JSON.stringify(item.acquiredAt)+'});').join("")+
+     'const e=$("trend-scenes");e.replaceChildren();'+
+     source.scenes.map(item=>
+       '(()=>{const box=document.createElement("input");box.type="checkbox";'+
+       'box.value='+JSON.stringify(item.sceneId)+';box.checked=true;'+
+       'const label=document.createElement("label");label.textContent='+
+       JSON.stringify(item.acquiredAt.slice(0,10))+';label.prepend(box);e.append(label);})();'
+     ).join("")+
+     'return true;})()';
+   await evalJs(c.send,sceneSetup);
+   await evalJs(c.send,'loadTrend('+JSON.stringify(source.sceneIds)+')');
+   await until(async()=>await evalJs(c.send,
+     '!!trendData&&!!observationActive?.trendTexture&&'+
+     '$("obs-mode").value==="trend"'),
+     "actual original Sentinel multi-date trend in WebGL1",25000);
+   const observed=await evalJs(c.send,inspectPixels);
+   assert.equal(observed.glError,0);
+   assert.equal(observed.loaded,true);
+   assert.notEqual(observed.checksum,clear.checksum,
+     "At least three original scenes must change real rendered GPU pixels");
+   const computed=await evalJs(c.send,
+     '({scenes:trendData.meta.scenes.length,'+
+     'common:trendData.meta.statistics.commonValidPixels,'+
+     'actualSlopes:trendData.slopes.filter(Number.isFinite).length,'+
+     'chartLabel:$("trend-summary").textContent,'+
+     'csvEnabled:!$("trend-export").disabled,'+
+     'grid:trendData.meta.grid.crs})');
+   assert.equal(computed.scenes,source.scenes.length);
+   assert.equal(computed.common,source.statistics.commonValidPixels);
+   assert.equal(computed.actualSlopes,source.statistics.commonValidPixels);
+   assert.equal(computed.csvEnabled,true);
+   assert.equal(computed.grid,"EPSG:3857");
+   assert.match(computed.chartLabel,/Theil/);
+   await evalJs(c.send,'(()=>{drawTrendChart();window.scrollTo(0,'+
+     'Math.max(0,$("trend-chart").getBoundingClientRect().top+window.scrollY-85));'+
+     'return true;})()');
+   const bytes=await capture("prague-real-sentinel-ndvi-3-date-trend.png");
+   actualTrendView={scenes:source.scenes,statistics:source.statistics,
+     common:computed.common,checksum:observed.checksum,
+     terrainChecksum:clear.checksum,screenshotBytes:bytes,
+     renderer:"actual Edge WebGL1; measured Theil-Sen, 3 real STAC scenes"};
+   console.log("PASS real "+computed.scenes+"-date Sentinel NDVI trend actual Edge WebGL1: "+
+     computed.common+" pixels jointly valid in every original COG scene, "+
+     clear.checksum+" -> "+observed.checksum+
+     ", graphical NDVI time series + "+bytes+" real screenshot bytes");
+ }catch(error){
+   if(existsSync(join(cache,"trends-live-report.json")))throw error;
+   console.log("NOTICE genuine three-source Sentinel trend unavailable; "+
+     "no fabricated time-series graph or screenshot generated.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,actualChangeView,
+   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
