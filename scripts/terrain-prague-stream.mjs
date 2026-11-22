@@ -20,6 +20,7 @@ import {SENTINEL_NDVI_CHANGE_VERSION} from "../dist/terrain/sentinel-change.js";
 import {SENTINEL_NDVI_TREND_VERSION,SENTINEL_TREND_MAX_SCENES}
   from "../dist/terrain/sentinel-trend.js";
 import {SENTINEL_SEASONAL_COMPOSITE_VERSION} from "../dist/terrain/sentinel-seasonal.js";
+import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -34,7 +35,7 @@ const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.j
 const sdk=new OpenLaunch();
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
-const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map();
+const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map(),multiYearTasks=new Map();
 const MAX_OBSERVATION_JOBS=2;
 const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
@@ -616,6 +617,130 @@ function obtainSeasonal(spec,beforeYear,afterYear,month,cloud){
  return promise;
 }
 
+/** Cross-year seasonal analysis never obtains scenes from client URLs.
+ * STAC source metadata for each of 3–5 years is discovered server-side.
+ */
+function multiyearArguments(from,to,month,cloud){
+ if(!Number.isInteger(from)||!Number.isInteger(to)||
+   from<2017||to>2100||to-from<2||to-from>4||
+   !Number.isInteger(month)||month<1||month>12||
+   !Number.isFinite(cloud)||cloud<0||cloud>100)
+   throw RangeError("Multi-year Sentinel requires 3..5 consecutive years, one month and scene cloud 0..100");
+}
+async function multiyearSceneSelection(spec,from,to,month,cloud){
+ multiyearArguments(from,to,month,cloud);
+ const seasons=[];
+ for(let year=from;year<=to;year++){
+   const [start,end]=seasonalDates(year,month);
+   const catalog=await observationScenes(spec,start,end,cloud);
+   const chosen=selectSeasonalSources(catalog.scenes,year,month);
+   if(chosen.length!==2){
+     const error=Error("Unable to verify two different real Sentinel L2A acquisitions in "+
+       year+"-"+String(month).padStart(2,"0")+
+       ". Change the season or cloud limit; no missing year will be guessed.");
+     error.code="OBSERVATION_INSUFFICIENT";throw error;
+   }
+   seasons.push({year,scenes:chosen});
+ }
+ return {status:"real-sentinel-multiyear-catalog",key:spec.key,
+   from,to,month,cloud,seasons,
+   source:"Copernicus Sentinel-2 L2A via Element84 Earth Search STAC",
+   note:"Per-year source scenes ranked by scene cloud percentage; only SCL pixel-level tests establish overlap."};
+}
+function multiyearCachePath(spec,catalog){
+ const digest=createHash("sha256").update(JSON.stringify({
+   key:spec.key,from:catalog.from,to:catalog.to,month:catalog.month,
+   cloud:catalog.cloud,sourceIds:catalog.seasons.map(s=>s.scenes.map(o=>o.id))
+ })).digest("hex").slice(0,24);
+ return join(cacheRoot,"multiyear-v"+SENTINEL_MULTIYEAR_VERSION+"-"+
+   spec.key+"-"+digest);
+}
+async function generateMultiyear(spec,from,to,month,cloud){
+ const catalog=await multiyearSceneSelection(spec,from,to,month,cloud);
+ const path=multiyearCachePath(spec,catalog);
+ try{
+   const [json,png]=await Promise.all([readFile(path+".json"),readFile(path+".png")]);
+   const doc=JSON.parse(json.toString("utf8"));
+   if(doc.status==="real-sentinel-multiyear-seasonal-trend"&&
+      doc.version===SENTINEL_MULTIYEAR_VERSION&&doc.key===spec.key&&
+      doc.statistics?.firstYear===from&&doc.statistics?.lastYear===to&&
+      doc.month===month&&doc.qa?.fixedCommonPixelPopulation===true&&
+      doc.qa?.leaveOneYearOutSensitivity===true&&
+      Buffer.from(doc.slopeF32LE??"","base64").byteLength===doc.width*doc.height*4&&
+      Buffer.from(doc.loF32LE??"","base64").byteLength===doc.width*doc.height*4&&
+      Buffer.from(doc.hiF32LE??"","base64").byteLength===doc.width*doc.height*4&&
+      Buffer.from(doc.robustB64??"","base64").byteLength===doc.width*doc.height&&
+      png.byteLength>100)return {json,png};
+ }catch{}
+ const seasons=[];
+ for(const sourceYear of catalog.seasons){
+   const observations=[];
+   for(const scene of sourceYear.scenes){
+     const product=await obtainObservation(spec,scene.id);
+     const doc=JSON.parse(product.json.toString("utf8"));
+     if(doc.status!=="real-sentinel2-observation"||
+        doc.version!==SENTINEL_TERRAIN_OVERLAY_VERSION||
+        doc.sceneId!==scene.id||doc.acquiredAt!==scene.acquiredAt||
+        doc.key!==spec.key||doc.qa?.sclMask!==true||
+        doc.grid?.crs!=="EPSG:3857"||
+        doc.terrainElevationUnchanged!==true||
+        !Number.isInteger(doc.width)||!Number.isInteger(doc.height)||
+        doc.width*doc.height>50000||typeof doc.ndviF32LE!=="string")
+       throw Error("Multi-year source observation is missing real numeric calibrated NDVI / SCL provenance");
+     const bytes=Buffer.from(doc.ndviF32LE,"base64");
+     if(bytes.byteLength!==doc.width*doc.height*4)
+       throw Error("Numeric annual NDVI raster has invalid actual source length");
+     observations.push({...doc,ndviValues:new Float32Array(
+       bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength))});
+   }
+   seasons.push({year:sourceYear.year,observations});
+ }
+ const product=sdk.terrain.analyzeSentinelMultiYear(seasons,{
+   thresholdNdviPerYear:.04,minCommonPixels:16,minValidPerYear:1
+ });
+ const buffer=floats=>Buffer.from(floats.buffer,
+   floats.byteOffset,floats.byteLength).toString("base64");
+ const report={
+   status:product.status,version:product.version,key:spec.key,
+   month:product.month,years:product.years,source:product.source,
+   area:product.area,grid:product.grid,
+   width:product.width,height:product.height,
+   groundSamplingM:product.groundSamplingM,
+   statistics:product.statistics,qa:product.qa,caveats:product.caveats,
+   slopeF32LE:buffer(product.slopePerYear),
+   loF32LE:buffer(product.sensitivityLow),
+   hiF32LE:buffer(product.sensitivityHigh),
+   robustB64:Buffer.from(product.robustAllYears).toString("base64"),
+   image:"/api/observations/multiyear/0/"+spec.x+"/"+spec.y+"/"+
+     from+"/"+to+"/"+month+".png?cloud="+cloud,
+   terrainElevationUnchanged:true
+ };
+ const json=Buffer.from(JSON.stringify(report)),
+   png=rgbaPng({width:product.width,height:product.height,rgba:product.trendRgba});
+ const nonce="."+process.pid+"-"+Date.now();
+ await writeFile(path+nonce+".png",png);
+ await rename(path+nonce+".png",path+".png");
+ await writeFile(path+nonce+".json",json);
+ await rename(path+nonce+".json",path+".json");
+ console.log("PASS true "+product.statistics.yearCount+"-year seasonal Sentinel "+
+   from+".."+to+": "+product.statistics.commonValidPixels+" common pixels, "+
+   product.statistics.robustAllYearsPixels+" with 2 genuine sources per year, "+
+   "Theil-Sen "+product.statistics.meanSlopeNdviPerYear.toFixed(5)+" NDVI/year");
+ return {json,png};
+}
+function obtainMultiyear(spec,from,to,month,cloud){
+ multiyearArguments(from,to,month,cloud);
+ const key=spec.key+"/"+from+"/"+to+"/"+month+"/"+cloud;
+ if(multiYearTasks.has(key))return multiYearTasks.get(key);
+ if(multiYearTasks.size>=1){
+   const e=Error("One multi-year source analysis already running");
+   e.code="OBSERVATION_BUSY";throw e;
+ }
+ const promise=generateMultiyear(spec,from,to,month,cloud)
+   .finally(()=>multiYearTasks.delete(key));
+ multiYearTasks.set(key,promise);return promise;
+}
+
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -654,6 +779,27 @@ const server=createServer(async(req,res)=>{
       const maxCloud=Number(incoming.searchParams.get("cloud")??"35");
       const catalog=await observationScenes(spec,from,to,maxCloud);
       send(res,200,JSON.stringify(catalog),"application/json; charset=utf-8");return;
+    }
+    const multiScenes=/^\/api\/observations\/multiyear\/scenes\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
+    if(multiScenes){
+      const spec=tileSpec(0,Number(multiScenes[1]),Number(multiScenes[2]));
+      const from=Number(incoming.searchParams.get("from")??"2023");
+      const to=Number(incoming.searchParams.get("to")??"2025");
+      const month=Number(incoming.searchParams.get("month")??"8");
+      const cloud=Number(incoming.searchParams.get("cloud")??"50");
+      const data=await multiyearSceneSelection(spec,from,to,month,cloud);
+      send(res,200,JSON.stringify(data),"application/json; charset=utf-8");return;
+    }
+    const multiResult=/^\/api\/observations\/multiyear\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4})\/([0-9]{4})\/([0-9]{1,2})\.(json|png)$/.exec(pathname);
+    if(multiResult){
+      const spec=tileSpec(0,Number(multiResult[1]),Number(multiResult[2]));
+      const from=Number(multiResult[3]),to=Number(multiResult[4]);
+      const month=Number(multiResult[5]);
+      const cloud=Number(incoming.searchParams.get("cloud")??"50");
+      const data=await obtainMultiyear(spec,from,to,month,cloud);
+      send(res,200,multiResult[6]==="json"?data.json:data.png,
+        multiResult[6]==="json"?"application/json; charset=utf-8":"image/png");
+      return;
     }
     const seasonalScenes=/^\/api\/observations\/seasonal\/scenes\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
     if(seasonalScenes){
@@ -733,7 +879,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
-  console.log("Sentinel-2 analytics: RGB, NDVI, two-date change, 3..6-date time series, and two-year same-month real seasonal median composites.");
+  console.log("Sentinel-2 analytics: actual dated RGB/NDVI, two-date change, three-date series, two-year medians and 3..5-year same-month observational trend with leave-one-year-out sensitivity.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
