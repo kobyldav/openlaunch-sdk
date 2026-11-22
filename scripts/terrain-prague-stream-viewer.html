@@ -1506,6 +1506,21 @@ function validateRegionSource(meta,tile){
        scene.sceneId===scenes[i].scenes[j].sceneId&&
        scene.acquiredAt===scenes[i].scenes[j].acquiredAt)))
    throw Error("3D regionální vrstva neodpovídá zdrojově ověřenému roku, SCL, geometrii nebo scénám");
+ // The source pixel raster must be georeferenced to exactly this measured
+ // Prague overview tile. Reject shifted/rotated grids and AOI substitutions.
+ const b=tile.cell?.bounds,a=meta.area,t=meta.grid?.transform;
+ if(!b||!Array.isArray(a)||a.length!==4||
+   !Array.isArray(t)||t.length!==6||
+   ![...a,...t].every(Number.isFinite)||
+   a.some((v,i)=>Math.abs(v-[b.west,b.south,b.east,b.north][i])>1e-7)||
+   t[2]!==0||t[4]!==0)
+   throw Error("3D regionální vrstva nemá shodnou geografickou hranici zdrojové dlaždice");
+ const mercWest=merc(b.west,b.north),mercEast=merc(b.east,b.south);
+ if(Math.abs(t[0]-mercWest[0])>.25||
+    Math.abs(t[3]-mercWest[1])>.25||
+    Math.abs(t[0]+t[1]*meta.width-mercEast[0])>.25||
+    Math.abs(t[3]+t[5]*meta.height-mercEast[1])>.25)
+   throw Error("3D regionální Sentinel rastr má posunutou EPSG:3857 mřížku");
  // The sampled raster is separately recalculated from actual source bits
  // and checked against the Stage 16 tile summary before uploading to GPU.
  const slopes=binary(meta.slopeF32LE,Float32Array),
@@ -1521,7 +1536,7 @@ async function loadRegionTexture(tile,epoch,controller){
  const id=tile.key,params=regionResult;
  const base="/api/observations/multiyear/0/"+tile.cell.x+"/"+tile.cell.y+"/"+
    params.fromYear+"/"+params.toYear+"/"+params.month+".";
- const cloud=Number($("region-cloud-frozen")?.value??regionPlan.cloud);
+ const cloud=Number(regionPlan?.cloud);
  if(!Number.isFinite(cloud))throw Error("Regionální oblačnost nebyla doložena");
  const suffix="?cloud="+cloud;
  const reply=await fetch(base+"json"+suffix,{signal:controller.signal});
