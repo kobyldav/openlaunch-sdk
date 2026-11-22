@@ -1,0 +1,37 @@
+# Stage 22 64MiB source-ETag COG range A/B, metadata-priority LRU.
+name: Prague Sentinel-2 original COG 206 Range cache A/B (Stage 22)
+on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+    paths:
+      - .github/workflows/terrain-prague-stage22-range-ab.yml
+  workflow_dispatch:
+jobs:
+  original-byte-range:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Validate ETag-pinned COG byte-range identity, changing objects, missing validators and LZW pixels
+        run: node --test tests/terrain-cog-range-cache.test.mjs tests/utm-cog.test.mjs tests/lzw-geotiff.test.mjs
+      - name: Original 4x4 cold COG 206 network A/B, zero vs 64MiB, strict identical Sentinel sources
+        timeout-minutes: 35
+        run: node scripts/terrain-prague-region-range-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --timeout-ms 1000000 --output test-results/terrain-prague-stage22-ab-report.json
+      - name: Upload original COG HTTP 206 request and transferred-byte evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prague-real-sentinel-stage22-cog-range-ab
+          path: |
+            test-results/terrain-prague-stage22-ab-report.json
+            test-results/terrain-prague-stage22-range-ab-cache/no-range-cache/source-audit.json
+            test-results/terrain-prague-stage22-range-ab-cache/strong-etag-64mib/source-audit.json
+          if-no-files-found: warn
+          retention-days: 14

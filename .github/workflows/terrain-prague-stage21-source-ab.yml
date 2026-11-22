@@ -1,0 +1,36 @@
+name: Prague Sentinel-2 original COG cold-load A/B (Stage 21)
+on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+    paths:
+      - .github/workflows/terrain-prague-stage21-source-ab.yml
+  workflow_dispatch:
+jobs:
+  original-source-ab:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Validate bounded two-original-scene concurrency without changing scientific sample order
+        run: node --test tests/terrain-sentinel-source-pair.test.mjs
+      - name: Cold-source ORIGINAL Sentinel 4x4, serial vs concurrent original acquisitions, isolated caches
+        timeout-minutes: 35
+        run: node scripts/terrain-prague-region-source-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --timeout-ms 1000000 --output test-results/terrain-prague-stage21-ab-report.json
+      - name: Preserve genuine cold COG A/B evidence, including scientifically different/failing results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prague-original-sentinel-cold-source-stage21-ab
+          path: |
+            test-results/terrain-prague-stage21-ab-report.json
+            test-results/terrain-prague-stage21-ab-cache/cold-serial/benchmark.json
+            test-results/terrain-prague-stage21-ab-cache/cold-bounded-dual-original-acquisitions/benchmark.json
+          if-no-files-found: warn
+          retention-days: 14

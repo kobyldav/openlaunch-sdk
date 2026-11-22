@@ -1,4 +1,5 @@
 import { decodeTiffLzw } from "./tiff-lzw.js";
+import {isStrongCogEtag,type CogRangeCache} from "./cog-range-cache.js";
 import type { AreaOfInterest } from "../geo/types.js";
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import {
@@ -6,7 +7,7 @@ import {
   validateRaster, worldToPixel,
 } from "./raster.js";
 import {
-  inflateDeflate, readCrs, readSample, readTransform, TiffDirectory,
+  inflateDeflate, readCrs, readSample, readTransform, undoFloatPredictor, TiffDirectory,
   undoHorizontalPredictor,
 } from "./geotiff.js";
 
@@ -22,6 +23,8 @@ export interface CogReadOptions {
   maxBlocks?: number;
   /** Bound each compressed or expanded tile; default 16 MiB. */
   maxBlockBytes?: number;
+  /** Optional shared, bounded cache of exact strong-ETag-verified source bytes. */
+  rangeCache?: CogRangeCache;
 }
 export interface CogReadResult {
   raster: RasterGrid;
@@ -66,14 +69,39 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   let metadataBytesRead=0,tileBytesRead=0,totalSourceBytes=0;
+  // Pin a strong original ETag within ONE TIFF read even if its shared
+  // range cache is disabled or adaptively reduced to 0 MiB.
+  let sourceEtag:string|null=null;
   try {
     const fetchRange=async(start:number,length:number):Promise<Uint8Array>=>{
       if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(length)||length<1||length>maxBlockBytes)
         throw new RangeError("Invalid or oversized HTTP TIFF byte range");
+      const sourceUrl=parsed.toString();
+      const hit=options.rangeCache?.get(sourceUrl,start,length);
+      if(hit){
+        if(totalSourceBytes&&hit.total!==totalSourceBytes)
+          throw new RangeError("Cached COG source length differs from previously validated TIFF data");
+        if(sourceEtag&&sourceEtag!==hit.etag)
+          throw new RangeError("Original COG strong ETag changed between cached TIFF ranges");
+        sourceEtag=hit.etag;
+        totalSourceBytes=hit.total;
+        return hit.bytes;
+      }
       const end=start+length-1;
-      const response=await fetchImpl(parsed.toString(),{
-        method:"GET",redirect:"error",signal:controller.signal,
-        headers:{Range:`bytes=${start}-${end}`,Accept:"application/octet-stream,image/tiff;q=0.9"},
+      // If-Range with a STRONG source validator guarantees that a later
+      // version cannot be combined with bytes from the previously cached one.
+      // A source change normally yields HTTP 200, which fails closed below.
+      const pinned=options.rangeCache?.validatorFor(sourceUrl)??null;
+      if(sourceEtag&&pinned&&sourceEtag!==pinned)
+        throw new RangeError("Original COG strong ETag differs from verified shared cache source");
+      const requiredEtag=sourceEtag??pinned;
+      const headers:Record<string,string>={
+        Range:`bytes=${start}-${end}`,
+        Accept:"application/octet-stream,image/tiff;q=0.9"
+      };
+      if(requiredEtag)headers["If-Range"]=requiredEtag;
+      const response=await fetchImpl(sourceUrl,{
+        method:"GET",redirect:"error",signal:controller.signal,headers,
       });
       if(response.status!==206)throw new RangeError("Remote COG requires HTTP 206 Partial Content; server ignored Range request");
       const header=response.headers.get("content-range");
@@ -88,7 +116,13 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       const declared=response.headers.get("content-length");
       if(declared!==null && Number(declared)>length)throw new RangeError("COG range exceeds requested length");
       const bytes=new Uint8Array(await response.arrayBuffer());
-      if(bytes.length!==last-first+1||bytes.length>length)throw new RangeError("Incorrect HTTP COG ranged response length");
+      if(bytes.length!==last-first+1||bytes.length>length)
+        throw new RangeError("Incorrect HTTP COG ranged response length");
+      const etag=response.headers.get("etag");
+      if(requiredEtag&&etag!==requiredEtag)
+        throw new RangeError("Original COG strong ETag changed between HTTP TIFF ranges");
+      if(!sourceEtag&&isStrongCogEtag(etag))sourceEtag=etag;
+      options.rangeCache?.accept(sourceUrl,start,length,bytes,total,etag);
       return bytes;
     };
 
@@ -122,8 +156,8 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
     if(![8,16,32,64].includes(bps)||
       !([1,2].includes(format)&&[8,16,32].includes(bps)||format===3&&[32,64].includes(bps)))
       throw new RangeError("Unsupported COG sample format");
-    if(![1,5,8,32946].includes(compression)||![1,2].includes(predictor)||
-      (format===3&&predictor===2))throw new RangeError("Unsupported COG compression/predictor");
+    if(![1,5,8,32946].includes(compression)||![1,2,3].includes(predictor)||
+      (format===3&&predictor===2)||(predictor===3&&format!==3))throw new RangeError("Unsupported COG compression/predictor");
     const crs=readCrs(tiff),transform=readTransform(tiff);
     const blockWidth=tiff.scalar(322,width),blockHeight=tiff.scalar(323,tiff.scalar(278,height));
     const tiled=tiff.numbers(322)!==undefined;
@@ -168,6 +202,7 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
         if(inflated.length!==expected)throw new RangeError("COG tile decompressed size mismatch");
         const raw=new Uint8Array(inflated);
         if(predictor===2)undoHorizontalPredictor(raw,blockWidth,decodedHeight,bps,tiff!.littleEndian);
+        if(predictor===3)undoFloatPredictor(raw,blockWidth,decodedHeight,bps,tiff!.littleEndian);
         const view=new DataView(raw.buffer,raw.byteOffset,raw.byteLength);
         const cx0=Math.max(c0,bx*blockWidth),cx1=Math.min(c1,(bx+1)*blockWidth,width);
         const ry0=Math.max(r0,by*blockHeight),ry1=Math.min(r1,(by+1)*blockHeight,height);

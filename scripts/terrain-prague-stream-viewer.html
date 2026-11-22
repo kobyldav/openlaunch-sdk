@@ -1,0 +1,2355 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OpenLaunch SDK · Praha 3D · streamované ČÚZK dlaždice</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#0d1a29;color:#eaf3fa;font:14px system-ui,Arial,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 20px;background:#112b40;border-bottom:1px solid #365570;flex-wrap:wrap}
+h1{font-size:18px;margin:0}main{max-width:1600px;margin:auto;padding:12px}
+.toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:10px}
+button{background:#204764;border:1px solid #5b7890;color:white;border-radius:7px;padding:8px 12px;cursor:pointer}
+button:hover{background:#346382}
+input[type=range]{accent-color:#66b3ec;vertical-align:middle}
+input[type=date],input[type=number],select{background:#193952;color:#eaf3fa;border:1px solid #628099;border-radius:6px;padding:6px}
+.observations{border:1px solid #365570;border-radius:10px;background:#132b3e;
+ padding:11px 13px;margin:0 0 10px}
+.observations .toolbar{margin:8px 0;gap:10px}
+.observations .small{margin:5px 0}
+.observations strong{color:#b8f2de}
+#obs-scene{max-width:min(360px,90vw)}
+#obs-note{color:#ccebdc}
+.trend-scenes{display:flex;gap:9px;align-items:center;flex-wrap:wrap;max-height:145px;
+ overflow:auto;margin:7px 0;padding:8px;border:1px solid #365570;border-radius:7px}
+.trend-scenes label{display:inline-flex;gap:5px;align-items:center;white-space:nowrap;
+ border:1px solid #35556d;padding:5px 8px;border-radius:6px;background:#14344a}
+#trend-chart{display:block;max-width:100%;height:165px;background:#0c2335;border-radius:7px;
+ margin-top:9px}
+label{white-space:nowrap}
+#map{width:100%;height:min(77vh,850px);min-height:380px;display:block;border-radius:12px;background:#112a43;touch-action:none;cursor:grab}
+#map:active{cursor:grabbing}
+.small{font-size:12px;line-height:1.5;color:#b2c9dc}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px;margin-top:10px}
+.stats>div{background:#142c41;border:1px solid #31506a;padding:12px;border-radius:9px}
+.stats strong{display:block;font-size:18px;color:#a8e1d5;font-variant-numeric:tabular-nums}
+#error{color:#ffae9e;min-height:1.4em}
+.map-wrap{position:relative}
+.map-pin{position:absolute;pointer-events:none;transform:translate(-50%,-100%);display:none;
+ font-weight:700;font-size:12px;background:#082739d9;border:2px solid #7de4e2;
+ border-radius:20px;padding:4px 8px;color:#fff;box-shadow:0 2px 8px #000}
+.map-pin.b{border-color:#f5bb83}
+#measurement{margin:12px 0;padding:14px;border:1px solid #365570;border-radius:9px;background:#132b3e}
+#measurement[hidden]{display:none}
+.measure-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+.measure-grid>div{line-height:1.8}
+#height-profile{width:100%;max-width:850px;height:170px;background:#0b2033;border-radius:8px;margin-top:10px}
+a{color:#9cd1fc}
+
+#region-coverage{width:100%;max-width:760px;height:auto;background:#0c2335;border:1px solid #385872;border-radius:9px;display:block;margin:8px 0}
+#region-status{color:#c9e9ea}
+#region-detail{font-size:12px;color:#adcde0;line-height:1.65}
+</style>
+</head>
+<body>
+<header>
+  <h1>OpenLaunch SDK · Praha 3D <small style="color:#91d5be">streamované reálné dlaždice</small></h1>
+  <span class="small">© ČÚZK · DMP OK + Ortofoto ČR · CC BY 4.0</span>
+</header>
+<main>
+ <div class="toolbar">
+  <button id="reset">Střed Prahy</button>
+  <button id="detail">Detail: automaticky</button>
+  <button id="buildings">Budovy: zapnuto</button>
+  <label>Výškové zvětšení <input id="vertical" type="range" min="1" max="5" step=".25" value="1"> <b id="verticalValue">1×</b></label>
+  <label><input id="inspect-mode" type="checkbox"> Měřit skutečný terén</label>
+  <button id="clear-inspect" disabled>Vymazat body</button>
+  <button id="export-profile" disabled>Profil CSV</button>
+  <span id="status" class="small">Připravuji mapu…</span>
+ </div>
+ <section class="observations" aria-label="Družicová pozorování nad 3D terénem">
+  <strong>Earth Intelligence · skutečné scény Sentinel-2 nad 3D Prahou</strong>
+  <div class="toolbar">
+   <label>Od <input id="obs-from" type="date" value="2025-08-01"></label>
+   <label>Do <input id="obs-to" type="date" value="2025-08-31"></label>
+   <label>Max. oblačnost scény <input id="obs-cloud" type="number" min="0" max="100" value="35" style="width:64px"> %</label>
+   <button id="obs-search">Najít scény pro střed mapy</button>
+   <select id="obs-scene" aria-label="Skutečná scéna Sentinel-2" disabled><option>Nejprve vyhledej scény</option></select>
+   <button id="obs-load" disabled>Načíst RGB + NDVI</button>
+   <label>Vrstva <select id="obs-mode">
+    <option value="ortho">ČÚZK ortofoto (základ)</option>
+    <option value="rgb">Sentinel-2 RGB</option>
+    <option value="ndvi">Sentinel-2 NDVI</option>
+    <option value="change">ΔNDVI – změna mezi dvěma snímky</option>
+    <option value="trend">Trend NDVI – 3 až 6 snímků</option>
+    <option value="seasonal">Meziroční ΔNDVI – stejný měsíc</option>
+    <option value="multiyear">Víceletý NDVI trend · stejná sezóna</option>
+    <option value="region">Regionální NDVI trend · více 3D dlaždic</option>
+   </select></label>
+  </div>
+  <div class="toolbar" aria-label="Časové porovnání NDVI">
+   <label>Starší snímek <select id="compare-before" disabled><option>Nejprve vyhledej scény</option></select></label>
+   <span class="small">Novější snímek = výběr scény v horním řádku</span>
+   <button id="compare-load" disabled>Porovnat ΔNDVI</button>
+   <button id="compare-export" disabled>Export ΔNDVI CSV</button>
+  </div>
+  <div class="small" id="compare-summary" aria-live="polite">ΔNDVI = novější NDVI − starší NDVI. Zobrazují se jen pixely platné v obou snímcích. Zelená = nárůst o 0,15 nebo více, červená = pokles o 0,15 nebo více, šedá = menší změna. Nejde o důkaz kácení nebo výstavby.</div>
+  <div aria-label="Časová řada NDVI">
+    <strong>Časová řada NDVI · 3 až 6 skutečných scén</strong>
+    <div class="small">Vyber skutečná data ze společného období. Graf používá jen pixely platné ve všech scénách. Theil–Sen je popisné tempo NDVI za 30 dní, nikoli předpověď nebo dlouhodobá diagnóza.</div>
+    <div id="trend-scenes" class="trend-scenes"><span class="small">Nejprve vyhledej scény.</span></div>
+    <div class="toolbar">
+      <button id="trend-load" disabled>Vypočítat trend a zobrazit v 3D</button>
+      <button id="trend-export" disabled>Export trendu CSV</button>
+      <span id="trend-summary" class="small" aria-live="polite">Zatím bez analýzy.</span>
+    </div>
+    <canvas id="trend-chart" width="900" height="165" aria-label="Skutečná časová řada průměrného NDVI společné pixelové oblasti"></canvas>
+    <p class="small">Trend: zelená = rostoucí NDVI, červená = klesající, šedá = menší tempo změny. Výrazný trend může být způsoben sezónností nebo jinými podmínkami snímkování.</p>
+  </div>
+  <div aria-label="Meziroční analýza Sentinel NDVI">
+    <strong>Meziroční vegetace · stejný kalendářní měsíc</strong>
+    <div class="small">Pro dva roky se vyberou dvě skutečné nezávislé scény v témže měsíci. NDVI se pro každý pixel vypočte z reálně dostupných měření; oblačné pixely se nedoplňují.</div>
+    <div class="toolbar">
+      <label>Rok před <input id="season-before" type="number" min="2017" max="2100" step="1" value="2024" style="width:88px"></label>
+      <label>Rok po <input id="season-after" type="number" min="2017" max="2100" step="1" value="2025" style="width:88px"></label>
+      <label>Měsíc <select id="season-month">
+        <option value="5">Květen</option><option value="6">Červen</option><option value="7">Červenec</option><option value="8" selected>Srpen</option><option value="9">Září</option>
+      </select></label>
+      <label>Max. oblačnost scény <input id="season-cloud" type="number" min="0" max="100" value="50" style="width:62px"> %</label>
+      <button id="season-search">Najít skutečné scény pro oba roky</button>
+      <button id="season-load" disabled>Porovnat sezónní NDVI</button>
+      <button id="season-export" disabled>Export meziročního CSV</button>
+    </div>
+    <p id="season-scenes" class="small">Zatím nejsou vybrané žádné původní družicové scény.</p>
+    <p id="season-summary" class="small" aria-live="polite">Výsledek bude ΔNDVI (novější rok − starší rok), s počtem platných pixelů, počtem opakovaných měření a varováním při nízkém pokrytí.</p>
+    <p class="small">Zelená = vyšší NDVI, červená = nižší NDVI, šedá = menší rozdíl než ±0,15. Nejde o statistický důkaz změny využití krajiny. I stejný měsíc se může v počasí a vegetační fázi mezi roky lišit.</p>
+  </div>
+  <div aria-label="Víceleté sledování skutečného Sentinel-2 NDVI">
+    <strong>Víceletá analýza · 3–5 stejných sezón</strong>
+    <div class="small">Dvě datovaná pozorování Sentinel-2 za rok; společná maska oblačnosti všech let, roční mediány a robustní tempo NDVI za rok. Rozsah při vynechání jednotlivého roku ukazuje citlivost výsledku, nikoli interval statistické spolehlivosti.</div>
+    <div class="toolbar">
+      <label>Od roku <input id="multi-from" type="number" min="2017" max="2100" value="2023" style="width:78px"></label>
+      <label>Do roku <input id="multi-to" type="number" min="2017" max="2100" value="2025" style="width:78px"></label>
+      <label>Stejný měsíc <select id="multi-month">
+        <option value="5">Květen</option><option value="6">Červen</option><option value="7">Červenec</option><option value="8" selected>Srpen</option><option value="9">Září</option>
+      </select></label>
+      <label>Max. oblačnost scény <input id="multi-cloud" type="number" min="0" max="100" value="50" style="width:62px"> %</label>
+      <button id="multi-search">Najít meziroční pozorování</button>
+      <button id="multi-load" disabled>Vypočítat víceletý trend</button>
+      <button id="multi-export" disabled>Export trendu a citlivosti CSV</button>
+    </div>
+    <p id="multi-scenes" class="small">Zatím nejsou ověřené zdrojové scény pro všechny roky.</p>
+    <p id="multi-summary" class="small" aria-live="polite">U výsledku zobrazím skutečné pokrytí, podíl pixelů se dvěma měřeními za každý rok a citlivost na vynechání roku.</p>
+    <canvas id="multi-chart" width="900" height="165" aria-label="Roční mediány Sentinel NDVI na skutečně společných geografických pixelech" style="max-width:100%;height:165px;background:#0c2335;border-radius:7px"></canvas>
+    <p class="small">Barvy: zelená růst NDVI ≥0,04 za rok, červená pokles ≤−0,04 za rok, šedá menší změna. Jde o ilustrační prahovou hodnotu. Nižší průhlednost znamená jen jedno platné měření v některém roce.</p>
+  </div>
+  <div aria-label="Regionální víceroční analýza Sentinel-2">
+    <strong>Regionální pokrytí NDVI · více skutečných dlaždic</strong>
+    <p class="small">Prověří 2×2 až 4×4 sousedních přibližně 0,7km dlaždic kolem středu kamery. V celém regionu se zamknou společné termíny družicových scén; každá dlaždice dál samostatně ověřuje masky SCL a trend. Výsledky přicházejí průběžně; zůstávají jen malé souhrny, ne všechny rastry v paměti.</p>
+    <div class="toolbar">
+      <label>Území <select id="region-size">
+        <option value="2" selected>2×2 dlaždice (přibližně 1,4 km)</option>
+        <option value="3">3×3 dlaždice (přibližně 2,1 km)</option>
+        <option value="4">4×4 dlaždice (přibližně 2,8 km)</option>
+      </select></label>
+      <button id="region-start">Prověřit skutečné regionální pokrytí</button>
+      <button id="region-stop" disabled>Zastavit</button>
+      <button id="region-export" disabled>Pokrytí CSV</button>
+      <button id="region-geojson" disabled>Pokrytí GeoJSON</button>
+      <button id="region-seam-export" disabled>Kontrola hranic CSV</button>
+      <button id="region-quality-export" disabled>Měření provozu JSON</button>
+      <button id="region-3d" disabled>Zobrazit regionální trend ve 3D</button>
+    </div>
+    <p id="region-quality" class="small" aria-live="polite">Etapa 20: během skutečné analýzy měřím čas, RAM procesu Node a cache. Paměť GPU prohlížeče se neměří. Nedoložené oblasti se nezapočítávají do celoregionálního pokrytí pixelů.</p>
+    <p id="region-source-status" class="small" aria-live="polite">Etapa 19: před výpočtem regionu vyberu stejné dvě původní scény Sentinel-2 pro každý rok a všechny dlaždice. Pokud společné zdroje chybí, výpočet nepoužije náhradní snímky.</p>
+    <p id="region-seam-note" class="small" aria-live="polite">Hranice dlaždic: zatím bez porovnání původních pixelů. Oranžové hranice znamenají nesrovnatelná měření nebo výraznější rozdíl mezi sousedními pixelovými středy – nikoli automaticky chybu terénu.</p>
+    <p id="region-3d-status" class="small" aria-live="polite">3D vrstva: vypnutá. Po dokončení skutečné regionální analýzy lze promítnout ověřené pixely na původní ČÚZK terén. Načítají se jen právě potřebné textury (nejvýše 6 v GPU).</p>
+    <p id="region-status" class="small" aria-live="polite">Použije roky, měsíc a limit oblačnosti ze sekce víceleté analýzy výše.</p>
+    <canvas id="region-coverage" width="760" height="400" role="img" aria-label="Geografická mapa platného pokrytí dlaždic Sentinel-2 od severu k jihu"></canvas>
+    <div id="region-detail">Zelená = podíl platných pixelů ve všech letech uvnitř ověřené dlaždice; šedá = chybí úplná datová řada; oranžová = chyba zdroje. Číslo není statistická spolehlivost. Regionální průměr zahrnuje pouze skutečně doložené pixely a neúplné území není považováno za prozkoumané.</div>
+  </div>
+  <p id="obs-note" class="small">Vyber výřez pohybem kamery a klikni na „Najít scény“. Stahuje se pouze jedna dlaždice (~0,7 km), nikoli celá Praha. Sentinel-2 má 10m spektrální rozlišení.</p>
+  <p class="small">NDVI: tmavě zelená = vyšší vegetační aktivita, béžová = nižší, modrá = záporné hodnoty.
+   Datum odpovídá skutečné scéně Sentinel-2 L2A. Oblaka, stíny a neplatné pixely jsou průhledné – pod nimi zůstává ortofoto ČÚZK.
+   Výšky a měření A/B se nemění. © Copernicus Sentinel data, zprostředkováno Element84 Earth Search.</p>
+ </section>
+ <div class="map-wrap">
+  <canvas id="map" aria-label="3D interaktivní mapa Prahy načítaná po dlaždicích"></canvas>
+  <span class="map-pin" id="pinA">A</span>
+  <span class="map-pin b" id="pinB">B</span>
+ </div>
+ <section id="measurement" hidden>
+  <strong>Výšky ČÚZK DMP OK (Bpv) · původní změřené trojúhelníky</strong>
+  <div class="measure-grid">
+   <div id="pointA">A: klikni na terén pro první bod.</div>
+   <div id="pointB">B: vyber druhý bod.</div>
+   <div id="measure-distance">Vzdálenost: —</div>
+  </div>
+  <canvas id="height-profile" width="850" height="170" aria-label="Výškový profil ze skutečného DEM"></canvas>
+  <p class="small" id="measure-note">Klikni bez táhnutí na dva body. Chybějící dlaždice nejsou doplňovány umělými výškami. Výšky jsou Bpv; délky jsou orientační lokální metry.</p>
+ </section>
+ <div class="stats">
+  <div>Viditelné dlaždice<strong id="visible">0</strong></div>
+  <div>Načtené v paměti<strong id="resident">0</strong></div>
+  <div>Rozpracované požadavky<strong id="pending">0</strong></div>
+  <div>Zobrazené trojúhelníky<strong id="faces">0</strong></div>
+  <div>3D budovy<strong id="building-count">0</strong></div>
+  <div>Vzdálenost kamery<strong id="distance">—</strong></div>
+ </div>
+ <p class="small">Levé tlačítko / jeden prst: otáčení · pravé tlačítko nebo Shift + tah: posunutí mapy · kolečko / dva prsty: přiblížení · šipky / WASD: posun. Při přiblížení se automaticky stahuje skutečný jemnější výškový model, vzdálené dlaždice se vykreslují hruběji. Server uchovává stažené dlaždice na disku; GPU paměť má omezenou LRU cache.</p>
+ <p class="small" id="building-status">Budovy: OSM půdorysy (ODbL), ČÚZK DMR 5G základ, OSM výšky nebo odhad střechy z ČÚZK DMP OK. Plochá střecha je vizuální LOD1 aproximace. Střešní textura je skutečné ortofoto ČÚZK.</p>
+ <p class="small" id="source">Výšky: ČÚZK DMP OK, Bpv. Barvy: ČÚZK Ortofoto ČR. Nejpodrobnější geometrie 2 m, textura 0,5 m. Žádné rekonstruované fasády.</p>
+ <p id="error" aria-live="polite"></p>
+</main>
+<script src="/api/visibility.js"></script>
+<script src="/api/inspect.js"></script>
+<script>
+"use strict";
+const $=id=>document.getElementById(id),canvas=$("map");
+let config,gl,program,attrs,uni,planner,needsDraw=false,graphicsEpoch=0;
+let selection={coarse:[],finer:[],detailActive:false};
+const transitions=new Map();
+let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
+let buildingsEnabled=true;
+let observationTile=null,observationActive=null,observationRequest=null;
+let comparisonData=null,trendData=null,trendSceneIds=[];
+let seasonalSelection=null,seasonalData=null;
+let multiSelection=null,multiData=null;
+let regionRun=null,regionResult=null,regionPlan=null;
+// Six individually source-verified GPU textures, never a whole-region mosaic.
+const MAX_REGION_GPU=6,regionGpu=new Map(),regionFailed=new Map();
+let regionTextureLoading=null,regionEpoch=0;
+const regionTiles=new Map();
+let regionSeams=[];
+let observationEpoch=0;
+const observationCatalog=new Map();
+const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
+const buildingCache=new Map(),buildingPending=new Map(),buildingFailed=new Map();
+let yaw=-.6,pitch=.78,distance=1550,panX=0,panNorth=0,vertical=1,enableDetail=true;
+const BASE_HEIGHT=180,cache=new Map(),queue=[],pending=new Set(),controllers=new Map();
+const MAX_REQUESTS=3,MAX_GPU_TILES=40,MAX_BUILDING_GPU=8;
+const failed=new Map();
+let active=0;
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const vlen=v=>Math.hypot(...v)||1;
+const vnorm=v=>v.map(x=>x/vlen(v));
+const vcross=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+const vdot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
+function merc(lon,lat){
+ const r=6378137;return [r*lon*Math.PI/180,r*Math.log(Math.tan(Math.PI/4+lat*Math.PI/360))];
+}
+function boundsFor(z,x,y){
+ const r=config.bounds,lv=config.levels[z],n=lv.cols,m=lv.rows;
+ return [r[0]+(r[2]-r[0])*x/n,r[3]-(r[3]-r[1])*(y+1)/m,
+   r[0]+(r[2]-r[0])*(x+1)/n,r[3]-(r[3]-r[1])*y/m];
+}
+function worldFor(lon,lat){
+ const c=merc(config.center[0],config.center[1]),p=merc(lon,lat);
+ const factor=Math.cos(config.centerLatitudeDeg*Math.PI/180);
+ return [(p[0]-c[0])*factor,(p[1]-c[1])*factor];
+}
+function tileCenter(z,x,y){
+ const b=boundsFor(z,x,y);return worldFor((b[0]+b[2])/2,(b[1]+b[3])/2);
+}
+function nearTile(z,x,y){
+ const p=tileCenter(z,x,y);return Math.hypot(p[0]-panX,p[1]-panNorth);
+}
+function tileKey(z,x,y){return z+"-"+x+"-"+y;}
+function choose(){
+ const aspect=Math.max(.5,(canvas.clientWidth||900)/(canvas.clientHeight||600));
+ return planner.choose({yaw,pitch,distance,panX,panNorth,vertical,aspect,enableDetail});
+}
+function childIds(parent){
+ const children=[];
+ for(let dy=0;dy<2;dy++)for(let dx=0;dx<2;dx++)
+   children.push(tileKey(1,parent.x*2+dx,parent.y*2+dy));
+ return children;
+}
+function lerpFade(parent,target,now){
+ const state=transitions.get(parent)||{value:0,last:now};
+ const dt=clamp((now-state.last)/480,0,1);
+ const value=target>state.value?Math.min(target,state.value+dt):
+   Math.max(target,state.value-dt);
+ transitions.set(parent,{value,last:now});
+ return value;
+}
+
+function scheduleFetch(tile){
+ if(cache.has(tile.key)||pending.has(tile.key)||queue.some(q=>q.key===tile.key)||
+    (failed.get(tile.key)??0)>Date.now())return;
+ queue.push(tile);
+}
+function pump(){
+ if(!gl)return;
+ while(active<MAX_REQUESTS&&queue.length){
+   const tile=queue.shift();
+   if(cache.has(tile.key)||pending.has(tile.key))continue;
+   active++;pending.add(tile.key);
+   const controller=new AbortController();
+   controllers.set(tile.key,controller);
+   const epoch=graphicsEpoch;
+   const meshUrl="/api/tiles/"+tile.z+"/"+tile.x+"/"+tile.y+".json";
+   (async()=>{
+     const reply=await fetch(meshUrl,{signal:controller.signal});
+     if(!reply.ok)throw Error((await reply.text()).slice(0,350));
+     const data=await reply.json();
+     if(data.status!=="real-data"||data.key!==tile.key||
+        data.verticalDatum!=="Bpv (Baltic 1957)")throw Error("Invalid real tile provenance: "+tile.key);
+     const textureReply=await fetch(data.texture.file,{signal:controller.signal});
+     if(!textureReply.ok)throw Error("Orthophoto unavailable for "+tile.key);
+     const blob=await textureReply.blob();
+     if(epoch!==graphicsEpoch||!gl||controller.signal.aborted)return; // obsolete camera or context
+     const bitmap=await createImageBitmap(blob);
+     try{
+       if(epoch!==graphicsEpoch||!gl||controller.signal.aborted)return;
+       const gpu=createGpuTile(data,bitmap);
+       cache.set(tile.key,{...gpu,meta:data,lastUsed:Date.now()});
+     }finally{bitmap.close?.();}
+     $("error").textContent="";
+   })().catch(err=>{
+     if(epoch!==graphicsEpoch||controller.signal.aborted||err?.name==="AbortError")return;
+     failed.set(tile.key,Date.now()+30_000);
+     console.error(tile.key,err);
+     $("error").textContent="Dlaždice "+tile.key+": "+String(err.message||err)+
+       " · Dříve načtené dlaždice zůstávají viditelné.";
+     // Failed tiles remain eligible for explicit movement/reload rather than inventing a replacement.
+   }).finally(()=>{active--;pending.delete(tile.key);
+     if(controllers.get(tile.key)===controller)controllers.delete(tile.key);
+     update();pump();});
+ }
+ $("pending").textContent=String(active+queue.length);
+}
+function binary(base64,Type){
+ const raw=atob(base64),bytes=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)bytes[i]=raw.charCodeAt(i);
+ if(bytes.byteLength%Type.BYTES_PER_ELEMENT)throw Error("Corrupt tile binary");
+ return new Type(bytes.buffer);
+}
+function makeBuffer(data,target){
+ const buf=gl.createBuffer();gl.bindBuffer(target,buf);gl.bufferData(target,data,gl.STATIC_DRAW);return buf;
+}
+function createGpuTile(d,bitmap){
+ if(d.validVertices<=0||d.width*d.height>50000||d.texture.width>1024||
+    bitmap.width!==d.texture.width||bitmap.height!==d.texture.height)throw Error("Invalid tile dimensions");
+ const local=binary(d.positionsF32LE,Float32Array),
+   uv=binary(d.uvsF32LE,Float32Array),
+   indices=binary(d.trianglesU16LE,Uint16Array);
+ if(d.seam?.version!==2||d.renderVertices<d.width*d.height||
+    local.length!==d.renderVertices*3||uv.length!==d.renderVertices*2||
+    indices.length!==d.triangles*3)
+   throw Error("Malformed versioned edge-apron tile geometry");
+ const pos=new Float32Array(local.length);
+ for(let i=0;i<local.length/3;i++){
+   const j=i*3;
+   pos[j]=local[j]+d.originMeters[0];
+   pos[j+1]=local[j+1]+d.originMeters[1];
+   pos[j+2]=Number.isFinite(local[j+2])?local[j+2]:BASE_HEIGHT;
+ }
+ // All triangle indices originate in the measured SDK mesh; NoData is never drawn.
+ if(indices.some(i=>i>=d.renderVertices))throw Error("Tile triangle index out of range");
+ const positions=makeBuffer(pos,gl.ARRAY_BUFFER),uvs=makeBuffer(uv,gl.ARRAY_BUFFER);
+ const faces=makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER);
+ const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ // CPU arrays retain only source elevations, independent of GPU color and skirts.
+ const inspectorPositions=new Float32Array(pos);
+ for(let i=0;i<local.length/3;i++)if(!Number.isFinite(local[i*3+2]))
+   inspectorPositions[i*3+2]=NaN;
+ return {positions,uvs,faces,texture,count:indices.length,
+   inspect:{id:d.key,positions:inspectorPositions,indices,
+     measuredTriangles:d.measuredTriangles,width:d.width,height:d.height}};
+}
+function makeBuildingGpu(d){
+ if(d.status!=="real-source-buildings"||d.verticalDatum!=="Bpv (Baltic 1957)"||
+    d.roofGeometry!=="flat-LOD1-visual-proxy"||d.buildings>350||
+    !Number.isInteger(d.renderVertices)||d.renderVertices<0||d.renderVertices>=65536)
+   throw Error("Building provenance or limits invalid");
+ const positions=binary(d.positionsF32LE,Float32Array),
+   uv=binary(d.uvsF32LE,Float32Array),
+   indices=binary(d.trianglesU16LE,Uint16Array);
+ if(d.roofTexture!=="real-ČÚZK-ortofoto-reprojected"||
+    !Number.isInteger(d.wallTriangles)||!Number.isInteger(d.roofTriangles)||
+    d.wallTriangles+d.roofTriangles!==d.triangles||
+    positions.length!==d.renderVertices*3||uv.length!==d.renderVertices*2||
+    indices.length!==d.triangles*3||positions.some(n=>!Number.isFinite(n))||
+    uv.some(n=>!Number.isFinite(n)||Math.abs(n)>2)||
+    indices.some(id=>id>=d.renderVertices))
+    throw Error("Invalid textured building mesh");
+ if(indices.length===0)return {count:0,buildings:0,lastUsed:Date.now()};
+ const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,
+   new Uint8Array([166,186,190,255]));
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+ return {positions:makeBuffer(positions,gl.ARRAY_BUFFER),
+   uvs:makeBuffer(uv,gl.ARRAY_BUFFER),
+   faces:makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER),
+   texture,count:indices.length,wallCount:d.wallTriangles*3,
+   roofCount:d.roofTriangles*3,buildings:d.buildings,lastUsed:Date.now()};
+}
+function updateBuildings(){
+ if(!gl||!config)return;
+ const needed=new Set();
+ if(buildingsEnabled&&selection.detailActive)
+   for(const tile of selection.finer)
+     if(tile.parent&&cache.has(tile.parent))needed.add(tile.parent);
+ for(const [id,controller] of buildingPending)
+   if(!needed.has(id))controller.abort();
+ if(buildingCache.size>MAX_BUILDING_GPU){
+   for(const [id,t] of [...buildingCache].filter(([id])=>!needed.has(id))
+     .sort((a,b)=>a[1].lastUsed-b[1].lastUsed)){
+     if(buildingCache.size<=MAX_BUILDING_GPU)break;
+     if(t.positions)dispose(t);buildingCache.delete(id);
+   }
+ }
+ for(const id of needed){
+   if(buildingCache.has(id)||buildingPending.has(id)||buildingPending.size>=2||
+     (buildingFailed.get(id)??0)>Date.now())continue;
+   const [z,x,y]=id.split("-").map(Number);
+   if(z!==0)continue;
+   const controller=new AbortController(),epoch=graphicsEpoch;
+   buildingPending.set(id,controller);
+   (async()=>{
+     const response=await fetch("/api/buildings/0/"+x+"/"+y+".json",{signal:controller.signal});
+     if(!response.ok)throw Error((await response.text()).slice(0,180));
+     const data=await response.json();
+     if(data.key!==id||epoch!==graphicsEpoch||controller.signal.aborted||!gl)return;
+     buildingCache.set(id,makeBuildingGpu(data));
+     $("building-status").textContent="Budovy "+id+": "+data.buildings+
+       " půdorysů; OSM výška "+data.heightMethods.explicitOsmHeight+
+       ", odvozená z ČÚZK "+data.heightMethods.estimatedDsmMinusDmr+
+       ". Střechy jsou pouze přibližné ploché LOD1.";
+   })().catch(error=>{
+     if(controller.signal.aborted||epoch!==graphicsEpoch||error?.name==="AbortError")return;
+     buildingFailed.set(id,Date.now()+90000);
+     $("building-status").textContent="Budovy "+id+" nedostupné: "+
+       String(error?.message||error).slice(0,120)+". Terén zůstává viditelný.";
+   }).finally(()=>{
+     if(buildingPending.get(id)===controller)buildingPending.delete(id);
+     if(gl){requestDraw();updateBuildings();}
+   });
+ }
+}
+
+function chosenObservationTile(){
+ if(!planner)return null;
+ const level=planner.tileLevels[0];
+ return level.reduce((best,t)=>!best||
+   Math.hypot(t.center[0]-panX,t.center[1]-panNorth)<
+   Math.hypot(best.center[0]-panX,best.center[1]-panNorth)?t:best,null);
+}
+function observationMessage(message){
+ $("obs-note").textContent=message;
+}
+function disposeObservation(o){
+ if(o?.rgbTexture)gl?.deleteTexture(o.rgbTexture);
+ if(o?.ndviTexture)gl?.deleteTexture(o.ndviTexture);
+ if(o?.changeTexture)gl?.deleteTexture(o.changeTexture);
+ if(o?.trendTexture)gl?.deleteTexture(o.trendTexture);
+ if(o?.seasonalTexture)gl?.deleteTexture(o.seasonalTexture);
+ if(o?.multiTexture)gl?.deleteTexture(o.multiTexture);
+}
+function observationTexture(bitmap,width,height){
+ if(!gl||bitmap.width!==width||bitmap.height!==height||
+   width<2||height<2||width*height>50000)throw Error("Invalid genuine Sentinel raster");
+ const texture=gl.createTexture();
+ gl.bindTexture(gl.TEXTURE_2D,texture);
+ gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL,false);
+ gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,gl.RGBA,gl.UNSIGNED_BYTE,bitmap);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+ gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+ return texture;
+}
+async function searchObservations(){
+ observationEpoch++;
+ observationRequest?.abort();observationRequest=null;
+ disposeObservation(observationActive);observationActive=null;
+ const tile=chosenObservationTile();
+ if(!tile)return;
+ observationTile=tile;
+ const from=$("obs-from").value,to=$("obs-to").value;
+ const cloud=Number($("obs-cloud").value);
+ const selected=$("obs-scene"),older=$("compare-before");
+ comparisonData=null;$("compare-export").disabled=true;
+ trendData=null;$("trend-export").disabled=true;
+ trendSceneIds=[];$("trend-load").disabled=true;
+ $("trend-scenes").replaceChildren();drawTrendChart();
+ older.replaceChildren(new Option("Hledám scény…",""));
+ older.disabled=true;$("compare-load").disabled=true;
+ selected.replaceChildren(new Option("Hledám scény…",""));
+ selected.disabled=true;$("obs-load").disabled=true;
+ $("obs-search").disabled=true;
+ const controller=new AbortController(),epoch=observationEpoch;
+ observationRequest=controller;requestDraw();
+ try{
+   const uri="/api/observations/scenes/0/"+tile.x+"/"+tile.y+".json?"+
+     new URLSearchParams({from,to,cloud:String(cloud)});
+   observationMessage("Vyhledávám reálné snímky Sentinel-2 pro dlaždici "+tile.key+
+     " (nikoli celou Prahu)…");
+   const response=await fetch(uri,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,160));
+   const data=await response.json();
+   if(data.status!=="real-sentinel-catalog"||data.key!==tile.key||
+     !Array.isArray(data.scenes))throw Error("STAC nevrátil platný katalog scén");
+   if(epoch!==observationEpoch)return;
+   selected.replaceChildren();older.replaceChildren();
+   const allScenes=[];
+   for(const item of data.scenes){
+     if(!validSceneId(item.id))continue;
+     observationCatalog.set(item.id,item);
+     const date=String(item.acquiredAt).slice(0,10);
+     const cloudText=item.cloudPercent===null?"oblačnost neznámá":
+       item.cloudPercent+" % oblačnost scény";
+     selected.add(new Option(date+" · "+item.id+" · "+cloudText,item.id));
+     older.add(new Option(date+" · "+item.id+" · "+cloudText,item.id));
+     allScenes.push(item);
+   }
+   selected.disabled=!selected.options.length;
+   $("obs-load").disabled=selected.disabled;
+   older.disabled=selected.options.length<2;
+   if(!older.disabled)older.selectedIndex=older.options.length-1;
+   $("compare-load").disabled=older.disabled;
+   const section=$("trend-scenes");
+   for(const [i,item] of allScenes.entries()){
+     const label=document.createElement("label");
+     const checked=document.createElement("input");
+     checked.type="checkbox";checked.value=item.id;
+     // Prefer actual observations covering more dates; never fabricate an observation.
+     checked.checked=allScenes.length>=3&&(i===0||
+       i===Math.floor((allScenes.length-1)/2)||i===allScenes.length-1);
+     checked.onchange=()=>{
+       const checkedCount=section.querySelectorAll("input:checked").length;
+       if(checkedCount>6){checked.checked=false;
+         observationMessage("Časová řada nejvýše 6 skutečných scén.");}
+       $("trend-load").disabled=section.querySelectorAll("input:checked").length<3;
+     };
+     label.append(checked,document.createTextNode(" "+item.acquiredAt.slice(0,10)+
+       " · "+item.cloudPercent+" %"));
+     section.append(label);
+   }
+   if(allScenes.length<3)section.textContent="Pro časovou řadu potřebuješ alespoň 3 datované scény. Rozšiř období.";
+   $("trend-load").disabled=allScenes.length<3;
+   observationMessage(selected.options.length?
+     "Dlaždice "+tile.key+": "+selected.options.length+
+     " skutečných scén. Vyber datum a klikni na Načíst RGB + NDVI.":
+     "Pro výřez a datum nejsou vhodné skutečné Sentinel-2 RGB/NIR/SCL scény. Rozšiř období nebo oblačnost.");
+ }catch(error){
+   if(controller.signal.aborted)return;
+   observationMessage("Katalog Sentinel-2 není dostupný: "+
+     String(error.message||error).slice(0,200)+". ČÚZK terén zůstává nezměněn.");
+ }finally{
+   if(observationRequest===controller)observationRequest=null;
+   $("obs-search").disabled=false;
+ }
+}
+async function loadObservation(){
+ const tile=observationTile,sceneId=$("obs-scene").value;
+ if(!tile||!validSceneId(sceneId)||!observationCatalog.has(sceneId))return;
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("obs-load").disabled=true;
+ observationMessage("Načítám 5 původních pásem Sentinel-2 (RGB, NIR, SCL) pro "+
+   tile.key+"; NDVI počítám z kalibrované odrazivosti…");
+ const prefix="/api/observations/0/"+tile.x+"/"+tile.y+"/"+encodeURIComponent(sceneId);
+ let rgbTexture=null,ndviTexture=null;
+ try{
+   const response=await fetch(prefix+".json",{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,180));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel2-observation"||meta.sceneId!==sceneId||
+     meta.key!==tile.key||meta.version!==2||meta.qa?.sclMask!==true||
+     meta.terrainElevationUnchanged!==true||
+     !Number.isInteger(meta.statistics?.validPixels)||meta.statistics.validPixels<4)
+     throw Error("Ověření původu satelitních dat nebo NDVI selhalo");
+   const [rgbResponse,ndviResponse]=await Promise.all([
+     fetch(prefix+".rgb.png",{signal:controller.signal}),
+     fetch(prefix+".ndvi.png",{signal:controller.signal})
+   ]);
+   if(!rgbResponse.ok||!ndviResponse.ok)
+     throw Error("Chybí skutečná spektrální rastrová vrstva");
+   const [rgb,ndvi]=await Promise.all([
+     createImageBitmap(await rgbResponse.blob()),
+     createImageBitmap(await ndviResponse.blob())
+   ]);
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     rgbTexture=observationTexture(rgb,meta.width,meta.height);
+     ndviTexture=observationTexture(ndvi,meta.width,meta.height);
+   }finally{rgb.close?.();ndvi.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   disposeObservation(observationActive);
+   comparisonData=null;$("compare-export").disabled=true;
+   observationActive={key:tile.key,sceneId,meta,rgbTexture,ndviTexture};
+   rgbTexture=null;ndviTexture=null;
+   if($("obs-mode").value==="ortho")$("obs-mode").value="rgb";
+   observationMessage("Sentinel-2: "+meta.acquiredAt+" · dlaždice "+tile.key+
+     " · "+meta.statistics.validPixels+" platných pixelů (SCL maska)"+
+     " · NDVI průměr "+(meta.statistics.ndviMean===null?"–":
+       Number(meta.statistics.ndviMean).toFixed(3))+
+     " · RGB/NDVI jsou jen obrazové vrstvy, 3D výšky jsou stále ČÚZK Bpv.");
+   requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   observationMessage("Satelitní data nelze použít: "+
+     String(error.message||error).slice(0,250)+
+     ". Nezobrazuji náhradní vymyšlenou texturu.");
+ }finally{
+   if(rgbTexture)gl?.deleteTexture(rgbTexture);
+   if(ndviTexture)gl?.deleteTexture(ndviTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("obs-load").disabled=false;
+ }
+}
+
+
+/** Request two real dated observations. Comparing already-palette-colored
+ * NDVI PNGs would be numerically invalid: the SDK compares cached Float32
+ * calibrated reflectance-derived NDVI for identical pixel centers.
+ */
+async function loadComparison(){
+ const tile=observationTile,beforeId=$("compare-before").value;
+ const afterId=$("obs-scene").value;
+ if(!tile||!validSceneId(beforeId)||!validSceneId(afterId)||
+    !observationCatalog.has(beforeId)||!observationCatalog.has(afterId))return;
+ const before=observationCatalog.get(beforeId),after=observationCatalog.get(afterId);
+ if(beforeId===afterId||Date.parse(before.acquiredAt)>=Date.parse(after.acquiredAt)){
+   observationMessage("Vyber dvě různá data: starší snímek v dolním poli a novější v horním.");
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("compare-load").disabled=true;
+ comparisonData=null;$("compare-export").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";
+ $("compare-summary").textContent="Požadované časové porovnání zatím není ověřené. Jen pixely platné v obou datech mohou vytvořit výsledek.";
+ requestDraw(); // never show a stale previous result as the newly selected pair
+ let changeTexture=null;
+ try{
+   const path="/api/observations/compare/0/"+tile.x+"/"+tile.y+"/"+
+     encodeURIComponent(beforeId)+"/"+encodeURIComponent(afterId);
+   observationMessage("Počítám ΔNDVI ze dvou skutečných snímků "+
+     before.acquiredAt.slice(0,10)+" a "+after.acquiredAt.slice(0,10)+
+     ". Kontroluji platné pixely v obou datech…");
+   const response=await fetch(path+".json",{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,210));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel-ndvi-comparison"||meta.version!==1||
+      meta.key!==tile.key||meta.before?.sceneId!==beforeId||
+      meta.after?.sceneId!==afterId||meta.qa?.bothSclMasked!==true||
+      meta.qa?.sameGrid!==true||meta.terrainElevationUnchanged!==true||
+      meta.grid?.crs!=="EPSG:3857"||!Number.isInteger(meta.width)||
+      !Number.isInteger(meta.height)||meta.width*meta.height>50000||
+      !Number.isInteger(meta.statistics?.overlapPixels)||
+      meta.statistics.overlapPixels<16||
+      typeof meta.deltaF32LE!=="string")
+     throw Error("NDVI časové porovnání nemá ověřený společný rastr");
+   const deltas=binary(meta.deltaF32LE,Float32Array);
+   if(deltas.length!==meta.width*meta.height||
+      deltas.filter(Number.isFinite).length!==meta.statistics.overlapPixels||
+      deltas.some(v=>!Number.isNaN(v)&&(!Number.isFinite(v)||Math.abs(v)>2.001)))
+     throw Error("Číselný ΔNDVI rastr je nekompletní nebo poškozený");
+   const png=await fetch(path+".png",{signal:controller.signal});
+   if(!png.ok)throw Error("Výsledek ΔNDVI nemá skutečný obrázek");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     changeTexture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   disposeObservation(observationActive);
+   observationActive={key:tile.key,changeTexture,sceneId:afterId,meta};
+   changeTexture=null;
+   comparisonData={meta,deltas};
+   $("compare-export").disabled=false;
+   $("obs-mode").value="change";
+   const stats=meta.statistics;
+   const summary="ΔNDVI "+meta.before.acquiredAt.slice(0,10)+" → "+
+     meta.after.acquiredAt.slice(0,10)+": "+
+     stats.overlapPixels+" společných validních pixelů ("+
+     stats.overlapPercent.toFixed(1)+" % plochy rastru); "+
+     stats.increasedPixels+" nárůst ≥"+stats.thresholdNdvi.toFixed(2)+", "+
+     stats.decreasedPixels+" pokles ≤−"+stats.thresholdNdvi.toFixed(2)+", "+
+     stats.stablePixels+" menší změna. Průměrný ΔNDVI "+
+     stats.meanDeltaNdvi.toFixed(3)+
+     ". Nejde o automatické určení příčiny nebo zdravotního stavu vegetace.";
+   $("compare-summary").textContent=summary;
+   observationMessage("Zobrazuji porovnání dvou skutečných scén Sentinel-2. "+
+     "Jen shodné 10m pixely platné v obou SCL maskách; 3D ČÚZK Bpv zůstává stejné.");
+   requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   observationMessage("NDVI porovnání odmítnuto: "+
+     String(error?.message||error).slice(0,245)+
+     ". Bez dostatečných skutečných společných pixelů změnu neodhaduji.");
+ }finally{
+   if(changeTexture)gl?.deleteTexture(changeTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("compare-load").disabled=$("compare-before").disabled;
+ }
+}
+function exportComparison(){
+ if(!comparisonData)return;
+ const {meta,deltas}=comparisonData;
+ const t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const EARTH_RADIUS=6378137;
+ const lines=["before_scene,after_scene,longitude_deg,latitude_deg,delta_ndvi,valid_both"];
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const x=t[0]+t[1]*(col+.5)+t[2]*(row+.5);
+   const y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const lon=x/EARTH_RADIUS*180/Math.PI;
+   const lat=(2*Math.atan(Math.exp(y/EARTH_RADIUS))-Math.PI/2)*180/Math.PI;
+   const value=deltas[row*meta.width+col];
+   lines.push([meta.before.sceneId,meta.after.sceneId,
+     lon.toFixed(8),lat.toFixed(8),
+     Number.isFinite(value)?value.toFixed(6):"",
+     Number.isFinite(value)?"1":"0"].join(","));
+ }
+ const blob=new Blob([lines.join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob);
+ const link=document.createElement("a");
+ link.href=url;link.download="praha-sentinel-delta-ndvi.csv";
+ document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+
+/** Every plotted mean uses the SAME pixel population, not the changing
+ * per-scene valid-pixel denominators that would bias the apparent trend.
+ */
+function drawTrendChart(){
+ const plot=$("trend-chart"),ctx=plot?.getContext("2d");
+ if(!ctx)return;
+ const w=plot.width,h=plot.height,scenes=trendData?.meta?.scenes??[];
+ ctx.clearRect(0,0,w,h);ctx.fillStyle="#0c2335";ctx.fillRect(0,0,w,h);
+ ctx.font="12px system-ui";ctx.fillStyle="#b2c9dc";
+ if(scenes.length<3){ctx.fillText("Čekám na alespoň 3 ověřená pozorování…",22,30);return;}
+ const left=65,right=25,top=22,bottom=36;
+ const stamps=scenes.map(s=>Date.parse(s.acquiredAt));
+ const values=scenes.map(s=>s.meanNdviCommon);
+ const min=Math.min(...values),max=Math.max(...values);
+ const pad=Math.max(.035,(max-min)*.25);
+ const low=Math.max(-1,min-pad),high=Math.min(1,max+pad);
+ const xx=t=>left+(w-left-right)*(t-stamps[0])/
+   Math.max(1,stamps[stamps.length-1]-stamps[0]);
+ const yy=v=>top+(h-top-bottom)*(high-v)/Math.max(.001,high-low);
+ ctx.strokeStyle="#2e566f";ctx.lineWidth=1;ctx.beginPath();
+ ctx.moveTo(left,top);ctx.lineTo(left,h-bottom);ctx.lineTo(w-right,h-bottom);ctx.stroke();
+ ctx.fillStyle="#a9cfdf";ctx.fillText(high.toFixed(3),9,top+8);
+ ctx.fillText(low.toFixed(3),9,h-bottom);
+ ctx.fillText("NDVI · stejná platná plocha pro všechna data",left+4,13);
+ ctx.strokeStyle="#81d5a6";ctx.lineWidth=2.5;ctx.beginPath();
+ for(let i=0;i<scenes.length;i++){
+   const x=xx(stamps[i]),y=yy(values[i]);
+   if(!i)ctx.moveTo(x,y);else ctx.lineTo(x,y);
+ }
+ ctx.stroke();
+ for(let i=0;i<scenes.length;i++){
+   const x=xx(stamps[i]),y=yy(values[i]);
+   ctx.fillStyle="#b1f1c7";ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle="#e7f5ee";ctx.fillText(values[i].toFixed(3),
+     Math.min(w-58,Math.max(left,x-20)),Math.max(25,y-9));
+   const date=scenes[i].acquiredAt.slice(5,10);
+   ctx.fillStyle="#bbd4e4";ctx.fillText(date,Math.max(left,x-17),h-12);
+ }
+}
+async function loadTrend(explicitSceneIds){
+ const tile=observationTile;
+ const chosen=Array.isArray(explicitSceneIds)?explicitSceneIds:
+   [...$("trend-scenes").querySelectorAll("input:checked")].map(x=>x.value);
+ if(!tile||chosen.length<3||chosen.length>6||
+    new Set(chosen).size!==chosen.length||
+    chosen.some(id=>!validSceneId(id)||!observationCatalog.has(id))){
+   observationMessage("Časová řada vyžaduje 3 až 6 skutečně nalezených odlišných scén.");
+   return;
+ }
+ const chronological=[...chosen].sort((a,b)=>Date.parse(
+   observationCatalog.get(a).acquiredAt)-Date.parse(observationCatalog.get(b).acquiredAt));
+ const first=Date.parse(observationCatalog.get(chronological[0]).acquiredAt),
+   last=Date.parse(observationCatalog.get(chronological[chronological.length-1]).acquiredAt);
+ if(!Number.isFinite(first)||!Number.isFinite(last)||(last-first)<14*86400000){
+   observationMessage("Časová řada musí pokrývat alespoň 14 dní. Vyber vzdálenější skutečná data.");
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("trend-load").disabled=true;$("trend-export").disabled=true;
+ trendData=null;drawTrendChart();
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();
+ $("trend-summary").textContent="Ověřuji společné pixely "+chosen.length+
+   " původních scén Sentinel-2 a počítám Theil–Sen…";
+ let trendTexture=null;
+ try{
+   const prefix="/api/observations/trend/0/"+tile.x+"/"+tile.y+"/"+
+     chronological.map(encodeURIComponent).join(",");
+   const response=await fetch(prefix+".json",{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,220));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel-ndvi-time-series"||meta.version!==1||
+      meta.key!==tile.key||meta.grid?.crs!=="EPSG:3857"||
+      meta.qa?.allSclMasked!==true||meta.qa?.sameGrid!==true||
+      meta.qa?.fixedCommonPixelPopulation!==true||meta.qa?.theilSen!==true||
+      meta.terrainElevationUnchanged!==true||
+      !Array.isArray(meta.scenes)||meta.scenes.length!==chronological.length||
+      !chronological.every((id,i)=>meta.scenes[i]?.sceneId===id)||
+      !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+      meta.width<2||meta.height<2||meta.width*meta.height>50000||
+      !Number.isInteger(meta.statistics?.commonValidPixels)||
+      meta.statistics.commonValidPixels<16||typeof meta.slopeF32LE!=="string")
+     throw Error("Časová řada neobsahuje důvěryhodný společný georeferencovaný rastr");
+   const slopes=binary(meta.slopeF32LE,Float32Array);
+   if(slopes.length!==meta.width*meta.height||
+      slopes.filter(Number.isFinite).length!==meta.statistics.commonValidPixels||
+      slopes.some(v=>!Number.isNaN(v)&&!Number.isFinite(v)))
+     throw Error("Ověření skutečných numerických hodnot trendu selhalo");
+   const png=await fetch(prefix+".png",{signal:controller.signal});
+   if(!png.ok)throw Error("Chybí původem doložená mapová vrstva trendu");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     trendTexture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   observationActive={key:tile.key,sceneId:chronological[chronological.length-1],
+     meta,trendTexture};
+   trendTexture=null;
+   trendData={meta,slopes};trendSceneIds=chronological;
+   $("trend-export").disabled=false;
+   $("obs-mode").value="trend";
+   const st=meta.statistics;
+   $("trend-summary").textContent=st.sceneCount+" scén · "+
+     st.commonValidPixels+" společných pixelů ("+st.commonValidPercent.toFixed(1)+
+     " %) · "+st.spanDays.toFixed(0)+" dní · průměr Theil–Sen "+
+     st.meanSlopePer30Days.toFixed(4)+" NDVI/30 dní · růst "+
+     st.increasingPixels+" / pokles "+st.decreasingPixels+
+     " / menší změna "+st.stablePixels+". Nejde o dlouhodobou předpověď.";
+   observationMessage("Zobrazuji popisné tempo NDVI ze "+st.sceneCount+
+     " skutečných scén. Žádná data se nedoplňují do oblačných pixelů. "+
+     "Výšky ČÚZK Bpv zůstávají původní.");
+   drawTrendChart();requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("trend-summary").textContent="Časová řada nebyla ověřena.";
+   observationMessage("Trend nelze vypočítat: "+
+     String(error.message||error).slice(0,260)+
+     ". Nevytvářím náhradní hodnoty ani obraz z neúplných dat.");
+ }finally{
+   if(trendTexture)gl?.deleteTexture(trendTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("trend-load").disabled=$("trend-scenes").querySelectorAll("input:checked").length<3;
+ }
+}
+function exportTrend(){
+ if(!trendData)return;
+ const {meta,slopes}=trendData,t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const rows=["record_type,scene_id,acquired_at,longitude_deg,latitude_deg,mean_ndvi_same_pixels,trend_ndvi_per_30_days,valid_all_scenes"];
+ for(const scene of meta.scenes)
+   rows.push(["scene",scene.sceneId,scene.acquiredAt,"","",
+     scene.meanNdviCommon.toFixed(7),"",""].join(","));
+ const R=6378137;
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const x=t[0]+t[1]*(col+.5)+t[2]*(row+.5);
+   const y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const lon=x/R*180/Math.PI;
+   const lat=(2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI;
+   const v=slopes[row*meta.width+col],valid=Number.isFinite(v);
+   rows.push(["pixel","","",lon.toFixed(8),lat.toFixed(8),"",
+     valid?v.toFixed(7):"",valid?"1":"0"].join(","));
+ }
+ const url=URL.createObjectURL(new Blob([rows.join("\r\n")+"\r\n"],{
+   type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;a.download="praha-sentinel-ndvi-casova-rada.csv";
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/** Two-year same-month source discovery never accepts guessed scene IDs.
+ * Each dated source is validated by the local SDK/Element84 STAC adapter.
+ */
+async function searchSeasonal(){
+ const tile=chosenObservationTile();
+ if(!tile){$("season-summary").textContent="Nejprve načti mapu Prahy.";return;}
+ const beforeYear=Number($("season-before").value),
+   afterYear=Number($("season-after").value),
+   month=Number($("season-month").value),
+   cloud=Number($("season-cloud").value);
+ if(!Number.isInteger(beforeYear)||!Number.isInteger(afterYear)||
+    beforeYear<2017||beforeYear>=afterYear||afterYear>2100||
+    afterYear-beforeYear>15||!Number.isInteger(month)||month<1||month>12||
+    !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("season-summary").textContent="Zadej dva vzestupné roky, jeden měsíc a oblačnost 0–100 %.";
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ seasonalSelection=null;seasonalData=null;
+ $("season-load").disabled=true;$("season-export").disabled=true;
+ $("season-search").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();
+ $("season-scenes").textContent="Ověřuji skutečný STAC katalog pro "+beforeYear+
+   " a "+afterYear+"…";
+ $("season-summary").textContent="Výsledek není zatím k dispozici; žádné barvy nejsou odhadované.";
+ try{
+   const query=new URLSearchParams({before:String(beforeYear),
+     after:String(afterYear),month:String(month),cloud:String(cloud)});
+   const url="/api/observations/seasonal/scenes/0/"+tile.x+"/"+tile.y+
+     ".json?"+query;
+   const response=await fetch(url,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,225));
+   const found=await response.json();
+   if(found.status!=="real-sentinel-seasonal-catalog"||found.key!==tile.key||
+      found.month!==month||found.before?.year!==beforeYear||
+      found.after?.year!==afterYear||found.before.scenes.length!==2||
+      found.after.scenes.length!==2||
+      ![...found.before.scenes,...found.after.scenes].every(x=>
+        validSceneId(x.id)&&Number.isFinite(Date.parse(x.acquiredAt))))
+     throw Error("STAC nevrátil čtyři ověřená zdrojová pozorování");
+   if(epoch!==observationEpoch)return;
+   seasonalSelection={tile,beforeYear,afterYear,month,cloud,catalog:found};
+   $("season-scenes").textContent="Vybrané reálné scény: "+
+     [found.before,found.after].map(group=>
+       group.year+": "+group.scenes.map(x=>x.acquiredAt.slice(0,10)+
+         " ("+(x.cloudPercent??"neznámá")+" % oblačnost celé scény)").join(" + ")
+     ).join(" · ");
+   $("season-summary").textContent="Připraveno: 2 nezávislé scény v každém roce. "+
+     "Kliknutím na Porovnat sezónní NDVI se načtou původní spektrální rastry (4× RGB/NIR/SCL).";
+   $("season-load").disabled=false;
+   observationMessage("Nalezeny čtyři původní scény Sentinel-2, jedna srovnatelná měsíční oblast.");
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("season-scenes").textContent="Nebyly získány čtyři použitelné scény.";
+   $("season-summary").textContent="Nelze doložit sezónní zdroje: "+
+     String(error?.message||error).slice(0,250)+
+     ". Vyzkoušej jiný měsíc, rok či větší maximální oblačnost.";
+ }finally{
+   if(observationRequest===controller)observationRequest=null;
+   $("season-search").disabled=false;
+ }
+}
+async function loadSeasonal(){
+ const selection=seasonalSelection;
+ if(!selection)return;
+ const {tile,beforeYear,afterYear,month,cloud}=selection;
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("season-load").disabled=true;$("season-export").disabled=true;
+ seasonalData=null;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();
+ $("season-summary").textContent="Načítám kalibrované zdrojové Sentinel-2 rastry z obou roků. "+
+   "Mediány vzniknou pouze z platných skutečných pixelů; chybějící hodnoty se nedopočítávají.";
+ let seasonalTexture=null;
+ try{
+   const url="/api/observations/seasonal/0/"+tile.x+"/"+tile.y+"/"+
+     beforeYear+"/"+afterYear+"/"+month+"?cloud="+cloud;
+   const prefix=url.replace("?cloud=", ".json?cloud=");
+   const response=await fetch(prefix,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,220));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel-interannual-ndvi"||meta.version!==2||
+      meta.key!==tile.key||meta.before?.year!==beforeYear||
+      meta.after?.year!==afterYear||meta.before.month!==month||
+      meta.after.month!==month||meta.grid?.crs!=="EPSG:3857"||
+      meta.terrainElevationUnchanged!==true||
+      meta.qa?.sameMonth!==true||meta.qa?.pixelSclMasked!==true||
+      meta.qa?.medianPerYear!==true||
+      !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+      meta.width<2||meta.height<2||meta.width*meta.height>50000||
+      meta.statistics?.overlapPixels<16||
+      typeof meta.deltaF32LE!=="string"||
+      typeof meta.beforeCountB64!=="string"||
+      typeof meta.afterCountB64!=="string")
+     throw Error("Meziroční NDVI nemá ověřené měsíční zdroje nebo rastr");
+   const matches=(actual,selected)=>actual.length===selected.length&&
+     actual.every((scene,i)=>scene.sceneId===selected[i].id&&
+       scene.acquiredAt===selected[i].acquiredAt);
+   if(!matches(meta.before.scenes,selection.catalog.before.scenes)||
+      !matches(meta.after.scenes,selection.catalog.after.scenes))
+     throw Error("Změnil se výběr původních scén; načti sezónní katalog znovu");
+   const delta=binary(meta.deltaF32LE,Float32Array),
+     countBefore=binary(meta.beforeCountB64,Uint8Array),
+     countAfter=binary(meta.afterCountB64,Uint8Array);
+   const n=meta.width*meta.height;
+   if(delta.length!==n||countBefore.length!==n||countAfter.length!==n||
+      delta.filter(Number.isFinite).length!==meta.statistics.overlapPixels||
+      delta.some(v=>!Number.isNaN(v)&&(!Number.isFinite(v)||Math.abs(v)>2.001))||
+      countBefore.some(v=>v>meta.before.scenes.length)||
+      countAfter.some(v=>v>meta.after.scenes.length))
+     throw Error("Číselná data nebo počty skutečných pozorování jsou poškozené");
+   const png=await fetch(prefix.replace(".json?cloud=",".png?cloud="),
+     {signal:controller.signal});
+   if(!png.ok)throw Error("Chybí ověřená skutečná rastrová vrstva");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     seasonalTexture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   observationActive={key:tile.key,meta,seasonalTexture};
+   seasonalTexture=null;
+   seasonalData={meta,delta,countBefore,countAfter};
+   observationTile=tile;
+   $("season-export").disabled=false;$("obs-mode").value="seasonal";
+   const stats=meta.statistics;
+   const quality=stats.lowCoverageWarning?" POZOR: nízké pokrytí (<25 %).":"";
+   const date=stats.dateShiftWarning?" POZOR: rozdíl dnů pořízení >10.":"";
+   $("season-summary").textContent=beforeYear+" → "+afterYear+
+     ": "+stats.overlapPixels+" platných pixelů ("+
+     stats.overlapPercent.toFixed(1)+" % plochy), "+
+     stats.robustTwoPerYearPixels+" pixelů se dvěma měřeními v obou letech. "+
+     "Průměrné ΔNDVI "+stats.meanDeltaNdvi.toFixed(4)+
+     ". Nárůst "+stats.increasedPixels+", pokles "+stats.decreasedPixels+
+     ", menší rozdíl "+stats.stablePixels+"."+quality+date+
+     " Jde o meziroční spektrální rozdíl, nikoli o potvrzení jeho příčiny.";
+   observationMessage("Zobrazuji skutečný meziroční mediánový rozdíl NDVI na "+
+     "stejném ČÚZK 3D terénu. Žádné chybějící údaje nejsou domalované.");
+   requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("season-summary").textContent="Meziroční analýzu nelze doložit: "+
+     String(error.message||error).slice(0,260)+
+     ". Žádný náhradní snímek či trend nebyl vytvořen.";
+ }finally{
+   if(seasonalTexture)gl?.deleteTexture(seasonalTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("season-load").disabled=!seasonalSelection;
+ }
+}
+function exportSeasonal(){
+ if(!seasonalData)return;
+ const {meta,delta,countBefore,countAfter}=seasonalData;
+ const t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const lines=["year_before,year_after,month,longitude_deg,latitude_deg,delta_ndvi,count_before,count_after,valid_both"];
+ const R=6378137;
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const index=row*meta.width+col,
+     x=t[0]+t[1]*(col+.5)+t[2]*(row+.5),
+     y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const longitude=x/R*180/Math.PI,
+     latitude=(2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI;
+   const v=delta[index];
+   lines.push([meta.before.year,meta.after.year,meta.before.month,
+     longitude.toFixed(8),latitude.toFixed(8),
+     Number.isFinite(v)?v.toFixed(7):"",countBefore[index],countAfter[index],
+     Number.isFinite(v)?"1":"0"].join(","));
+ }
+ const url=URL.createObjectURL(new Blob([lines.join("\r\n")+"\r\n"],{
+   type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;
+ a.download="praha-sentinel-mezirocni-ndvi-"+meta.before.year+"-"+meta.after.year+".csv";
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+/** Real annual scene catalog: one bounded source tile, two distinct dated
+ * acquisitions per calendar month/year. No guessed annual observations.
+ */
+async function searchMultiYear(){
+ const tile=chosenObservationTile();
+ if(!tile){$("multi-summary").textContent="Nejprve načti mapu Prahy.";return;}
+ const from=Number($("multi-from").value),
+   to=Number($("multi-to").value),
+   month=Number($("multi-month").value),cloud=Number($("multi-cloud").value);
+ if(!Number.isInteger(from)||!Number.isInteger(to)||from<2017||to>2100||
+    to-from<2||to-from>4||!Number.isInteger(month)||month<1||month>12||
+    !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("multi-summary").textContent="Vyber 3–5 po sobě jdoucích let, měsíc 1–12 a oblačnost 0–100 %.";
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ multiSelection=null;multiData=null;
+ $("multi-load").disabled=true;$("multi-export").disabled=true;
+ $("multi-search").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();drawMultiYearChart();
+ $("multi-scenes").textContent="Vyhledávám skutečné STAC scény pro "+(to-from+1)+" let…";
+ $("multi-summary").textContent="Dokud nejsou získaná původní data, žádný víceletý trend se nezobrazuje.";
+ try{
+   const uri="/api/observations/multiyear/scenes/0/"+tile.x+"/"+tile.y+
+     ".json?"+new URLSearchParams({
+       from:String(from),to:String(to),month:String(month),cloud:String(cloud)});
+   const response=await fetch(uri,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,230));
+   const data=await response.json();
+   if(data.status!=="real-sentinel-multiyear-catalog"||data.key!==tile.key||
+      data.from!==from||data.to!==to||data.month!==month||
+      !Array.isArray(data.seasons)||data.seasons.length!==to-from+1||
+      !data.seasons.every((season,i)=>season.year===from+i&&
+        season.scenes.length===2&&
+        season.scenes.every(scene=>validSceneId(scene.id)&&
+          Number.isFinite(Date.parse(scene.acquiredAt)))))
+     throw Error("Katalog neobsahuje ověřené dvě skutečné scény v každém roce");
+   if(epoch!==observationEpoch)return;
+   multiSelection={tile,from,to,month,cloud,catalog:data};
+   $("multi-scenes").textContent="Ověřené původní scény: "+
+     data.seasons.map(year=>year.year+": "+
+       year.scenes.map(s=>s.acquiredAt.slice(0,10)+" ("+
+         (s.cloudPercent??"?")+" % celé scény)").join(", ")).join(" | ");
+   $("multi-load").disabled=false;
+   $("multi-summary").textContent="Nalezeno "+data.seasons.length*2+
+     " skutečných pozorování. Analýza načte jejich kalibrované spektrální pixely a použije společnou SCL masku všech let.";
+   observationMessage("Nalezeno "+data.seasons.length+
+     " skutečných sezón Sentinel-2; bez uměle doplněných roků.");
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("multi-scenes").textContent="Zvolená úplná časová řada nebyla doložena.";
+   $("multi-summary").textContent="Nelze získat původní roky: "+
+     String(error.message||error).slice(0,250)+
+     ". Zvol jiný měsíc, rozsah let nebo limit oblačnosti.";
+ }finally{
+   if(observationRequest===controller)observationRequest=null;
+   $("multi-search").disabled=false;
+ }
+}
+function drawMultiYearChart(){
+ const canvas=$("multi-chart"),ctx=canvas?.getContext("2d");
+ if(!ctx)return;
+ const w=canvas.width,h=canvas.height;
+ ctx.clearRect(0,0,w,h);ctx.fillStyle="#0c2335";ctx.fillRect(0,0,w,h);
+ ctx.fillStyle="#bbd4e4";ctx.font="12px system-ui";
+ const seasons=multiData?.meta?.years??[];
+ if(seasons.length<3){ctx.fillText("Čekám na ověřené roční zdrojové mediány…",20,35);return;}
+ const left=65,right=30,top=24,bottom=31;
+ const values=seasons.map(s=>s.meanNdviOnCommon);
+ const min=Math.min(...values),max=Math.max(...values),
+   pad=Math.max(.035,(max-min)*.2),low=Math.max(-1,min-pad),
+   high=Math.min(1,max+pad),denom=Math.max(.001,high-low);
+ const x=i=>left+(w-left-right)*i/(seasons.length-1);
+ const y=v=>top+(h-top-bottom)*(high-v)/denom;
+ ctx.strokeStyle="#3b5a6e";ctx.beginPath();
+ ctx.moveTo(left,top);ctx.lineTo(left,h-bottom);ctx.lineTo(w-right,h-bottom);ctx.stroke();
+ ctx.fillStyle="#b8e5df";ctx.fillText("NDVI · pouze stejné společné platné pixely",left,14);
+ ctx.fillText(high.toFixed(3),10,top+6);
+ ctx.fillText(low.toFixed(3),10,h-bottom);
+ ctx.lineWidth=2.5;ctx.strokeStyle="#85dba8";ctx.beginPath();
+ for(let i=0;i<seasons.length;i++){
+   if(i===0)ctx.moveTo(x(i),y(values[i]));else ctx.lineTo(x(i),y(values[i]));
+ }
+ ctx.stroke();
+ for(let i=0;i<seasons.length;i++){
+   const xx=x(i),yy=y(values[i]);
+   ctx.fillStyle="#b4f1d6";ctx.beginPath();ctx.arc(xx,yy,4,0,Math.PI*2);ctx.fill();
+   ctx.fillStyle="#e6f5f1";ctx.fillText(values[i].toFixed(3),
+     Math.max(65,Math.min(w-75,xx-22)),Math.max(24,yy-12));
+   ctx.fillStyle="#a9cadb";ctx.fillText(String(seasons[i].year),xx-14,h-9);
+ }
+}
+async function loadMultiYear(){
+ const selected=multiSelection;
+ if(!selected)return;
+ const {tile,from,to,month,cloud}=selected;
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ multiData=null;$("multi-load").disabled=true;$("multi-export").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();drawMultiYearChart();
+ $("multi-summary").textContent="Načítám původní kalibrované NDVI a ověřuji stejné platné pixely ve "+
+   (to-from+1)+" letech. Bez chybějících roků a interpolací.";
+ let texture=null;
+ try{
+   const prefix="/api/observations/multiyear/0/"+tile.x+"/"+tile.y+"/"+
+     from+"/"+to+"/"+month+".";
+   const params="?cloud="+cloud;
+   const response=await fetch(prefix+"json"+params,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,240));
+   const meta=await response.json();
+   const sceneMatches=Array.isArray(meta.years)&&
+     meta.years.length===selected.catalog.seasons.length&&
+     meta.years.every((annual,i)=>annual.year===selected.catalog.seasons[i].year&&
+       annual.scenes.length===2&&
+       annual.scenes.every((scene,j)=>{
+         const actual=selected.catalog.seasons[i].scenes[j];
+         return scene.sceneId===actual.id&&scene.acquiredAt===actual.acquiredAt;
+       }));
+   if(meta.status!=="real-sentinel-multiyear-seasonal-trend"||meta.version!==1||
+      meta.key!==tile.key||meta.month!==month||!sceneMatches||
+      meta.statistics?.firstYear!==from||meta.statistics?.lastYear!==to||
+      meta.qa?.allSourceSclMasked!==true||meta.qa?.allSameGrid!==true||
+      meta.qa?.fixedCommonPixelPopulation!==true||
+      meta.qa?.leaveOneYearOutSensitivity!==true||
+      meta.terrainElevationUnchanged!==true||meta.grid?.crs!=="EPSG:3857"||
+      !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+      meta.width<2||meta.height<2||meta.width*meta.height>50000||
+      !Number.isInteger(meta.statistics?.commonValidPixels)||
+      meta.statistics.commonValidPixels<16)
+     throw Error("Víceletý výsledek nemá průkazné původní zdroje nebo shodnou mřížku");
+   const slope=binary(meta.slopeF32LE,Float32Array),
+     low=binary(meta.loF32LE,Float32Array),
+     high=binary(meta.hiF32LE,Float32Array),
+     robust=binary(meta.robustB64,Uint8Array);
+   const n=meta.width*meta.height;
+   if([slope,low,high,robust].some(v=>v.length!==n)||
+      slope.filter(Number.isFinite).length!==meta.statistics.commonValidPixels||
+      robust.some(v=>v!==0&&v!==1)||
+      slope.some((v,i)=>Number.isFinite(v)&&(
+        !Number.isFinite(low[i])||!Number.isFinite(high[i])||low[i]>high[i]))||
+      slope.some((v,i)=>Number.isNaN(v)&&(
+        !Number.isNaN(low[i])||!Number.isNaN(high[i])||robust[i]!==0)))
+     throw Error("Číselná roční NDVI data nebo citlivost jsou poškozené");
+   const png=await fetch(prefix+"png"+params,{signal:controller.signal});
+   if(!png.ok)throw Error("Skutečná víceletá WebGL vrstva chybí");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     texture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   observationActive={key:tile.key,meta,multiTexture:texture};
+   texture=null;multiData={meta,slope,low,high,robust};
+   observationTile=tile;
+   $("multi-export").disabled=false;
+   $("obs-mode").value="multiyear";
+   const st=meta.statistics;
+   $("multi-summary").textContent=from+"–"+to+": "+
+     st.commonValidPixels+" platných pixelů ve všech letech ("+
+     st.commonValidPercent.toFixed(1)+" %). Dvě skutečná měření každý rok: "+
+     st.robustAllYearsPixels+". Theil–Sen "+
+     st.meanSlopeNdviPerYear.toFixed(4)+" NDVI/rok. Citlivost znaménka na "+
+     "vynechání roku: "+st.signSensitivePixels+" pixelů. "+
+     (st.lowCoverageWarning?"POZOR: nízké prostorové pokrytí. ":"")+
+     (st.dateShiftWarning?"POZOR: roční mediány jsou z různých dnů měsíce. ":"")+
+     "Nejde o interval statistické spolehlivosti ani předpověď.";
+   observationMessage("Skutečný víceletý NDVI trend je promítnut na původní "+
+     "3D ČÚZK terén. Původní výšky Bpv jsou nezměněné.");
+   drawMultiYearChart();requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("multi-summary").textContent="Víceletou analýzu nelze doložit: "+
+     String(error.message||error).slice(0,260)+
+     ". Výsledek z neplatných zdrojů nevytvářím.";
+ }finally{
+   if(texture)gl?.deleteTexture(texture);
+   if(observationRequest===controller)observationRequest=null;
+   $("multi-load").disabled=!multiSelection;
+ }
+}
+function exportMultiYear(){
+ if(!multiData)return;
+ const {meta,slope,low,high,robust}=multiData,t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const rows=["type,year,longitude_deg,latitude_deg,mean_ndvi_same_pixels,ndvi_slope_per_year,leave_year_out_low,leave_year_out_high,two_valid_sources_every_year,valid_all_years"];
+ for(const year of meta.years)
+   rows.push(["annual",year.year,"","",year.meanNdviOnCommon.toFixed(7),"","","","",""].join(","));
+ const R=6378137;
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const i=row*meta.width+col;
+   const x=t[0]+t[1]*(col+.5)+t[2]*(row+.5),
+     y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const lon=x/R*180/Math.PI,lat=(2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI;
+   const valid=Number.isFinite(slope[i]);
+   rows.push(["pixel","",lon.toFixed(8),lat.toFixed(8),"",
+     valid?slope[i].toFixed(7):"",valid?low[i].toFixed(7):"",
+     valid?high[i].toFixed(7):"",valid?robust[i]:"",valid?1:0].join(","));
+ }
+ const url=URL.createObjectURL(new Blob([rows.join("\r\n")+"\r\n"],{
+   type:"text/csv;charset=utf-8"}));
+ const link=document.createElement("a");link.href=url;
+ link.download="praha-sentinel-ndvi-vicelety-trend-"+meta.statistics.firstYear+"-"+meta.statistics.lastYear+".csv";
+ document.body.append(link);link.click();link.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+
+/** Stage 16. 2D geographic coverage is separate from the measured 3D
+ * ČÚZK surface and never paints invented cross-tile raster data.
+ */
+function drawRegionCoverage(){
+ const c=$("region-coverage"),ctx=c?.getContext("2d");
+ if(!ctx)return;
+ const w=c.width,h=c.height;
+ ctx.fillStyle="#0c2335";ctx.fillRect(0,0,w,h);
+ ctx.fillStyle="#c3deed";ctx.font="14px system-ui";
+ if(!regionPlan){ctx.fillText("Vyber oblast a spusť ověření reálných Sentinel-2 scén.",25,42);return;}
+ const p=regionPlan,marginX=65,top=32,bottom=65;
+ const cw=(w-marginX-28)/p.cols,ch=(h-top-bottom)/p.rows;
+ ctx.fillStyle="#bfdeec";ctx.fillText("S ↑  ·  skutečné geografické dlaždice / EPSG:4326",marginX,20);
+ for(const cell of p.tiles){
+   const rx=marginX+(cell.x-p.x)*cw,ry=top+(cell.y-p.y)*ch;
+   const t=regionTiles.get(cell.key),percent=t?.commonValidPercent;
+   const color=t?.status==="analyzed"?
+     (percent>=75?"#1d8568":percent>=40?"#b3a354":"#9b7645"):
+     t?.status==="insufficient"?"#566778":
+     t?.status==="error"?"#9c573b":"#1d384e";
+   ctx.fillStyle=color;ctx.fillRect(rx+2,ry+2,cw-4,ch-4);
+   ctx.strokeStyle="#8eaac0";ctx.lineWidth=1;ctx.strokeRect(rx+2,ry+2,cw-4,ch-4);
+   ctx.fillStyle="#fff";ctx.font="bold 15px system-ui";
+   ctx.fillText(cell.key,rx+10,ry+25);
+   ctx.font="13px system-ui";
+   const title=t?.status==="analyzed"?percent.toFixed(1)+" % SCL":
+     t?.status==="insufficient"?"nedostatek dat":
+     t?.status==="error"?"chyba zdroje":"čeká na zdroje";
+   ctx.fillText(title,rx+10,ry+46);
+   if(t?.status==="analyzed"){
+     ctx.fillText(t.commonValidPixels+" px",rx+10,ry+67);
+   }
+ }
+ // Only annotate the actual shared edge. Never interpolate missing spectral
+ // pixels or invent a gradient between independently sourced observations.
+ const byKey=new Map(p.tiles.map(t=>[t.key,t]));
+ for(const seam of regionSeams){
+   const a=byKey.get(seam.tileA),b=byKey.get(seam.tileB);
+   if(!a||!b)continue;
+   let x1,y1,x2,y2;
+   if(seam.orientation==="east-west"&&a.y===b.y&&Math.abs(a.x-b.x)===1){
+     x1=marginX+(Math.max(a.x,b.x)-p.x)*cw;
+     y1=top+(a.y-p.y)*ch;x2=x1;y2=y1+ch;
+   }else if(seam.orientation==="north-south"&&a.x===b.x&&Math.abs(a.y-b.y)===1){
+     y1=top+(Math.max(a.y,b.y)-p.y)*ch;
+     x1=marginX+(a.x-p.x)*cw;x2=x1+cw;y2=y1;
+   }else continue;
+   ctx.save();ctx.beginPath();ctx.setLineDash(seam.warning?[6,4]:[]);
+   ctx.lineWidth=seam.warning?3:2;
+   ctx.strokeStyle=seam.warning?"#ffbc76":"#a7f0d0";
+   ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+   if(seam.warning){
+     ctx.font="bold 18px system-ui";ctx.fillStyle="#ffe0aa";
+     ctx.fillText("!",(x1+x2)/2+5,(y1+y2)/2-5);
+   }
+   ctx.restore();
+ }
+ const first=p.tiles[0],last=p.tiles[p.tiles.length-1];
+ if(first?.bounds&&last?.bounds){
+   ctx.fillStyle="#b8d7e9";ctx.font="12px system-ui";
+   ctx.fillText("SZ: "+first.bounds.west.toFixed(5)+"° E, "+
+     first.bounds.north.toFixed(5)+"° N",marginX, h-37);
+   ctx.fillText("JV: "+last.bounds.east.toFixed(5)+"° E, "+
+     last.bounds.south.toFixed(5)+"° N",marginX,h-19);
+ }
+}
+function downloadRegion(name,mime,text){
+ const url=URL.createObjectURL(new Blob([text],{type:mime}));
+ const a=document.createElement("a");a.href=url;a.download=name;
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function exportRegionCsv(){
+ if(!regionResult)return;
+ const quote=v=>'"'+String(v??"").replace(/"/g,'""')+'"';
+ const rows=[["source_lock_id","tile","status","west","south","east","north",
+   "valid_all_years_px","analyzed_px","valid_percent_within_tile",
+   "two_valid_sources_each_year_px","mean_ndvi_slope_per_year","note"].join(",")];
+ for(const t of regionResult.tiles){
+   const b=t.bounds;
+   rows.push([regionResult.sourceLockId??"",t.key,t.status,b.west,b.south,b.east,b.north,
+     t.commonValidPixels,t.totalPixels,t.commonValidPercent,
+     t.robustAllYearsPixels,t.meanSlopeNdviPerYear,t.reason??""].map(quote).join(","));
+ }
+ downloadRegion("praha-sentinel-ndvi-regional-coverage-"+regionResult.fromYear+
+   "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",rows.join("\r\n")+"\r\n");
+}
+function exportRegionQuality(){
+ if(!regionResult?.quality)return;
+ const data={status:"real-sentinel-region-quality-export",
+   sourceLockId:regionResult.sourceLockId??null,
+   sourceSelectionStatus:regionResult.sourceSelectionStatus,
+   fromYear:regionResult.fromYear,toYear:regionResult.toYear,
+   month:regionResult.month,
+   originalAnnualScenes:regionResult.lockedSourceYears,
+   regionFullyAnalyzed:regionResult.regionFullyAnalyzed,
+   quality:regionResult.quality};
+ downloadRegion("praha-sentinel-regionalni-provoz-"+regionResult.fromYear+"-"+
+   regionResult.toYear+".json","application/json",JSON.stringify(data,null,2));
+}
+function exportRegionSeamsCsv(){
+ if(!regionResult?.seams)return;
+ const quote=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
+ const lines=[["source_lock_id","tile_a","tile_b","orientation","source_comparable","state",
+   "paired_real_pixel_centers","edge_pixels",
+   "mean_absolute_ndvi_year_difference","max_absolute_ndvi_year_difference",
+   "signed_b_minus_a_ndvi_year","warning","interpretation"].join(",")];
+ for(const s of regionResult.seams)lines.push([
+   regionResult.sourceLockId??"",s.tileA,s.tileB,s.orientation,s.comparableSources,s.state,
+   s.pairedPixels,s.sourceEdgePixels,
+   s.meanAbsDifferenceNdviPerYear,s.maxAbsDifferenceNdviPerYear,
+   s.meanSignedBMinusANdviPerYear,s.warning,s.note].map(quote).join(","));
+ downloadRegion("praha-sentinel-ndvi-overene-hranice-"+regionResult.fromYear+
+   "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",
+   lines.join("\r\n")+"\r\n");
+}
+function exportRegionGeoJson(){
+ if(!regionResult)return;
+ const features=regionResult.tiles.map(t=>{
+   const b=t.bounds;
+   return {type:"Feature",properties:{key:t.key,status:t.status,
+     validAllYearsPixels:t.commonValidPixels,
+     analyzedPixels:t.totalPixels,validPercent:t.commonValidPercent,
+     robustAllYearsPixels:t.robustAllYearsPixels,
+     slopeNdviPerYear:t.meanSlopeNdviPerYear,
+     reason:t.reason??null,
+     neighboringSeamWarnings:(regionResult.seams??[]).filter(s=>
+       s.warning&&(s.tileA===t.key||s.tileB===t.key)).length},
+     geometry:{type:"Polygon",coordinates:[[
+       [b.west,b.north],[b.east,b.north],[b.east,b.south],
+       [b.west,b.south],[b.west,b.north]
+     ]]}}
+ });
+ downloadRegion("praha-sentinel-ndvi-regional-coverage.geojson",
+   "application/geo+json",JSON.stringify({type:"FeatureCollection",
+     metadata:{sourceLockId:regionResult.sourceLockId??null,
+       sourceSelectionStatus:regionResult.sourceSelectionStatus??"unavailable",
+       originalAnnualScenes:regionResult.lockedSourceYears??[],
+       fromYear:regionResult.fromYear,toYear:regionResult.toYear,
+       month:regionResult.month,partial:!regionResult.regionFullyAnalyzed},
+     features},null,2));
+}
+async function runRegionCoverage(){
+ if(regionRun||!config)return;
+ const selected=chosenObservationTile();
+ if(!selected){$("region-status").textContent="Nejprve načti mapu.";return;}
+ const size=Number($("region-size").value);
+ const from=Number($("multi-from").value),to=Number($("multi-to").value),
+   month=Number($("multi-month").value),cloud=Number($("multi-cloud").value);
+ if(![2,3,4].includes(size)||!Number.isInteger(from)||!Number.isInteger(to)||
+   from<2017||to>2100||to-from<2||to-from>4||
+   !Number.isInteger(month)||month<1||month>12||
+   !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("region-status").textContent="Neplatný rozsah: zvol 3–5 roků, měsíc a oblačnost 0–100 %.";return;
+ }
+ const x=clamp(selected.x-Math.floor(size/2),0,config.levels[0].cols-size);
+ const y=clamp(selected.y-Math.floor(size/2),0,config.levels[0].rows-size);
+ const cells=[];
+ for(let iy=y;iy<y+size;iy++)for(let ix=x;ix<x+size;ix++){
+   const b=boundsFor(0,ix,iy);
+   cells.push({key:"0-"+ix+"-"+iy,x:ix,y:iy,
+     bounds:{west:b[0],south:b[1],east:b[2],north:b[3]}});
+ }
+ clearRegionGpu();
+ if($("obs-mode").value==="region")$("obs-mode").value="ortho";
+ $("region-3d").disabled=true;$("region-3d").textContent="Zobrazit regionální trend ve 3D";
+ regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud,sourceLockId:null,lockedSourceYears:[]};
+ regionTiles.clear();regionSeams=[];regionResult=null;drawRegionCoverage();
+ $("region-seam-export").disabled=true;
+ $("region-quality-export").disabled=true;
+ $("region-quality").textContent="Měřím celý region "+cells.length+
+   " dlaždic: časy po dlaždicích, vzorkovaná RAM procesu Node a využití původní zdrojové cache. GPU není měřeno.";
+ $("region-source-status").textContent="Nejprve ověřuji dvě stejné původní scény pro každý rok v celém regionu. Pokud společná scéna chybí, nic nenahradím.";
+ $("region-seam-note").textContent="Kontroluji nativní okraje každé dvojice sousedních skutečných Sentinel dlaždic. Žádné mezery automaticky nevyhlazuji.";
+ const controller=new AbortController();regionRun=controller;
+ $("region-start").disabled=true;$("region-stop").disabled=false;
+ $("region-export").disabled=true;$("region-geojson").disabled=true;
+ $("region-status").textContent="Postupně ověřuji "+cells.length+
+   " skutečných dlaždic; každá vyžaduje 2 zdrojové scény za rok. Bez doplněných pixelů.";
+ try{
+   const uri="/api/observations/multiyear/region.ndjson?"+
+     new URLSearchParams({x:String(x),y:String(y),cols:String(size),rows:String(size),
+       from:String(from),to:String(to),month:String(month),cloud:String(cloud)});
+   const response=await fetch(uri,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,240));
+   if(!response.body)throw Error("Prohlížeč nepodporuje průběžné streamování výsledku");
+   const reader=response.body.getReader(),decoder=new TextDecoder();
+   let buffer="",completed=false;
+   const consume=line=>{
+     if(!line.trim())return;
+     const event=JSON.parse(line);
+     if(event.type==="source-lock"){
+       if(event.status==="unavailable"){
+         $("region-source-status").textContent="Společné scény nebyly ověřeny: "+
+           String(event.reason??"zdroj nedostupný").slice(0,160)+
+           ". Všechny nedoložené dlaždice zůstanou bez Sentinel vrstvy.";
+       }else{
+         const groups=event.seasons;
+         if(event.status!=="real-sentinel-region-shared-scenes"||
+           !/^[a-f0-9]{32}$/.test(event.id)||
+           event.from!==from||event.to!==to||event.month!==month||
+           event.cloud!==cloud||!Array.isArray(groups)||
+           groups.length!==to-from+1||
+           !groups.every((y,i)=>y.year===from+i&&y.scenes.length===2&&
+             y.scenes.every(scene=>validSceneId(scene.id)&&
+               typeof scene.acquiredAt==="string"&&
+               Number.isFinite(Date.parse(scene.acquiredAt)))))
+           throw Error("Společný Sentinel regionální katalog nebyl ověřen");
+         regionPlan.sourceLockId=event.id;
+         regionPlan.lockedSourceYears=groups;
+         $("region-source-status").textContent="Snímky uzamčeny pro "+
+           cells.length+" dlaždic: "+groups.map(y=>y.year+" ("+
+             y.scenes.map(o=>o.acquiredAt.slice(0,10)).join(" a ")+")").join(" | ")+
+           ". Každá dlaždice používá totožné scény, ale vlastní SCL platnost.";
+       }
+     }else if(event.type==="tile"){
+       const t=event.tile;
+       if(!cells.some(c=>c.key===t.key)||!["analyzed","insufficient","error"].includes(t.status))
+         throw Error("Neověřená regionální dlaždice");
+       regionTiles.set(t.key,t);
+       const ok=[...regionTiles.values()].filter(t=>t.status==="analyzed").length;
+       $("region-status").textContent=event.processed+"/"+event.total+
+         " dlaždic prověřeno; úplná skutečná data: "+ok+
+         ". Nepokrytá místa zůstávají nevyplněná.";
+       const m=event.metrics;
+       if(m&&Number.isFinite(m.durationMs)&&m.durationMs>=0&&
+         Number.isFinite(m.rssBytes)&&m.rssBytes>=0&&
+         ["hit","miss","unavailable"].includes(m.sourceCache)){
+         $("region-quality").textContent="Zpracováno "+event.processed+"/"+event.total+
+           " dlaždic · poslední "+m.durationMs.toFixed(0)+" ms · "+
+           (m.rssBytes/1048576).toFixed(1)+" MiB aktuální RSS Node · "+
+           "zdrojová cache: "+m.sourceCache+
+           ". Zatím nejde o finální maximum ani o GPU paměť.";
+       }
+       drawRegionCoverage();
+     }else if(event.type==="seam"){
+       const seam=event.seam;
+       if(seam?.status!=="real-sentinel-region-seam-check"||
+         seam.version!==1||
+         !cells.some(c=>c.key===seam.tileA)||
+         !cells.some(c=>c.key===seam.tileB)||
+         !["comparable","different-acquisitions","unaligned-grid",
+           "insufficient-edge-data"].includes(seam.state)||
+         !Number.isInteger(seam.pairedPixels)||seam.pairedPixels<0||
+         regionSeams.some(s=>s.tileA===seam.tileA&&s.tileB===seam.tileB))
+         throw Error("Neověřená diagnostika hranice skutečných družicových dat");
+       regionSeams.push(seam);drawRegionCoverage();
+       const flagged=regionSeams.filter(s=>s.warning).length;
+       $("region-seam-note").textContent="Ověřeno "+regionSeams.length+
+         " sousedních hranic, upozornění "+flagged+
+         ". Porovnávám jen přímo sousední původní pixely při shodných zdrojích, bez interpolace.";
+     }else if(event.type==="complete"){
+       const r=event.result;
+       if(r.status!=="real-sentinel-multiyear-region-coverage"||
+         r.version!==1||r.fromYear!==from||r.toYear!==to||
+         r.month!==month||r.requestedTiles!==cells.length||
+         r.pendingTiles!==0||r.tiles.length!==cells.length)
+         throw Error("Neúplný nebo neověřený regionální přehled");
+       if(!["shared","unavailable"].includes(r.sourceSelectionStatus)||
+         r.sourceLockId!==(regionPlan.sourceLockId??null)||
+         !Array.isArray(r.lockedSourceYears)||
+         r.lockedSourceYears.length!==(r.sourceLockId?to-from+1:0)||
+         r.tiles.some(t=>t.status==="analyzed"&&!r.sourceLockId)||
+         (r.sourceLockId&&r.tiles.some(t=>t.status==="analyzed"&&
+           !r.lockedSourceYears.every((y,i)=>
+             y.year===from+i&&t.sourceScenes?.[i]?.year===y.year&&
+             y.scenes.every((scene,j)=>
+               t.sourceScenes[i].scenes[j]?.sceneId===scene.id&&
+               t.sourceScenes[i].scenes[j]?.acquiredAt===scene.acquiredAt)))))
+         throw Error("Regionální výsledek nedodržel společné historické zdroje");
+       if(!Array.isArray(r.seams)||r.seams.length!==regionSeams.length||
+         r.seamWarningCount!==regionSeams.filter(s=>s.warning).length)
+         throw Error("Regionální kontrola skutečných hranic není úplná");
+       const q=r.quality;
+       if(q?.status!=="real-sentinel-region-runtime-quality"||q.version!==1||
+         q.requestedTiles!==cells.length||q.measuredTileCount!==cells.length||
+         q.analyzedTiles!==r.analyzedTiles||
+         ![1,2].includes(q.scenePairConcurrency)||
+         !Number.isInteger(q.maxObservedConcurrentSourceJobs)||
+         q.maxObservedConcurrentSourceJobs<0||
+         q.maxObservedConcurrentSourceJobs>2||
+         !q.cogRangeCache||
+         !Number.isFinite(q.cogRangeCache.maxResidentMiB)||
+         !Number.isFinite(q.cogRangeCache.residentMiB)||
+         q.cogRangeCache.residentMiB<0||
+         q.cogRangeCache.residentMiB>q.cogRangeCache.maxResidentMiB||
+         !Number.isFinite(q.cogRangeCache.activeBudgetMiB)||
+         q.cogRangeCache.activeBudgetMiB<0||
+         q.cogRangeCache.activeBudgetMiB>q.cogRangeCache.maxResidentMiB||
+         q.cogRangeCache.residentMiB>q.cogRangeCache.activeBudgetMiB||
+         !q.cogMemory||
+         !["adaptive","fixed"].includes(q.cogMemory.mode)||
+         !Number.isFinite(q.cogMemory.activeBudgetMiB)||
+         q.cogMemory.activeBudgetMiB!==q.cogRangeCache.activeBudgetMiB||
+         !Number.isInteger(q.cogMemory.checks)||q.cogMemory.checks<0||
+         !Number.isInteger(q.cogMemory.shrinkEvents)||
+         q.cogMemory.shrinkEvents<0||
+         !Number.isInteger(q.cogMemory.recoveryEvents)||
+         q.cogMemory.recoveryEvents<0||
+         !Number.isInteger(q.cogRangeCache.httpRequests)||
+         q.cogRangeCache.httpRequests<0||
+         !Number.isInteger(q.cogRangeCache.httpBytesRead)||
+         q.cogRangeCache.httpBytesRead<0||
+         !Number.isInteger(q.cogRangeCache.rangeCacheHits)||
+         q.cogRangeCache.rangeCacheHits<0||
+         !Number.isFinite(q.elapsedMs)||q.elapsedMs<0||
+         !Number.isFinite(q.peakRssMiB)||q.peakRssMiB<=0||
+         !Number.isFinite(q.peakHeapUsedMiB)||q.peakHeapUsedMiB<=0||
+         q.rasterCacheHits+q.rasterCacheMisses+
+           q.rasterCacheUnavailable!==cells.length||
+         q.wholeRegionSclPixelCoveragePercent!==(
+           r.regionFullyAnalyzed?r.percentValidWithinAnalyzedTiles:null))
+         throw Error("Skutečné provozní údaje regionu nejsou úplné nebo odpovídající zdrojům");
+       regionResult=r;completed=true;
+       $("region-quality-export").disabled=false;
+       $("region-quality").textContent="ETAPY 20–23 · "+
+         r.analyzedTiles+"/"+cells.length+" doložených dlaždic ("+
+         q.analyzedTilePercent.toFixed(1)+" %) · "+
+         q.elapsedMs.toFixed(0)+" ms serverový výpočet · špička Node RSS "+
+         q.peakRssMiB.toFixed(1)+" MiB · špička V8 heap "+
+         q.peakHeapUsedMiB.toFixed(1)+" MiB · zdrojová cache "+
+         q.rasterCacheHits+"× hit / "+q.rasterCacheMisses+"× miss / "+
+         q.rasterCacheUnavailable+"× nedostupné · "+
+         "Načítání původních scén: "+q.scenePairConcurrency+
+         " současně (pozorováno max. "+q.maxObservedConcurrentSourceJobs+") · "+
+         "Původní COG HTTP 206: "+q.cogRangeCache.httpRequests+
+         " požadavků / "+(q.cogRangeCache.httpBytesRead/1048576).toFixed(2)+
+         " MiB staženo · znovu použito "+
+         q.cogRangeCache.rangeCacheHits+" rozsahů / "+
+         (q.cogRangeCache.reusedBytes/1048576).toFixed(2)+
+         " MiB · cache "+q.cogRangeCache.residentMiB.toFixed(1)+
+         "/"+q.cogRangeCache.maxResidentMiB.toFixed(0)+" MiB · "+
+         "Adaptivní ochrana RAM: "+q.cogMemory.mode+
+         ", aktuální strop "+q.cogMemory.activeBudgetMiB.toFixed(1)+
+         " MiB / cílová RSS "+q.cogMemory.effectiveRssTargetMiB+
+         " MiB; omezení "+q.cogMemory.shrinkEvents+
+         "×, návrat "+q.cogMemory.recoveryEvents+
+         "×, skutečně uvolněno "+
+         (q.cogMemory.freedFromCacheBytes/1048576).toFixed(2)+
+         " MiB · "+
+         "Celoregionální SCL pokrytí: "+
+         (q.wholeRegionSclPixelCoveragePercent===null?
+           "nelze spočítat – chybí skutečné dlaždice":
+           q.wholeRegionSclPixelCoveragePercent.toFixed(1)+" %")+
+         (q.memorySoftLimitExceeded?
+           " · UPOZORNĚNÍ: překročen měkký limit procesové RAM!":"")+
+         ". RAM je vzorkována po "+q.samplingIntervalMs+
+         " ms, GPU není měřeno.";
+       $("region-seam-export").disabled=r.seams.length===0;
+       $("region-seam-note").textContent="Mezi "+r.analyzedTiles+
+         " doloženými dlaždicemi porovnáno "+r.seams.length+
+         " přímých hranic; upozornění "+r.seamWarningCount+
+         ". Zelené = srovnatelné původní sousední pixely, oranžové = jiné zdroje, neshodná mřížka, chybějící okraj nebo výraznější rozdíl. Nenahrazuje se žádný pixel.";
+       $("region-3d").disabled=r.analyzedTiles===0;
+       $("region-export").disabled=false;$("region-geojson").disabled=false;
+       const mean=r.meanSlopeOnObservedPixels===null?"bez platných měření":
+         r.meanSlopeOnObservedPixels.toFixed(5)+" NDVI/rok";
+       $("region-status").textContent="Hotovo: "+r.analyzedTiles+"/"+r.requestedTiles+
+         " úplně doložených dlaždic, "+r.commonValidPixels+
+         " společných skutečných pixelů, vážený popisný trend: "+mean+
+         ". "+(r.regionFullyAnalyzed?"Všechny dlaždice doloženy.":
+         "ČÁSTEČNÉ ÚZEMÍ – nedoložené dlaždice nejsou ve výpočtu!")+
+         " Pokrytí v doložených dlaždicích: "+
+         (r.percentValidWithinAnalyzedTiles===null?"—":
+           r.percentValidWithinAnalyzedTiles.toFixed(1)+" %")+".";
+       $("region-detail").textContent=r.years.map(y=>y.year+": "+
+         (y.meanNdviOnObservedPixels===null?"bez dat":
+           y.meanNdviOnObservedPixels.toFixed(4))+" NDVI").join(" | ")+
+         ". Průměry jsou vážené pouze pixely doloženými ve všech letech v úspěšných dlaždicích. "+
+         "Nehodnotí se příčina změny ani statistická průkaznost.";
+     }
+   };
+   while(true){
+     const {value,done}=await reader.read();
+     if(done)break;
+     buffer+=decoder.decode(value,{stream:true});
+     let pos;
+     while((pos=buffer.indexOf("\n"))>=0){
+       consume(buffer.slice(0,pos));buffer=buffer.slice(pos+1);
+     }
+     if(buffer.length>131072)throw Error("Příliš velký proud regionálních metadat");
+   }
+   buffer+=decoder.decode();
+   if(buffer.trim())consume(buffer);
+   if(!completed)throw Error("Server nedokončil regionální zdrojovou analýzu");
+ }catch(error){
+   if(controller.signal.aborted){
+     $("region-status").textContent="Regionální analýza zastavena. Nedokončená oblast nemá výsledek.";
+   }else{
+     $("region-status").textContent="Regionální analýza nebyla dokončena: "+
+       String(error.message||error).slice(0,220);
+   }
+ }finally{
+   if(regionRun===controller)regionRun=null;
+   $("region-start").disabled=false;$("region-stop").disabled=true;
+ }
+}
+
+/** Regional overlay textures are never shared with or allowed to alter
+ * the genuine source ČÚZK mesh/elevation data.
+ * The Stage 15 server validates the actual Sentinel-2 COG source raster.
+ */
+function clearRegionGpu(){
+ regionEpoch++;
+ regionTextureLoading?.controller.abort();
+ regionTextureLoading=null;
+ for(const layer of regionGpu.values())gl?.deleteTexture(layer.texture);
+ regionGpu.clear();regionFailed.clear();
+ const line=$("region-3d-status");
+ if(line)line.textContent="3D regionální textury uvolněny; žádné nedoložené pixely se nezobrazují.";
+}
+function regionOverlayActive(){
+ return !!gl&&!!regionResult&&$("obs-mode").value==="region";
+}
+function regionWantedTiles(){
+ if(!regionOverlayActive())return [];
+ const selected=new Map(regionPlan?.tiles.map(t=>[t.key,t])??[]);
+ // Use only already verified, *currently render-selected* coarse parents.
+ // Fine z=1 meshes reuse the corresponding georeferenced source parent.
+ const visible=new Set(selection.coarse.map(t=>t.key));
+ for(const t of selection.finer)if(t.parent)visible.add(t.parent);
+ return [...visible].filter(id=>regionTiles.get(id)?.status==="analyzed"&&selected.has(id))
+   .map(id=>({key:id,cell:selected.get(id)}))
+   .sort((a,b)=>nearTile(0,a.cell.x,a.cell.y)-nearTile(0,b.cell.x,b.cell.y))
+   .slice(0,MAX_REGION_GPU);
+}
+function validateRegionSource(meta,tile){
+ const report=regionTiles.get(tile.key),from=regionResult?.fromYear,
+   to=regionResult?.toYear,month=regionResult?.month;
+ const n=meta?.width*meta?.height,scenes=report?.sourceScenes;
+ if(report?.status!=="analyzed"||
+   meta?.status!=="real-sentinel-multiyear-seasonal-trend"||
+   meta.version!==1||meta.key!==tile.key||meta.month!==month||
+   meta.terrainElevationUnchanged!==true||
+   meta.qa?.allSourceSclMasked!==true||meta.qa?.allSameGrid!==true||
+   meta.qa?.fixedCommonPixelPopulation!==true||
+   meta.qa?.noGapFilling!==true||
+   meta.qa?.leaveOneYearOutSensitivity!==true||
+   meta.grid?.crs!=="EPSG:3857"||
+   !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+   meta.width<2||meta.height<2||n>50000||
+   meta.statistics?.firstYear!==from||meta.statistics?.lastYear!==to||
+   meta.statistics?.totalPixels!==n||
+   meta.statistics?.commonValidPixels!==report.commonValidPixels||
+   meta.statistics?.robustAllYearsPixels!==report.robustAllYearsPixels||
+   (regionResult?.sourceLockId&&
+     (meta.sourceLockId!==regionResult.sourceLockId||
+      meta.regionSourceLocked!==true))||
+   !Array.isArray(meta.years)||meta.years.length!==to-from+1||
+   !Array.isArray(scenes)||scenes.length!==meta.years.length||
+   !meta.years.every((y,i)=>y.year===from+i&&
+     scenes[i].year===y.year&&y.scenes.length===2&&
+     scenes[i].scenes.length===2&&y.scenes.every((scene,j)=>
+       scene.sceneId===scenes[i].scenes[j].sceneId&&
+       scene.acquiredAt===scenes[i].scenes[j].acquiredAt)))
+   throw Error("3D regionální vrstva neodpovídá zdrojově ověřenému roku, SCL, geometrii nebo scénám");
+ // The source pixel raster must be georeferenced to exactly this measured
+ // Prague overview tile. Reject shifted/rotated grids and AOI substitutions.
+ const b=tile.cell?.bounds,a=meta.area,t=meta.grid?.transform;
+ if(!b||!Array.isArray(a)||a.length!==4||
+   !Array.isArray(t)||t.length!==6||
+   ![...a,...t].every(Number.isFinite)||
+   a.some((v,i)=>Math.abs(v-[b.west,b.south,b.east,b.north][i])>1e-7)||
+   t[2]!==0||t[4]!==0)
+   throw Error("3D regionální vrstva nemá shodnou geografickou hranici zdrojové dlaždice");
+ const mercWest=merc(b.west,b.north),mercEast=merc(b.east,b.south);
+ if(Math.abs(t[0]-mercWest[0])>.25||
+    Math.abs(t[3]-mercWest[1])>.25||
+    Math.abs(t[0]+t[1]*meta.width-mercEast[0])>.25||
+    Math.abs(t[3]+t[5]*meta.height-mercEast[1])>.25)
+   throw Error("3D regionální Sentinel rastr má posunutou EPSG:3857 mřížku");
+ // The sampled raster is separately recalculated from actual source bits
+ // and checked against the Stage 16 tile summary before uploading to GPU.
+ const slopes=binary(meta.slopeF32LE,Float32Array),
+   robust=binary(meta.robustB64,Uint8Array);
+ if(slopes.length!==n||robust.length!==n||
+   slopes.filter(Number.isFinite).length!==report.commonValidPixels||
+   robust.reduce((a,v)=>a+(v===1?1:0),0)!==report.robustAllYearsPixels||
+   robust.some((v,i)=>v>1||(v===1&&!Number.isFinite(slopes[i]))))
+   throw Error("3D regionální NDVI mřížka nesouhlasí s doloženými SCL pixely");
+ return true;
+}
+async function loadRegionTexture(tile,epoch,controller){
+ const id=tile.key,params=regionResult;
+ const base="/api/observations/multiyear/0/"+tile.cell.x+"/"+tile.cell.y+"/"+
+   params.fromYear+"/"+params.toYear+"/"+params.month+".";
+ const cloud=Number(regionPlan?.cloud);
+ if(!Number.isFinite(cloud))throw Error("Regionální oblačnost nebyla doložena");
+ const suffix="?"+new URLSearchParams({
+   cloud:String(cloud),...(params.sourceLockId?{lock:params.sourceLockId}:{})
+ });
+ const reply=await fetch(base+"json"+suffix,{signal:controller.signal});
+ if(!reply.ok)throw Error("Sentinel regionální metadata HTTP "+reply.status);
+ const meta=await reply.json();
+ if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+ validateRegionSource(meta,tile);
+ const bitmapReply=await fetch(base+"png"+suffix,{signal:controller.signal});
+ if(!bitmapReply.ok)throw Error("Ověřená regionální Sentinel textura HTTP "+bitmapReply.status);
+ const bitmap=await createImageBitmap(await bitmapReply.blob());
+ let texture=null;
+ try{
+   if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+   texture=observationTexture(bitmap,meta.width,meta.height);
+   if(epoch!==regionEpoch||controller.signal.aborted||!regionOverlayActive())return;
+   regionGpu.set(id,{texture,lastUsed:Date.now(),sourceScenes:meta.years.length});
+   texture=null;
+ }finally{
+   bitmap.close?.();
+   if(texture)gl?.deleteTexture(texture);
+ }
+}
+function updateRegionOverlays(){
+ if(!gl||!config)return;
+ if(!regionOverlayActive()){
+   if(regionGpu.size||regionTextureLoading)clearRegionGpu();
+   return;
+ }
+ const targets=regionWantedTiles(),keys=new Set(targets.map(t=>t.key));
+ if(regionTextureLoading&&!keys.has(regionTextureLoading.key))
+   regionTextureLoading.controller.abort();
+ for(const [key,entry] of regionGpu)
+   if(!keys.has(key)){gl.deleteTexture(entry.texture);regionGpu.delete(key);}
+ if(regionGpu.size>MAX_REGION_GPU)throw Error("Regional GPU texture budget exceeded");
+ const line=$("region-3d-status");
+ line.textContent="3D Sentinel: "+regionGpu.size+"/"+MAX_REGION_GPU+
+   " skutečných textur v GPU; pouze aktuálně potřebné oblasti. "+
+   "Chybějící pixely, scény a celé dlaždice nechávám průhledné.";
+ if(regionTextureLoading)return;
+ const next=targets.find(t=>!regionGpu.has(t.key)&&
+   (regionFailed.get(t.key)??0)<=Date.now());
+ if(!next)return;
+ const controller=new AbortController(),epoch=regionEpoch;
+ regionTextureLoading={controller,key:next.key};
+ loadRegionTexture(next,epoch,controller).catch(error=>{
+   if(controller.signal.aborted||epoch!==regionEpoch||error?.name==="AbortError")return;
+   regionFailed.set(next.key,Date.now()+30000);
+   line.textContent="Dlaždice "+next.key+" nemá ověřenou regionální 3D texturu: "+
+     String(error?.message||error).slice(0,170)+
+     ". Nedoplňuji jí žádnými náhradními pixely.";
+ }).finally(()=>{
+   if(regionTextureLoading?.controller===controller)
+     regionTextureLoading=null;
+   if(epoch===regionEpoch&&gl){
+     requestDraw();updateRegionOverlays();
+   }
+ });
+}
+function toggleRegion3d(){
+ if(!regionResult||regionResult.analyzedTiles===0)return;
+ if($("obs-mode").value==="region"){
+   $("obs-mode").value="ortho";
+   $("region-3d").textContent="Zobrazit regionální trend ve 3D";
+   clearRegionGpu();
+ }else{
+   disposeObservation(observationActive);observationActive=null;
+   $("obs-mode").value="region";
+   $("region-3d").textContent="Skrýt regionální 3D trend";
+   updateRegionOverlays();
+ }
+ requestDraw();
+}
+function dispose(t){
+ gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
+ gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
+}
+function evict(keep){
+ if(cache.size<=MAX_GPU_TILES)return;
+ const old=[...cache].filter(([id])=>!keep.has(id))
+   .sort((a,b)=>a[1].lastUsed-b[1].lastUsed);
+ for(const [id,t] of old){
+   if(cache.size<=MAX_GPU_TILES)break;
+   dispose(t);cache.delete(id);
+ }
+}
+function update(){
+ if(!config||!gl)return;
+ selection=choose();
+ const {coarse,finer}=selection;
+ const ids=new Set();
+ // Coarse first, then four fine children per nearby area (atomic LOD switch).
+ for(const t of coarse){ids.add(t.key);scheduleFetch(t);}
+ for(const t of finer){ids.add(t.key);scheduleFetch(t);}
+ for(const t of coarse){
+   if((transitions.get(t.key)?.value??0)>.001){
+     for(const child of childIds(t))ids.add(child);
+   }
+ }
+ // Drop stale requests that have not started. Disk-cached requests can be reused later.
+ const desired=new Set([...coarse,...finer].map(t=>t.key));
+ for(const [id,controller] of controllers)if(!desired.has(id))controller.abort();
+ for(let i=queue.length-1;i>=0;i--)if(!desired.has(queue[i].key))queue.splice(i,1);
+ evict(ids);
+ pump();updateBuildings();updateRegionOverlays();requestDraw();
+}
+function camera(){
+ const ray=[Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),Math.cos(yaw)*Math.cos(pitch)];
+ const forward=ray.map(x=>-x),right=vnorm(vcross(forward,[0,1,0]));
+ const up=vnorm(vcross(right,forward));
+ return {forward,right,up,target:[panX,28*vertical,-panNorth]};
+}
+function makeShader(type,src){
+ const sh=gl.createShader(type);gl.shaderSource(sh,src);gl.compileShader(sh);
+ if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;
+}
+function startGpu(){
+ gl=canvas.getContext("webgl",{alpha:false,antialias:true,preserveDrawingBuffer:false});
+ if(!gl)throw Error("WebGL 1.0 nedostupné – vyžaduje grafický prohlížeč.");
+ const vertexSrc=[
+   "attribute vec3 aPosition; attribute vec2 aUv;",
+   "uniform highp vec3 uForward,uRight,uUp,uTarget;",
+   "uniform highp float uVertical,uAspect,uTanHalf,uDistance,uNear,uFar,uBase;",
+   "varying mediump vec2 vUv; varying mediump float vElevation;",
+   "void main(){",
+   " vec3 world=vec3(aPosition.x,(aPosition.z-uBase)*uVertical,-aPosition.y);",
+   " vec3 rel=world-uTarget;",
+   " float d=dot(rel,uForward)+uDistance;",
+   " gl_Position=vec4(dot(rel,uRight)/(uTanHalf*uAspect),dot(rel,uUp)/uTanHalf,",
+   "   (uFar+uNear)/(uFar-uNear)*d-2.0*uFar*uNear/(uFar-uNear),d);",
+   " vUv=aUv;vElevation=aPosition.z;",
+   "}"
+ ].join("\n");
+ const fragmentSrc=[
+   "precision mediump float;",
+   "uniform sampler2D uTexture;",
+   "uniform sampler2D uOverlayTexture;",
+   "uniform mediump vec4 uOverlayUv;",
+   "uniform int uOverlayMode;",
+   "uniform mediump float uFade;",
+   "uniform int uPass;",
+   "varying mediump vec2 vUv; varying mediump float vElevation;",
+   "void main(){",
+   " vec2 cell=mod(floor(gl_FragCoord.xy),4.0);",
+   " vec2 low=mod(cell,2.0),hi=floor(cell*.5);",
+   " float lo=2.0*low.x+3.0*low.y-4.0*low.x*low.y;",
+   " float up=2.0*hi.x+3.0*hi.y-4.0*hi.x*hi.y;",
+   " float threshold=(lo*4.0+up+.5)/16.0;",
+   " if(uPass==1 && uFade<threshold)discard;",
+   " if(uPass==0 && uFade>=threshold)discard;",
+   " vec4 rgba=texture2D(uTexture,vUv);",
+   " if(uOverlayMode==1){",
+   "   // Reject measured source sampling outside each tile, even on LOD skirts.",
+   "   if(vUv.x>=0.0 && vUv.x<=1.0 && vUv.y>=0.0 && vUv.y<=1.0){",
+   "     vec4 observation=texture2D(uOverlayTexture,vUv*uOverlayUv.zw+uOverlayUv.xy);",
+   "     if(observation.a>0.01){",
+   "       rgba=vec4(mix(rgba.rgb,observation.rgb,observation.a),max(rgba.a,observation.a));",
+   "     }",
+   "   }",
+   " }",
+   " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
+   " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",
+   " gl_FragColor=vec4(colour,1.0);",
+   "}"
+ ].join("\n");
+ program=gl.createProgram();
+ gl.attachShader(program,makeShader(gl.VERTEX_SHADER,vertexSrc));
+ gl.attachShader(program,makeShader(gl.FRAGMENT_SHADER,fragmentSrc));
+ gl.linkProgram(program);
+ if(!gl.getProgramParameter(program,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(program));
+ gl.useProgram(program);
+ attrs={pos:gl.getAttribLocation(program,"aPosition"),uv:gl.getAttribLocation(program,"aUv")};
+ uni=Object.fromEntries(["uForward","uRight","uUp","uTarget","uVertical","uAspect",
+   "uTanHalf","uDistance","uNear","uFar","uBase","uTexture","uFade","uPass",
+   "uOverlayTexture","uOverlayUv","uOverlayMode"]
+   .map(n=>[n,gl.getUniformLocation(program,n)]));
+ gl.enable(gl.DEPTH_TEST);gl.depthFunc(gl.LEQUAL);gl.clearColor(.055,.12,.19,1);
+ gl.uniform1f(uni.uBase,BASE_HEIGHT);
+ gl.uniform1i(uni.uTexture,0);
+ gl.uniform1i(uni.uOverlayTexture,1);
+ gl.uniform1i(uni.uOverlayMode,0);
+ gl.uniform4f(uni.uOverlayUv,0,0,1,1);
+}
+function bindAttr(buffer,location,size){
+ gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+ gl.enableVertexAttribArray(location);
+ gl.vertexAttribPointer(location,size,gl.FLOAT,false,0,0);
+}
+function requestDraw(){
+ if(needsDraw)return;needsDraw=true;
+ requestAnimationFrame(()=>{
+   needsDraw=false;draw();
+ });
+}
+function draw(){
+ if(!gl)return;
+ const ratio=Math.min(2,window.devicePixelRatio||1);
+ const width=Math.max(1,Math.round(canvas.clientWidth*ratio));
+ const height=Math.max(1,Math.round(canvas.clientHeight*ratio));
+ if(canvas.width!==width||canvas.height!==height){canvas.width=width;canvas.height=height;}
+ gl.viewport(0,0,width,height);
+ gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);
+ gl.useProgram(program);
+ const c=camera();
+ gl.uniform3fv(uni.uForward,c.forward);
+ gl.uniform3fv(uni.uRight,c.right);
+ gl.uniform3fv(uni.uUp,c.up);
+ gl.uniform3fv(uni.uTarget,c.target);
+ gl.uniform1f(uni.uVertical,vertical);
+ gl.uniform1f(uni.uAspect,width/height);
+ gl.uniform1f(uni.uTanHalf,Math.tan(Math.PI/8));
+ gl.uniform1f(uni.uDistance,distance);
+ gl.uniform1f(uni.uNear,.1);
+ gl.uniform1f(uni.uFar,15000);
+ const {coarse,finer}=selection;
+ const requesting=new Set(finer.map(t=>t.parent));
+ const now=performance.now(),render=[];
+ let animating=false;
+ for(const parent of coarse){
+   const ids=childIds(parent),ready=ids.every(id=>cache.has(id));
+   const fineRequested=requesting.has(parent.key);
+   const target=fineRequested&&ready?1:0;
+   let mix=lerpFade(parent.key,target,now);
+   if(!cache.has(parent.key)&&ready)mix=1;
+   if(mix>.001&&ready){
+     for(const id of ids)render.push({id,pass:1,fade:mix});
+   }
+   if(mix<.999&&cache.has(parent.key))
+     render.push({id:parent.key,pass:0,fade:mix});
+   if(mix>.001&&mix<.999)animating=true;
+ }
+ lastRendered=render;
+ let faces=0;
+ for(const draw of render){
+   const t=cache.get(draw.id);
+   if(!t)continue;
+   t.lastUsed=Date.now();
+   gl.uniform1f(uni.uFade,draw.fade);
+   gl.uniform1i(uni.uPass,draw.pass);
+   gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
+   const active=observationActive,kind=$("obs-mode").value;
+   const parts=draw.id.split("-").map(Number);
+   const z=parts[0],x=parts[1],y=parts[2];
+   const parentKey=z===0?draw.id:"0-"+Math.floor(x/2)+"-"+Math.floor(y/2);
+   const regional=kind==="region"?regionGpu.get(parentKey)?.texture:null;
+   const observed=kind==="rgb"?active?.rgbTexture:
+     kind==="ndvi"?active?.ndviTexture:
+     kind==="change"?active?.changeTexture:
+     kind==="trend"?active?.trendTexture:
+     kind==="seasonal"?active?.seasonalTexture:
+     kind==="multiyear"?active?.multiTexture:null;
+   const sourceTexture=regional??observed;
+   const validObservation=!!regional||!!observed&&active?.key===parentKey;
+   gl.uniform1i(uni.uOverlayMode,validObservation?1:0);
+   if(validObservation){
+     gl.activeTexture(gl.TEXTURE1);gl.bindTexture(gl.TEXTURE_2D,sourceTexture);
+     gl.uniform4f(uni.uOverlayUv,z===0?0:(x%2)*.5,
+       z===0?0:(y%2)*.5,z===0?1:.5,z===0?1:.5);
+     gl.activeTexture(gl.TEXTURE0);
+   }
+   bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
+   gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
+   gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
+   faces+=t.count/3;
+ }
+ if(animating)requestDraw();
+ let shownBuildings=0;
+ if(buildingsEnabled&&selection.detailActive){
+   gl.uniform1i(uni.uOverlayMode,0);
+   gl.uniform1f(uni.uFade,0);gl.uniform1i(uni.uPass,0);
+   for(const id of requesting){
+     const t=buildingCache.get(id);
+     if(!t?.count)continue;
+     t.lastUsed=Date.now();
+     gl.activeTexture(gl.TEXTURE0);
+     bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
+     gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
+     // Real DMR ground supports solid-colored walls, while the simple
+     // flat roof takes its photograph from the same genuine ČÚZK ortho
+     // as the parent DSM tile. No synthetic RGB roof pixels are created.
+     gl.bindTexture(gl.TEXTURE_2D,t.texture);
+     gl.drawElements(gl.TRIANGLES,t.wallCount,gl.UNSIGNED_SHORT,0);
+     const terrainTexture=cache.get(id)?.texture;
+     if(terrainTexture&&t.roofCount){
+       gl.bindTexture(gl.TEXTURE_2D,terrainTexture);
+       gl.drawElements(gl.TRIANGLES,t.roofCount,gl.UNSIGNED_SHORT,t.wallCount*2);
+     }
+     faces+=(t.wallCount+(terrainTexture?t.roofCount:0))/3;
+     shownBuildings+=t.buildings;
+   }
+ }
+ $("building-count").textContent=String(shownBuildings);
+ $("visible").textContent=String(render.length);
+ $("resident").textContent=String(cache.size);
+ $("pending").textContent=String(active+queue.length);
+ $("faces").textContent=faces.toLocaleString("cs-CZ");
+ $("distance").textContent=Math.round(distance)+" m";
+ $("status").textContent=selection.detailActive?"Plynulý přechod detailu 2 m podle kamery":"Přehled 12 m · přesný výběr podle kamery";
+ renderMeasurePins();
+}
+
+function inspectorTiles(){
+ const active=new Map();
+ for(const item of lastRendered){
+   // During a screen-door transition, choose only the predominant LOD,
+   // so picking does not accidentally prefer a hidden overlapping triangle.
+   if(item.pass===1&&item.fade<.5)continue;
+   if(item.pass===0&&item.fade>=.5)continue;
+   const t=cache.get(item.id);
+   if(t?.inspect)active.set(item.id,t.inspect);
+ }
+ return [...active.values()];
+}
+function inspectionCamera(){return {yaw,pitch,panX,panNorth,vertical,distance};}
+function renderMeasurePins(){
+ if(!inspector||!config)return;
+ const c=inspector.cameraBasis(inspectionCamera());
+ const w=canvas.clientWidth,h=canvas.clientHeight,tan=Math.tan(Math.PI/8),aspect=w/Math.max(1,h);
+ measuredPoints.forEach((point,i)=>{
+   const pin=$(i===0?"pinA":"pinB");
+   const world=[point.east,(point.elevationM-BASE_HEIGHT)*vertical,-point.north];
+   const rel=world.map((v,j)=>v-c.target[j]);
+   const depth=vdot(rel,c.forward)+distance;
+   const sx=vdot(rel,c.right)/Math.max(.01,depth*tan*aspect);
+   const sy=vdot(rel,c.up)/Math.max(.01,depth*tan);
+   if(depth<=0||Math.abs(sx)>1.05||Math.abs(sy)>1.05){pin.style.display="none";return;}
+   pin.style.left=((sx+1)*w/2)+"px";pin.style.top=((1-sy)*h/2)+"px";
+   pin.style.display="block";
+ });
+ for(let i=measuredPoints.length;i<2;i++)$(i===0?"pinA":"pinB").style.display="none";
+}
+function fmtPoint(label,p){
+ if(!p)return label+": klikni na skutečný terén.";
+ const c=p.coords;
+ return label+": "+c.latitudeDeg.toFixed(6)+"° N · "+c.longitudeDeg.toFixed(6)+
+   "° E · "+p.elevationM.toFixed(2)+" m Bpv";
+}
+function drawProfile(){
+ const canvasProfile=$("height-profile"),ctx=canvasProfile.getContext("2d");
+ if(!ctx)return;
+ const w=canvasProfile.width,h=canvasProfile.height;
+ ctx.clearRect(0,0,w,h);
+ const data=currentProfile?.samples;
+ if(!data?.length)return;
+ const valid=data.filter(p=>p.elevationM!==null);
+ if(!valid.length)return;
+ let lo=Math.min(...valid.map(p=>p.elevationM)),hi=Math.max(...valid.map(p=>p.elevationM));
+ const pad=Math.max(2,(hi-lo)*.12);lo-=pad;hi+=pad;
+ const L=65,R=20,T=18,B=36,dx=Math.max(.001,currentProfile.horizontalDistanceM);
+ ctx.strokeStyle="#3b607c";ctx.lineWidth=1;ctx.beginPath();
+ ctx.moveTo(L,T);ctx.lineTo(L,h-B);ctx.lineTo(w-R,h-B);ctx.stroke();
+ ctx.font="12px system-ui";ctx.fillStyle="#c2dbee";
+ ctx.fillText(hi.toFixed(1)+" m",5,T+8);
+ ctx.fillText(lo.toFixed(1)+" m",5,h-B);
+ ctx.fillText("0 m",L,h-10);
+ ctx.fillText(dx.toFixed(0)+" m",w-R-58,h-10);
+ ctx.lineWidth=2.2;ctx.strokeStyle="#65dfd0";ctx.beginPath();
+ let started=false;
+ for(const p of data){
+   if(p.elevationM===null){started=false;continue;}
+   const x=L+(w-L-R)*(p.distanceM/dx),
+     y=T+(h-T-B)*(hi-p.elevationM)/(hi-lo);
+   if(!started){ctx.moveTo(x,y);started=true;}else ctx.lineTo(x,y);
+ }
+ ctx.stroke();
+}
+function inspectAt(clientX,clientY){
+ if(!inspector||!config)return;
+ const rect=canvas.getBoundingClientRect();
+ const x=clientX-rect.left,y=clientY-rect.top;
+ if(x<0||y<0||x>rect.width||y>rect.height)return;
+ const ray=inspector.screenRay(inspectionCamera(),x,y,rect.width,rect.height);
+ const hit=inspector.pickMeasured(inspectorTiles(),ray,{vertical,baseHeight:BASE_HEIGHT});
+ if(!hit){
+   $("measure-note").textContent="Na tomto místě nejsou ve vykreslených dlaždicích platné změřené trojúhelníky. Přibliž mapu nebo vyčkej na načtení; žádná výška se nedopočítává.";
+   return;
+ }
+ hit.coords=inspector.geoFromLocal(hit.east,hit.north,config);
+ if(measuredPoints.length>=2)measuredPoints=[];
+ measuredPoints.push(hit);
+ currentProfile=null;
+ if(measuredPoints.length===2){
+   const [a,b]=measuredPoints;
+   currentProfile=inspector.profile(inspectorTiles(),a,b,{samples:32,
+     config,vertical,baseHeight:BASE_HEIGHT});
+   const d=currentProfile.horizontalDistanceM,dz=b.elevationM-a.elevationM;
+   $("measure-distance").textContent="Vodorovně "+d.toFixed(1)+" m · Δh "+
+     (dz>=0?"+":"")+dz.toFixed(2)+" m · sklon "+
+     (d>0?(100*dz/d).toFixed(2):"—")+" % · profil "+
+     currentProfile.validSamples+"/32 platných";
+   $("export-profile").disabled=false;
+   $("measure-note").textContent="Profil je vzorkovaný pouze ze skutečných dostupných DEM trojúhelníků. Neplatné úseky zůstávají prázdné; přesun kamery může změnit dostupnost dat.";
+ }else{
+   $("measure-distance").textContent="Vyber druhý bod pro vzdálenost a výškový profil.";
+   $("export-profile").disabled=true;
+ }
+ $("pointA").textContent=fmtPoint("A",measuredPoints[0]);
+ $("pointB").textContent=fmtPoint("B",measuredPoints[1]);
+ $("clear-inspect").disabled=false;
+ drawProfile();renderMeasurePins();
+}
+function clearInspection(){
+ measuredPoints=[];currentProfile=null;
+ $("pointA").textContent=fmtPoint("A");
+ $("pointB").textContent=fmtPoint("B");
+ $("measure-distance").textContent="Vzdálenost: —";
+ $("measure-note").textContent="Klikni bez táhnutí na dva body. Bez naměřených DEM dat zůstávají hodnoty prázdné.";
+ $("clear-inspect").disabled=true;$("export-profile").disabled=true;
+ drawProfile();renderMeasurePins();
+}
+$("inspect-mode").onchange=()=>{
+ $("measurement").hidden=!$("inspect-mode").checked;
+ if($("inspect-mode").checked)drawProfile();
+};
+$("clear-inspect").onclick=clearInspection;
+$("export-profile").onclick=()=>{
+ if(!currentProfile)return;
+ const rows=["distance_m,longitude_deg,latitude_deg,elevation_Bpv_m",
+   ...currentProfile.samples.map(p=>[
+     p.distanceM.toFixed(3),p.longitudeDeg.toFixed(8),
+     p.latitudeDeg.toFixed(8),p.elevationM===null?"":p.elevationM.toFixed(3)
+   ].join(","))];
+ const csv=rows.join("\r\n")+"\r\n";
+ const blob=new Blob([csv],{type:"text/csv;charset=utf-8"});
+ const url=URL.createObjectURL(blob);
+ const a=document.createElement("a");a.href=url;a.download="praha-dem-profil-Bpv.csv";
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+};
+
+function move(dx,dy){
+ // Horizontal local world pan. Clamp to published Prague coverage.
+ const bound=worldFor(config.bounds[2],config.bounds[3]);
+ panX=clamp(panX+dx,-Math.abs(bound[0]),Math.abs(bound[0]));
+ panNorth=clamp(panNorth+dy,-Math.abs(bound[1]),Math.abs(bound[1]));
+ update();
+}
+$("obs-search").onclick=searchObservations;
+$("obs-load").onclick=loadObservation;
+$("compare-load").onclick=loadComparison;
+$("compare-export").onclick=exportComparison;
+$("trend-load").onclick=loadTrend;
+$("trend-export").onclick=exportTrend;
+$("season-search").onclick=searchSeasonal;
+$("season-load").onclick=loadSeasonal;
+$("season-export").onclick=exportSeasonal;
+$("multi-search").onclick=searchMultiYear;
+$("multi-load").onclick=loadMultiYear;
+$("multi-export").onclick=exportMultiYear;
+$("region-start").onclick=runRegionCoverage;
+$("region-stop").onclick=()=>regionRun?.abort();
+$("region-export").onclick=exportRegionCsv;
+$("region-geojson").onclick=exportRegionGeoJson;
+$("region-seam-export").onclick=exportRegionSeamsCsv;
+$("region-quality-export").onclick=exportRegionQuality;
+$("region-3d").onclick=toggleRegion3d;
+$("obs-mode").onchange=()=>{
+ if($("obs-mode").value!=="region"){
+   clearRegionGpu();
+   $("region-3d").textContent="Zobrazit regionální trend ve 3D";
+ }else if(regionResult?.analyzedTiles){
+   $("region-3d").textContent="Skrýt regionální 3D trend";
+ }
+ updateRegionOverlays();requestDraw();
+};
+$("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
+$("buildings").onclick=()=>{
+ buildingsEnabled=!buildingsEnabled;
+ $("buildings").textContent="Budovy: "+(buildingsEnabled?"zapnuto":"vypnuto");
+ update();
+};
+$("detail").onclick=()=>{
+ enableDetail=!enableDetail;
+ $("detail").textContent="Detail: "+(enableDetail?"automaticky":"vypnuto");
+ update();
+};
+$("vertical").oninput=()=>{vertical=Number($("vertical").value);
+ $("verticalValue").textContent=vertical+"×";requestDraw();};
+canvas.oncontextmenu=e=>e.preventDefault();
+const pointers=new Map();
+let lastPinch=0,previous={x:0,y:0};
+const downPoints=new Map();
+canvas.addEventListener("pointerdown",e=>{
+ e.preventDefault();canvas.setPointerCapture(e.pointerId);
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY,mode:e.button===2||e.shiftKey?"pan":"orbit"});
+ downPoints.set(e.pointerId,{x:e.clientX,y:e.clientY,button:e.button,shift:e.shiftKey});
+ previous={x:e.clientX,y:e.clientY};lastPinch=0;
+});
+canvas.addEventListener("pointermove",e=>{
+ if(!pointers.has(e.pointerId))return;
+ const old=pointers.get(e.pointerId);
+ pointers.set(e.pointerId,{...old,x:e.clientX,y:e.clientY});
+ if(pointers.size===2){
+   const pair=[...pointers.values()],gap=Math.hypot(pair[0].x-pair[1].x,pair[0].y-pair[1].y);
+   if(lastPinch>0)distance=clamp(distance*lastPinch/Math.max(1,gap),100,4500);
+   lastPinch=gap;update();return;
+ }
+ const dx=e.clientX-old.x,dy=e.clientY-old.y;
+ if(old.mode==="pan"){
+   const amount=distance*.0013;
+   move(-dx*amount,dy*amount);
+ }else{
+   yaw-=dx*.006;pitch=clamp(pitch-dy*.006,.09,1.48);update();
+ }
+});
+for(const name of ["pointerup","pointercancel","lostpointercapture"]){
+ canvas.addEventListener(name,e=>{
+   const down=downPoints.get(e.pointerId);
+   if(name==="pointerup"&&$("inspect-mode").checked&&
+      down?.button===0&&!down.shift&&pointers.size===1&&
+      Math.hypot(e.clientX-down.x,e.clientY-down.y)<=6)
+     inspectAt(e.clientX,e.clientY);
+   downPoints.delete(e.pointerId);pointers.delete(e.pointerId);lastPinch=0;
+ });
+}
+canvas.addEventListener("wheel",e=>{
+ e.preventDefault();
+ distance=clamp(distance*Math.exp(e.deltaY*.0012),100,4500);
+ update();
+},{passive:false});
+window.addEventListener("keydown",e=>{
+ if(["ArrowLeft","ArrowRight","ArrowUp","ArrowDown","w","a","s","d"].includes(e.key)){
+   if(e.target instanceof HTMLInputElement)return;
+   e.preventDefault();
+   const step=clamp(distance*.12,35,250);
+   if(e.key==="ArrowLeft"||e.key==="a")move(-step,0);
+   if(e.key==="ArrowRight"||e.key==="d")move(step,0);
+   if(e.key==="ArrowUp"||e.key==="w")move(0,step);
+   if(e.key==="ArrowDown"||e.key==="s")move(0,-step);
+ }
+});
+window.addEventListener("resize",requestDraw);
+canvas.addEventListener("webglcontextlost",event=>{
+ event.preventDefault(); // request restoration from the browser
+ graphicsEpoch++;
+ observationEpoch++;
+ observationRequest?.abort();observationRequest=null;
+ observationActive=null; // all GPU textures were destroyed by lost context
+ clearRegionGpu(); // GPU-owned source textures died with the context
+ for(const controller of controllers.values())controller.abort();
+ controllers.clear();
+ queue.length=0;
+ gl=null;program=null;uni=null;attrs=null;
+ cache.clear();lastRendered=[];transitions.clear();
+ for(const controller of buildingPending.values())controller.abort();
+ buildingPending.clear();buildingCache.clear();
+ $("status").textContent="WebGL kontext přerušen; čekám na obnovení.";
+ $("error").textContent="Grafický kontext byl ztracen. Mapu znovu vykreslím z uložených skutečných dlaždic.";
+});
+canvas.addEventListener("webglcontextrestored",()=>{
+ try{
+   startGpu();
+   $("error").textContent="";
+   if(config&&planner)update();
+   if($("obs-mode").value==="region"&&regionResult){
+     updateRegionOverlays();requestDraw();
+   }else if($("obs-mode").value==="multiyear"&&multiSelection)loadMultiYear();
+   else if($("obs-mode").value==="seasonal"&&seasonalSelection)loadSeasonal();
+   else if(observationTile&&observationCatalog.has($("obs-scene").value)){
+     if($("obs-mode").value==="trend"&&trendSceneIds.length>=3)
+       loadTrend(trendSceneIds);
+     else if($("obs-mode").value==="change"&&!$("compare-before").disabled)
+       loadComparison();
+     else loadObservation();
+   }
+ }catch(error){
+   console.error(error);
+   $("error").textContent="WebGL nebylo možné obnovit: "+String(error);
+ }
+});
+(async()=>{
+ try{
+  const response=await fetch("/api/config");
+  if(!response.ok)throw Error("Server nenabídl konfiguraci");
+  config=await response.json();
+  if(config.offlineMode){
+    buildingsEnabled=false;
+    $("buildings").textContent="Budovy: vypnuto";
+    $("status").textContent="Offline: zobrazuji pouze uložené skutečné dlaždice.";
+  }
+  if(config.status!=="real-remote-data"||config.levels.length!==2)
+    throw Error("Neplatná konfigurace skutečných dlaždic");
+  inspector=window.OpenLaunchTerrainInspect;
+  if(!inspector)throw Error("Chybí modul pro měření skutečných výšek");
+  planner=window.OpenLaunchTilePlanner?.createPlanner(config);
+  if(!planner)throw Error("Chybí modul pro výběr viditelných dlaždic");
+  startGpu();
+  update();
+ }catch(err){
+  console.error(err);$("status").textContent="Nelze spustit prohlížeč";
+  $("error").textContent=String(err);
+ }
+})();
+</script>
+</body></html>

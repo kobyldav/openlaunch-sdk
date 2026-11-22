@@ -1,0 +1,150 @@
+name: Prague real 3D DEM integration
+on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+  workflow_dispatch:
+jobs:
+  real-prague:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: node --test tests/terrain-real-map.test.mjs tests/terrain-prague-viewer.test.mjs tests/terrain-measure.test.mjs tests/terrain-cuzk-dmpok.test.mjs tests/terrain-cuzk-ortho.test.mjs
+      - name: Verify terrain GLSL program actually links in headless Edge WebGL1
+        run: node scripts/terrain-webgl-link-smoke.mjs
+      - name: Validate streamed Prague grid and local server without remote downloads
+        run: node --test tests/terrain-prague-stream.test.mjs
+      - name: Verify measured ray picking, NoData, Bpv profiles and geolocation
+        run: node --test tests/terrain-prague-stream-inspect.test.mjs
+      - name: Validate measured OSM footprints and ČÚZK building LOD1 geometry without external sources
+        run: node --test tests/terrain-prague-buildings.test.mjs
+      - name: Validate SDK single-scene Sentinel-2 calibrated reflectance, NDVI and SCL masks (deterministic fixtures)
+        run: node --test tests/terrain-sentinel-overlay.test.mjs
+      - name: Verify source-backed interannual Sentinel same-month median, NoData and pixel support counts
+        run: node --test tests/terrain-sentinel-seasonal.test.mjs
+      - name: Validate 3-5 annual same-month Sentinel source NDVI, Theil-Sen, leave-year-out instability and all-year masks
+        run: node --test tests/terrain-sentinel-multiyear.test.mjs
+      - name: Stage 16 source-proven bounded regional coverage and offline NDJSON stream
+        run: node --test tests/terrain-sentinel-region.test.mjs tests/terrain-prague-region-stream.test.mjs
+      - name: Stage 17 validate source-locked regional GPU tile selection and no-data handling
+        run: node --test tests/terrain-prague-region-webgl.test.mjs
+      - name: Stage 18 validate native Sentinel cross-tile edge comparisons and NoData
+        run: node --test tests/terrain-sentinel-region-seams.test.mjs
+      - name: Stage 19 verify original shared regional Sentinel selection and no unauthorized scene mixing
+        run: node --test tests/terrain-sentinel-region-catalog.test.mjs
+      - name: Stage 20 measured 4x4 source coverage, Node RSS, QA and 3 real process restarts (offline)
+        run: node --test tests/terrain-sentinel-region-quality.test.mjs tests/terrain-prague-region-benchmark.test.mjs
+      - name: Stage 21 source-safe original acquisition pair scheduling and chronology
+        run: node --test tests/terrain-sentinel-source-pair.test.mjs
+      - name: Stage 22 reuse genuine TIFF byte ranges only under matching strong original source ETag
+        run: node --test tests/terrain-cog-range-cache.test.mjs tests/utm-cog.test.mjs tests/lzw-geotiff.test.mjs
+      - name: Stage 23 adapt verified original COG cache under Node RSS and host free RAM while preserving original TIFF pixels
+        run: node --test tests/terrain-cog-memory.test.mjs tests/terrain-cog-range-cache.test.mjs
+      - name: Stage 20 preserve actual offline 4x4 times and Node RSS in benchmark artifact
+        run: node scripts/terrain-prague-region-benchmark.mjs --x 1 --y 1 --cols 4 --rows 4 --repeat 2 --cache test-results/terrain-prague-stream-ci --output test-results/terrain-prague-stream-ci/region-4x4-offline-audit.json
+      - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
+        run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
+      - name: Fetch one real ČÚZK on-demand tile through the local streaming server
+        run: node scripts/terrain-prague-stream-smoke.mjs
+      - name: Validate real OSM Prague building footprints and ČÚZK DMR 5G ground source
+        run: node scripts/terrain-prague-buildings-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify real dated Sentinel STAC scene, 5 original COG bands, calibrated NDVI and SCL mask
+        run: node scripts/terrain-prague-observation-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify real chronological Sentinel-2 COG pair and jointly cloud-masked numeric NDVI changes
+        run: node scripts/terrain-prague-change-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify 3 genuine Sentinel-2 date COG sources and fixed-common-pixel Theil-Sen trend over Prague
+        run: node scripts/terrain-prague-trend-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify actual two-year same-month Sentinel-2 COG scenes, per-year source medians and measured ΔNDVI
+        run: node scripts/terrain-prague-seasonal-live-smoke.mjs
+        continue-on-error: true
+      - name: Verify three historical years and six true Sentinel-2 same-month COG acquisitions
+        run: node scripts/terrain-prague-multiyear-live-smoke.mjs
+        continue-on-error: true
+      - name: Stage 18 verify original Sentinel-2 L2A COGs on two adjacent tiles and real edge QA
+        run: node scripts/terrain-prague-region-live-smoke.mjs
+        continue-on-error: true
+      - name: Stage 20 replay two real source-backed tiles across fresh Node processes using disk cache
+        run: node scripts/terrain-prague-region-benchmark.mjs --cache test-results/terrain-prague-stream-ci --x 3 --y 3 --cols 2 --rows 1 --repeat 2 --require-complete --require-cached-replay --output test-results/terrain-prague-stream-ci/region-2tile-cache-replay.json
+        continue-on-error: true
+      - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
+        run: node scripts/terrain-prague-browser-smoke.mjs
+      - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
+        run: node scripts/terrain-prague-3d.mjs
+      - name: Verify texture, OBJ UVs, PNG alpha and HTML package
+        run: node scripts/terrain-prague-validate.mjs
+      - name: Generate actual fine Prague surface from ČÚZK DMP OK
+        run: npm run example:terrain-prague-detail
+      - name: Verify fine-resolution Czech DEM and distinct height datum
+        run: node scripts/terrain-prague-validate.mjs test-results/terrain-prague-detail
+      - name: Generate genuine 0.5m Czech orthophoto on real 2m Prague DSM
+        run: npm run example:terrain-prague-ortho
+      - name: Validate integrated ČÚZK ortho plus Bpv surface
+        run: node scripts/terrain-prague-validate.mjs test-results/terrain-prague-ortho
+      - name: Upload complete standalone 3D model and real-data provenance
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: terrain-prague-real-3d
+          path: |
+            test-results/terrain-prague-3d/index.html
+            test-results/terrain-prague-3d/terrain.obj
+            test-results/terrain-prague-3d/terrain.mtl
+            test-results/terrain-prague-3d/terrain-texture.png
+            test-results/terrain-prague-3d/report.json
+            test-results/terrain-prague-detail/index.html
+            test-results/terrain-prague-detail/terrain.obj
+            test-results/terrain-prague-detail/terrain.mtl
+            test-results/terrain-prague-detail/terrain-texture.png
+            test-results/terrain-prague-detail/report.json
+            test-results/terrain-prague-ortho/index.html
+            test-results/terrain-prague-ortho/terrain.obj
+            test-results/terrain-prague-ortho/terrain.mtl
+            test-results/terrain-prague-ortho/terrain-texture.png
+            test-results/terrain-prague-ortho/report.json
+            test-results/terrain-prague-stream-ci/v2-0-3-3.json
+            test-results/terrain-prague-stream-ci/v2-0-3-3.png
+            test-results/terrain-prague-stream-ci/buildings-v2-0-3-3.json
+            test-results/terrain-prague-browser-ci/report.json
+            test-results/terrain-prague-browser-ci/prague-real-3d-initial.png
+            test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png
+            test-results/terrain-prague-browser-ci/prague-real-3d-after-flight.png
+            test-results/terrain-prague-browser-ci/prague-real-3d-with-buildings.png
+            test-results/terrain-prague-stream-ci/observations-scenes-v2-*.json
+            test-results/terrain-prague-stream-ci/observations-v2-*.json
+            test-results/terrain-prague-stream-ci/observations-v2-*.rgb.png
+            test-results/terrain-prague-stream-ci/observations-v2-*.ndvi.png
+            test-results/terrain-prague-stream-ci/observations-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-rgb.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi.png
+            test-results/terrain-prague-stream-ci/changes-v1-*.json
+            test-results/terrain-prague-stream-ci/changes-v1-*.png
+            test-results/terrain-prague-stream-ci/changes-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-delta-ndvi.png
+            test-results/terrain-prague-stream-ci/trends-v1-*.json
+            test-results/terrain-prague-stream-ci/trends-v1-*.png
+            test-results/terrain-prague-stream-ci/trends-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-3-date-trend.png
+            test-results/terrain-prague-stream-ci/seasonal-v2-*.json
+            test-results/terrain-prague-stream-ci/seasonal-v2-*.png
+            test-results/terrain-prague-stream-ci/seasonal-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-seasonal-interannual.png
+            test-results/terrain-prague-stream-ci/multiyear-v1-*.json
+            test-results/terrain-prague-stream-ci/multiyear-v1-*.png
+            test-results/terrain-prague-stream-ci/multiyear-live-report.json
+            test-results/terrain-prague-stream-ci/region-adjacent-live-report.json
+            test-results/terrain-prague-stream-ci/region-2tile-cache-replay.json
+            test-results/terrain-prague-stream-ci/region-4x4-offline-audit.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-multiyear-3-annual-trend.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-one-source-tile.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-two-real-tiles.png

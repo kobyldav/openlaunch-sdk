@@ -1,0 +1,33 @@
+name: Prague Sentinel-2 actual 4x4 regional quality benchmark
+on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+    paths:
+      - .github/workflows/terrain-prague-region-4x4-benchmark.yml
+  workflow_dispatch:
+jobs:
+  original-4x4-quality:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - name: Strict original 4x4 Prague three-year Sentinel COG benchmark, source-consistent replay
+        timeout-minutes: 36
+        run: node scripts/terrain-prague-region-benchmark.mjs --live --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --repeat 2 --timeout-ms 1000000 --rss-limit-mib 1536 --require-complete --require-cached-replay --cache test-results/terrain-prague-stream-benchmark --output test-results/terrain-prague-4x4-live-quality.json
+      - name: Preserve genuine source audit even on partial coverage or failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prague-real-sentinel-4x4-quality
+          path: |
+            test-results/terrain-prague-4x4-live-quality.json
+            test-results/terrain-prague-stream-benchmark/region-sources-v1-*.json
+          if-no-files-found: warn
+          retention-days: 14
