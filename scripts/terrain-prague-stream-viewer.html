@@ -505,6 +505,10 @@ async function loadComparison(){
  observationRequest=controller;
  $("compare-load").disabled=true;
  comparisonData=null;$("compare-export").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";
+ $("compare-summary").textContent="Požadované časové porovnání zatím není ověřené. Jen pixely platné v obou datech mohou vytvořit výsledek.";
+ requestDraw(); // never show a stale previous result as the newly selected pair
  let changeTexture=null;
  try{
    const path="/api/observations/compare/0/"+tile.x+"/"+tile.y+"/"+
