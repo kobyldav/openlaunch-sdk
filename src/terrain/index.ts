@@ -6,10 +6,12 @@ import {reconstructTerrainFromSource} from "./source.js";
 import {discoverAsterStereo} from "./aster.js";
 import {loadRealTerrain} from "./real-map.js";
 import {discoverSentinelTerrainScenes,loadSentinelTerrainOverlay} from "./sentinel-overlay.js";
+import {compareSentinelNdviScenes} from "./sentinel-change.js";
 export class TerrainReconstructionEngine {
   load = loadRealTerrain;
   discoverObservations = discoverSentinelTerrainScenes;
   observeSentinel2 = loadSentinelTerrainOverlay;
+  compareSentinelNdvi = compareSentinelNdviScenes;
   reconstruct = reconstructTerrain;
   reconstructFromSource = reconstructTerrainFromSource;
   validate = validateTerrainHeights;
@@ -30,3 +32,4 @@ export * from "./cuzk-ortho.js";
 export * from "./measure.js";
 
 export * from "./sentinel-overlay.js";
+export * from "./sentinel-change.js";
