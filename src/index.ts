@@ -17,6 +17,7 @@ export * from "./terrain/sentinel-change.js";
 export * from "./terrain/sentinel-trend.js";
 export * from "./terrain/sentinel-seasonal.js";
 export * from "./terrain/sentinel-multiyear.js";
+export * from "./terrain/sentinel-region.js";
 export * from "./intelligence/index.js";
 export * from "./orbit/index.js";
 export * from "./traffic/index.js";
