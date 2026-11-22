@@ -10,7 +10,7 @@ OpenLaunch brings together data from space-related providers and tools for worki
 
 Use the complete SDK or install just the packages your project requires.
 
-[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Live demo](#live-example-satellite-imagery-viewer) · [Browse examples](examples/README.md) · [Documentation](#documentation)
+[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Real SDK showcase](#see-openlaunch-sdk-in-action) · [Browse examples](examples/README.md) · [Documentation](#documentation)
 
 ## What you can build
 
@@ -24,24 +24,40 @@ Use the complete SDK or install just the packages your project requires.
 | **Mission engineering** | Combine orbital calculations, spacecraft sizing, sensor geometry, and observation planning. | [Integrated mission examples](examples/11-integrated-missions/) |
 | **Scientific computing** | Work with vectors, matrices, quaternions, numerical methods, controls, atmospheric models, and aerospace formulas. | [Mathematics examples](examples/07-gnc-math/) |
 
-## Live example: satellite imagery viewer
+## See OpenLaunch SDK in action
 
-The [interactive satellite viewer on kobylkadavid.cz](https://www.kobylkadavid.cz/) is a real application using OpenLaunch SDK behind its Earth-observation APIs. These screenshots were captured from the running website in Chromium after the browser had loaded imagery from the selected source.
+These are **actual application screenshots and SDK-computed visualizations**, not stock pictures or generated decorative dashboards. OpenLaunch is a TypeScript library: the browser interfaces shown here are examples built *using* it, rather than a built-in UI.
 
-[![Real Sentinel-2 true-color satellite map of the Czech Republic shown in a website using OpenLaunch SDK](docs/images/live/sentinel2-real-ui.png)](https://www.kobylkadavid.cz/)
+### Earth observation — real Sentinel-2 imagery
 
-*Sentinel-2 RGB — actual Copernicus imagery shown in the web application, with layer controls and the Czech Republic boundary.*
+[![Real Czech Republic Sentinel-2 satellite scene displayed in an application backed by OpenLaunch SDK](docs/images/live/sentinel2-real-ui.png)](https://www.kobylkadavid.cz/)
 
-| NASA Terra MODIS | Sentinel-2 vegetation index (NDVI) |
+The [interactive satellite explorer on kobylkadavid.cz](https://www.kobylkadavid.cz/) uses SDK-backed endpoints for Copernicus and NASA observation data. This is real Sentinel-2 RGB imagery in a working map interface with geographic alignment and source selection, not a replacement photograph.
+
+### Orbital mechanics and real 3D terrain
+
+| **ISS orbit — SGP4 propagation** | **Prague — measured 3D terrain (experimental)** |
 | --- | --- |
-| [![Real NASA MODIS daily imagery in the OpenLaunch-backed application](docs/images/live/nasa-modis-real-ui.png)](https://www.kobylkadavid.cz/) | [![Real Copernicus NDVI analysis in the OpenLaunch-backed application](docs/images/live/ndvi-real-ui.png)](https://www.kobylkadavid.cz/) |
-| Daily NASA GIBS imagery for the requested date 2026-08-15 (acquisition time not independently verified). | NDVI layer calculated by the site's Copernicus processing service; not a synthetic raster. |
+| [![3D Earth and ISS orbit computed from historical TLE using OpenLaunch SGP4](docs/images/live/sdk-orbit-3d.png)](examples/14-orbit-traffic/10-czml-3d-scenario.ts) | [![Real Prague ČÚZK elevation and orthophoto textured WebGL terrain generated through OpenLaunch](docs/images/live/terrain-prague-real-3d.png)](https://github.com/kobyldav/openlaunch-sdk/tree/feature/terrain-prague-real-dem) |
+| **Orbit & traffic:** actual SDK-propagated Earth-fixed orbit positions and ground track from a historical 2019 ISS TLE; Earth texture uses NASA Blue Marble. [Propagation and CZML](examples/14-orbit-traffic/10-czml-3d-scenario.ts) | **Terrain:** actual ČÚZK DMP OK elevations, Ortofoto ČR and 3D WebGL viewer. This capability is on the [experimental terrain branch](https://github.com/kobyldav/openlaunch-sdk/tree/feature/terrain-prague-real-dem), **not** the published main SDK. [Terrain documentation](https://github.com/kobyldav/openlaunch-sdk/blob/feature/terrain-prague-real-dem/docs/TERRAIN_REAL_3D.md) |
 
-The viewer also offers NASA VIIRS, Sentinel-1 radar and NDWI layers. Availability varies by provider and current credentials or processing quotas. The separate airspace viewer on the same page is not presented as an OpenLaunch SDK demonstration.
+### Ascent simulation and satellite analytics
 
-To capture **real browser screenshots of the live satellite viewer**, see the [reproducible capture tool](docs/README_GALLERY.md). Screenshots must only be published when real provider imagery has loaded; placeholder illustrations and synthetic map compositions are not acceptable substitutes.
+| **Multistage launch engineering** | **Sentinel-2 vegetation index (NDVI)** |
+| --- | --- |
+| [![3D trajectory from OpenLaunch generic two-stage launch simulator](docs/images/live/sdk-launch-3d.png)](examples/15-launch-trajectory/01-multistage-flight.ts) | [![Real vegetation-index map from Copernicus data served through OpenLaunch-backed website](docs/images/live/ndvi-real-ui.png)](https://www.kobylkadavid.cz/) |
+| **Engineering:** spatial path calculated by `simulateLaunch()`, with Max-Q and stage events. The model is **illustrative**, not a real rocket's flight telemetry. [Launch trajectory examples](examples/15-launch-trajectory/) | **Raster processing:** a genuine Copernicus processed NDVI layer in a deployed web application, not an invented spectral fixture. [Raster examples](examples/17-raster/) |
 
-For runnable code that uses OpenLaunch directly, see the [Earth observation examples](examples/13-earth-observation/), [raster examples](examples/17-raster/), and [web integration examples](examples/19-web-integration/).
+<details>
+<summary>Another real provider view: NASA Terra MODIS</summary>
+
+[![Real NASA MODIS satellite imagery shown in the OpenLaunch-powered web application](docs/images/live/nasa-modis-real-ui.png)](https://www.kobylkadavid.cz/)
+
+Daily NASA GIBS map tiles, requested for 2026-08-15; the precise acquisition date of each pixel is not independently verified.
+
+</details>
+
+All model screenshots can be reproduced through the [3D showcase guide](docs/SHOWCASE.md) and `npm run showcase`; live site screenshots through [`npm run gallery`](docs/README_GALLERY.md). The 3D examples show **what you can build with the SDK's computed outputs**, not built-in SDK windows. For the broader API surface, browse [the runnable example catalog](examples/README.md).
 
 ## Quick start
 
