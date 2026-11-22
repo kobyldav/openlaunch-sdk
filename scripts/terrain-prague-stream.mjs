@@ -8,6 +8,7 @@ import {resolve,join} from "node:path";
 import {deflateSync} from "node:zlib";
 import {spawn} from "node:child_process";
 import {createHash} from "node:crypto";
+import {freemem} from "node:os";
 import {OpenLaunch} from "../dist/index.js";
 import {bbox} from "../dist/geo/types.js";
 import {tileSpec,tileOriginOffset,pragueStreamManifest} from "./terrain-prague-stream-grid.mjs";
@@ -28,6 +29,7 @@ import {selectSharedSentinelRegionSources,verifySharedSentinelRegionSourceYears}
   from "../dist/terrain/sentinel-region-catalog.js";
 import {assessSentinelRegionQuality} from "../dist/terrain/sentinel-region-quality.js";
 import {CogRangeCache} from "../dist/eo/cog-range-cache.js";
+import {AdaptiveCogRangeMemory} from "../dist/eo/cog-range-memory.js";
 import {readCogWindowUrl} from "../dist/eo/cog.js";
 import {loadSentinelSourcePair} from "../dist/terrain/sentinel-source-pair.js";
 
@@ -41,6 +43,13 @@ if(![1,2].includes(scenePairConcurrency))
 const cogRangeCacheMiB=Number(getArg("cog-range-cache-mib","64"));
 if(!Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>128)
  throw RangeError("--cog-range-cache-mib must be 0 (actual network baseline) or 1..128 bounded MiB");
+const cogMemoryMode=getArg("cog-memory-mode","adaptive");
+if(!["fixed","adaptive"].includes(cogMemoryMode))
+ throw RangeError("--cog-memory-mode must be fixed or adaptive");
+const cogRssTargetMiB=Number(getArg("cog-rss-target-mib","512"));
+if(!Number.isInteger(cogRssTargetMiB)||
+  cogRssTargetMiB<256||cogRssTargetMiB>8192)
+ throw RangeError("--cog-rss-target-mib must be an integer 256..8192 MiB");
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
 const offline=args.includes("--offline");
 await mkdir(cacheRoot,{recursive:true});
@@ -51,7 +60,17 @@ const sdk=new OpenLaunch();
 // Stage 22: process-local, STRONG-ETag version-pinned original TIFF byte ranges.
 // No persistence of compressed data and no cross-scene/URL substitutions.
 const cogRangeCache=new CogRangeCache(cogRangeCacheMiB*1048576);
-const readOriginalCog=(url,area,options)=>readCogWindowUrl(url,area,{...options,rangeCache:cogRangeCache});
+const cogRangeMemory=new AdaptiveCogRangeMemory(cogRangeCache,{
+ mode:cogMemoryMode,processLimitBytes:cogRssTargetMiB*1048576
+});
+const checkCogPressure=()=>cogRangeMemory.observe({
+ rssBytes:process.memoryUsage().rss,systemFreeBytes:freemem()
+});
+const readOriginalCog=async(url,area,options)=>{
+ checkCogPressure();
+ try{return await readCogWindowUrl(url,area,{...options,rangeCache:cogRangeCache});}
+ finally{checkCogPressure();}
+};
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
 const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map(),multiYearTasks=new Map();
@@ -899,7 +918,13 @@ async function streamRegionalMultiyear(req,res,params){
    from,to,month,specs.map(t=>t.key));
  // Only source edge strips (not 16 whole rasters) remain in RAM.
  const edgeCache=new Map(),seams=[];
+ // Stage 23: the original RSS safety ceiling is now applied to the CACHE
+ // before each original COG read, not only between complete 4x4 tiles.
+ const effectiveCogRssLimitMiB=Math.min(cogRssTargetMiB,rssLimitMiB);
+ cogRangeMemory.setProcessLimitBytes(effectiveCogRssLimitMiB*1048576);
+ checkCogPressure();
  const cogCacheStart=cogRangeCache.snapshot();
+ const cogMemoryStart=cogRangeMemory.snapshot();
  peakObservationJobs=observationTasks.size;
  // Stage 20 observes the REAL local Node process, not browser GPU memory.
  const beganAt=performance.now(),startedMemory=process.memoryUsage(),
@@ -909,6 +934,7 @@ async function streamRegionalMultiyear(req,res,params){
    const m=process.memoryUsage();
    peakRssBytes=Math.max(peakRssBytes,m.rss);
    peakHeapUsedBytes=Math.max(peakHeapUsedBytes,m.heapUsed);
+   cogRangeMemory.observe({rssBytes:m.rss,systemFreeBytes:freemem()});
    return m;
  };
  const sampler=setInterval(sampleMemory,samplingIntervalMs);
@@ -1009,9 +1035,31 @@ async function streamRegionalMultiyear(req,res,params){
        catalogCacheHitYears,tileMeasurements
      });
      quality.memorySoftLimitMiB=rssLimitMiB;
-     const cogEnd=cogRangeCache.snapshot();
+     const cogEnd=cogRangeCache.snapshot(),memoryEnd=cogRangeMemory.snapshot();
+     quality.cogMemory={
+       mode:cogMemoryMode,
+       configuredRssTargetMiB:cogRssTargetMiB,
+       effectiveRssTargetMiB:effectiveCogRssLimitMiB,
+       rssSafetyReserveMiB:memoryEnd.processReserveMiB,
+       systemSafetyReserveMiB:memoryEnd.systemReserveMiB,
+       checks:memoryEnd.samples-cogMemoryStart.samples,
+       pressureChecks:memoryEnd.pressureSamples-cogMemoryStart.pressureSamples,
+       shrinkEvents:memoryEnd.decreases-cogMemoryStart.decreases,
+       recoveryEvents:memoryEnd.increases-cogMemoryStart.increases,
+       freedFromCacheBytes:memoryEnd.evictedOnPressureBytes-
+         cogMemoryStart.evictedOnPressureBytes,
+       activeBudgetMiB:memoryEnd.activeBudgetMiB,
+       minimumBudgetMiB:Math.min(
+         cogCacheStart.maxResidentBytes/1048576,memoryEnd.minimumBudgetMiB),
+       observedPeakNodeRssMiB:peakRssBytes/1048576,
+       lastConstraint:memoryEnd.lastConstraint,
+       limitation:"RSS is sampled for the whole Node process; reducing cache allocations does not guarantee immediate RSS release or a hard memory cap."
+     };
      quality.cogRangeCache={
-       maxResidentMiB:cogEnd.maxResidentBytes/1048576,
+       maxResidentMiB:cogRangeCacheMiB,
+       activeBudgetMiB:cogEnd.maxResidentBytes/1048576,
+       minimumBudgetMiB:cogEnd.minimumBudgetBytes/1048576,
+       configuredBudgetMiB:cogEnd.configuredMaxResidentBytes/1048576,
        residentMiB:cogEnd.residentBytes/1048576,
        entries:cogEnd.entries,verifiedObjects:cogEnd.verifiedObjects,
        rangeCacheHits:cogEnd.rangeCacheHits-cogCacheStart.rangeCacheHits,
@@ -1034,7 +1082,11 @@ async function streamRegionalMultiyear(req,res,params){
        seamDiagnostics:"Native adjacent source pixel centers; no interpolation, no seam blending, not proof of terrain or ecological change."}});
      res.end();
    }
- }finally{clearInterval(sampler);regionalJobActive=false;}
+ }finally{
+   clearInterval(sampler);
+   cogRangeMemory.setProcessLimitBytes(cogRssTargetMiB*1048576);
+   regionalJobActive=false;
+ }
 }
 
 function send(res,status,data,contentType){
@@ -1184,6 +1236,8 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
+  console.log("Stage 23 COG RAM policy: "+cogMemoryMode+
+   " with "+cogRssTargetMiB+" MiB Node RSS soft target, host RAM reserve and bounded recovery.");
   console.log("Sentinel original COG Range cache: "+cogRangeCacheMiB+" MiB maximum; only exact strong-ETag-verified source bytes.");
   console.log("Sentinel source pair concurrency: "+scenePairConcurrency+" (one regional tile at a time, maximum two simultaneous original acquisitions).");
   console.log("Sentinel-2 analytics: actual dated RGB/NDVI, two-date change, three-date series, two-year medians and 3..5-year same-month observational trend with leave-one-year-out sensitivity.");
