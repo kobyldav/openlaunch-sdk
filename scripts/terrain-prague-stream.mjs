@@ -27,6 +27,8 @@ import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js"
 import {selectSharedSentinelRegionSources,verifySharedSentinelRegionSourceYears}
   from "../dist/terrain/sentinel-region-catalog.js";
 import {assessSentinelRegionQuality} from "../dist/terrain/sentinel-region-quality.js";
+import {CogRangeCache} from "../dist/eo/cog-range-cache.js";
+import {readCogWindowUrl} from "../dist/eo/cog.js";
 import {loadSentinelSourcePair} from "../dist/terrain/sentinel-source-pair.js";
 
 const args=process.argv.slice(2);
@@ -36,6 +38,9 @@ if(!Number.isInteger(port)||port<0||port>65535)throw Error("--port must be 0..65
 const scenePairConcurrency=Number(getArg("scene-pair-concurrency","2"));
 if(![1,2].includes(scenePairConcurrency))
  throw RangeError("--scene-pair-concurrency must be 1 (baseline) or 2 (bounded original COG pair)");
+const cogRangeCacheMiB=Number(getArg("cog-range-cache-mib","16"));
+if(!Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>32)
+ throw RangeError("--cog-range-cache-mib must be 0 (actual network baseline) or 1..32 bounded MiB");
 const cacheRoot=resolve(getArg("cache","test-results/terrain-prague-stream-cache"));
 const offline=args.includes("--offline");
 await mkdir(cacheRoot,{recursive:true});
@@ -43,6 +48,10 @@ const viewport=await readFile(new URL("./terrain-prague-stream-viewer.html",impo
 const visibilityScript=await readFile(new URL("./terrain-prague-stream-visibility.js",import.meta.url),"utf8");
 const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.js",import.meta.url),"utf8");
 const sdk=new OpenLaunch();
+// Stage 22: process-local, STRONG-ETag version-pinned original TIFF byte ranges.
+// No persistence of compressed data and no cross-scene/URL substitutions.
+const cogRangeCache=new CogRangeCache(cogRangeCacheMiB*1048576);
+const readOriginalCog=(url,area,options)=>readCogWindowUrl(url,area,{...options,rangeCache:cogRangeCache});
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
 const changeTasks=new Map(),trendTasks=new Map(),seasonalTasks=new Map(),multiYearTasks=new Map();
@@ -280,7 +289,7 @@ async function generateObservation(spec,sceneId){
  console.log("Loading real Sentinel-2 RGB+NDVI "+sceneId+" on Prague tile "+spec.key);
  const product=await sdk.terrain.observeSentinel2({
    area:bbox(spec.west,spec.south,spec.east,spec.north),
-   scene,resolutionM:10
+   scene,resolutionM:10,readWindow:readOriginalCog
  });
  if(product.status!=="real-sentinel2-observation"||
     product.sceneId!==sceneId||product.qa.sclMask!==true||
@@ -890,6 +899,7 @@ async function streamRegionalMultiyear(req,res,params){
    from,to,month,specs.map(t=>t.key));
  // Only source edge strips (not 16 whole rasters) remain in RAM.
  const edgeCache=new Map(),seams=[];
+ const cogCacheStart=cogRangeCache.snapshot();
  peakObservationJobs=observationTasks.size;
  // Stage 20 observes the REAL local Node process, not browser GPU memory.
  const beganAt=performance.now(),startedMemory=process.memoryUsage(),
@@ -999,6 +1009,19 @@ async function streamRegionalMultiyear(req,res,params){
        catalogCacheHitYears,tileMeasurements
      });
      quality.memorySoftLimitMiB=rssLimitMiB;
+     const cogEnd=cogRangeCache.snapshot();
+     quality.cogRangeCache={
+       maxResidentMiB:cogEnd.maxResidentBytes/1048576,
+       residentMiB:cogEnd.residentBytes/1048576,
+       entries:cogEnd.entries,verifiedObjects:cogEnd.verifiedObjects,
+       rangeCacheHits:cogEnd.rangeCacheHits-cogCacheStart.rangeCacheHits,
+       rangeCacheMisses:cogEnd.rangeCacheMisses-cogCacheStart.rangeCacheMisses,
+       reusedBytes:cogEnd.reusedBytes-cogCacheStart.reusedBytes,
+       httpRequests:cogEnd.httpRequests-cogCacheStart.httpRequests,
+       httpBytesRead:cogEnd.httpBytesRead-cogCacheStart.httpBytesRead,
+       evictions:cogEnd.evictions-cogCacheStart.evictions,
+       scope:"original exact-STAC-asset URL + byte range + strong HTTP ETag; Node process only"
+     };
      quality.scenePairConcurrency=scenePairConcurrency;
      quality.maxObservedConcurrentSourceJobs=peakObservationJobs;
      quality.sourceLoadPolicy="two genuine source acquisitions may overlap only within one year and one original source tile";
@@ -1161,6 +1184,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
+  console.log("Sentinel original COG Range cache: "+cogRangeCacheMiB+" MiB maximum; only exact strong-ETag-verified source bytes.");
   console.log("Sentinel source pair concurrency: "+scenePairConcurrency+" (one regional tile at a time, maximum two simultaneous original acquisitions).");
   console.log("Sentinel-2 analytics: actual dated RGB/NDVI, two-date change, three-date series, two-year medians and 3..5-year same-month observational trend with leave-one-year-out sensitivity.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
