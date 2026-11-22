@@ -24,6 +24,8 @@ import {SentinelMultiYearRegionAccumulator} from "../dist/terrain/sentinel-regio
 import {captureSentinelRegionSeamEdges,compareSentinelRegionSeamEdges}
   from "../dist/terrain/sentinel-region-seams.js";
 import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js";
+import {selectSharedSentinelRegionSources,verifySharedSentinelRegionSourceYears}
+  from "../dist/terrain/sentinel-region-catalog.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -552,7 +554,9 @@ async function generateSeasonal(spec,beforeYear,afterYear,month,cloud){
       Buffer.from(d.deltaF32LE??"","base64").byteLength===d.width*d.height*4&&
       Buffer.from(d.beforeCountB64??"","base64").byteLength===d.width*d.height&&
       Buffer.from(d.afterCountB64??"","base64").byteLength===d.width*d.height&&
-      png.byteLength>100)return {json,png};
+      png.byteLength>100&&
+      (!lock||verifySharedSentinelRegionSourceYears(doc.years,lock)))
+     return reportWithSourceLock({json,png},lock);
  }catch{}
  const values=[];
  for(const group of [meta.before,meta.after]){
@@ -620,6 +624,101 @@ function obtainSeasonal(spec,beforeYear,afterYear,month,cloud){
  return promise;
 }
 
+/** A shared STAC selection is chosen ONCE for the whole requested region.
+ * The source lock is a digest of only validated server-discovered IDs/dates.
+ * No client-selected scene URLs, fabricated spectra, or unbounded raster caches.
+ */
+const regionLocks=new Map();
+const REGION_LOCK_MAX=8;
+function regionCatalogSpec(specs){
+ const minX=Math.min(...specs.map(s=>s.x)),minY=Math.min(...specs.map(s=>s.y));
+ const cols=Math.max(...specs.map(s=>s.x))-minX+1;
+ const rows=Math.max(...specs.map(s=>s.y))-minY+1;
+ return {key:"region-"+minX+"-"+minY+"-"+cols+"-"+rows,
+   west:Math.min(...specs.map(s=>s.west)),
+   south:Math.min(...specs.map(s=>s.south)),
+   east:Math.max(...specs.map(s=>s.east)),
+   north:Math.max(...specs.map(s=>s.north))};
+}
+const regionLockDigest=payload=>createHash("sha256")
+  .update(JSON.stringify(payload)).digest("hex").slice(0,32);
+function rememberRegionLock(lock){
+ regionLocks.delete(lock.id);regionLocks.set(lock.id,lock);
+ if(regionLocks.size>REGION_LOCK_MAX)
+   regionLocks.delete(regionLocks.keys().next().value);
+}
+async function selectRegionSourceLock(specs,from,to,month,cloud){
+ const area=regionCatalogSpec(specs),yearCatalogs=[];
+ for(let year=from;year<=to;year++){
+   const [start,end]=seasonalDates(year,month);
+   const result=await observationScenes(area,start,end,cloud);
+   yearCatalogs.push({year,scenes:result.scenes});
+ }
+ const selected=selectSharedSentinelRegionSources(from,to,month,cloud,yearCatalogs);
+ const payload={version:1,from,to,month,cloud,
+   region:area,tiles:specs.map(s=>s.key),seasons:selected.seasons};
+ const id=regionLockDigest(payload),lock={id,...payload};
+ await writeFile(join(cacheRoot,"region-sources-v1-"+id+".json"),
+   JSON.stringify(lock));
+ rememberRegionLock(lock);
+ return lock;
+}
+async function loadRegionSourceLock(id){
+ if(!/^[a-f0-9]{32}$/.test(id))
+   throw new RangeError("Invalid regional source lock ID");
+ let lock=regionLocks.get(id);
+ if(!lock){
+   try{
+     lock=JSON.parse(await readFile(join(cacheRoot,"region-sources-v1-"+id+".json"),"utf8"));
+   }catch{
+     const e=Error("Shared regional Sentinel source catalog is not cached");
+     e.code="TILE_NOT_CACHED";throw e;
+   }
+ }
+ const {id:recorded,...payload}=lock??{};
+ if(recorded!==id||regionLockDigest(payload)!==id||
+   payload.version!==1||
+   !Array.isArray(payload.tiles)||payload.tiles.length<1||payload.tiles.length>16||
+   new Set(payload.tiles).size!==payload.tiles.length||
+   !Array.isArray(payload.seasons)||payload.seasons.length!==payload.to-payload.from+1)
+   throw Error("Regional source selection failed digest or structural validation");
+ multiyearArguments(payload.from,payload.to,payload.month,payload.cloud);
+ const checked=payload.tiles.map(key=>{
+   if(!/^0-[0-5]-[0-5]$/.test(key))throw Error("Invalid region source tile scope");
+   const [,x,y]=key.split("-").map(Number);return tileSpec(0,x,y);
+ });
+ if(JSON.stringify(regionCatalogSpec(checked))!==JSON.stringify(payload.region))
+   throw Error("Regional source lock geographic scope changed");
+ for(const sourceYear of payload.seasons){
+   if(sourceYear.year<payload.from||sourceYear.year>payload.to||
+     sourceYear.scenes?.length!==2||
+     sourceYear.scenes.some(s=>!OBS_SCENE_ID.test(s.id)||
+       !Number.isFinite(Date.parse(s.acquiredAt))))
+     throw Error("Invalid locked Sentinel-2 source dates or scene identities");
+ }
+ // Restore the real STAC metadata (and its approved source asset URLs)
+ // from the exact cached region-wide catalogs, never from client input.
+ for(let year=payload.from;year<=payload.to;year++){
+   const [start,end]=seasonalDates(year,payload.month);
+   const verified=await observationScenes(payload.region,start,end,payload.cloud);
+   const selection=payload.seasons.find(s=>s.year===year);
+   for(const scene of selection?.scenes??[]){
+     const fromCatalog=verified.scenes.find(s=>s.id===scene.id&&
+       s.acquiredAt===scene.acquiredAt);
+     if(!fromCatalog)throw Error("Shared Sentinel source ID no longer matches cached STAC catalog");
+   }
+ }
+ rememberRegionLock(lock);return lock;
+}
+function reportWithSourceLock(product,lock){
+ if(!lock)return product;
+ const doc=JSON.parse(product.json.toString("utf8"));
+ if(!verifySharedSentinelRegionSourceYears(doc.years,lock))
+   throw Error("Tile contains different Sentinel scenes from the locked regional selection");
+ return {json:Buffer.from(JSON.stringify({...doc,sourceLockId:lock.id,
+   regionSourceLocked:true})),png:product.png};
+}
+
 /** Cross-year seasonal analysis never obtains scenes from client URLs.
  * STAC source metadata for each of 3–5 years is discovered server-side.
  */
@@ -658,8 +757,9 @@ function multiyearCachePath(spec,catalog){
  return join(cacheRoot,"multiyear-v"+SENTINEL_MULTIYEAR_VERSION+"-"+
    spec.key+"-"+digest);
 }
-async function generateMultiyear(spec,from,to,month,cloud){
- const catalog=await multiyearSceneSelection(spec,from,to,month,cloud);
+async function generateMultiyear(spec,from,to,month,cloud,lock=null){
+ const catalog=lock?{key:spec.key,from,to,month,cloud,seasons:lock.seasons}:
+   await multiyearSceneSelection(spec,from,to,month,cloud);
  const path=multiyearCachePath(spec,catalog);
  try{
    const [json,png]=await Promise.all([readFile(path+".json"),readFile(path+".png")]);
@@ -729,17 +829,17 @@ async function generateMultiyear(spec,from,to,month,cloud){
    from+".."+to+": "+product.statistics.commonValidPixels+" common pixels, "+
    product.statistics.robustAllYearsPixels+" with 2 genuine sources per year, "+
    "Theil-Sen "+product.statistics.meanSlopeNdviPerYear.toFixed(5)+" NDVI/year");
- return {json,png};
+ return reportWithSourceLock({json,png},lock);
 }
-function obtainMultiyear(spec,from,to,month,cloud){
+function obtainMultiyear(spec,from,to,month,cloud,lock=null){
  multiyearArguments(from,to,month,cloud);
- const key=spec.key+"/"+from+"/"+to+"/"+month+"/"+cloud;
+ const key=spec.key+"/"+from+"/"+to+"/"+month+"/"+cloud+"/"+(lock?.id??"local");
  if(multiYearTasks.has(key))return multiYearTasks.get(key);
  if(multiYearTasks.size>=1){
    const e=Error("One multi-year source analysis already running");
    e.code="OBSERVATION_BUSY";throw e;
  }
- const promise=generateMultiyear(spec,from,to,month,cloud)
+ const promise=generateMultiyear(spec,from,to,month,cloud,lock)
    .finally(()=>multiYearTasks.delete(key));
  multiYearTasks.set(key,promise);return promise;
 }
