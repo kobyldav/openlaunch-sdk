@@ -79,6 +79,7 @@ a{color:#9cd1fc}
     <option value="change">ΔNDVI – změna mezi dvěma snímky</option>
     <option value="trend">Trend NDVI – 3 až 6 snímků</option>
     <option value="seasonal">Meziroční ΔNDVI – stejný měsíc</option>
+    <option value="multiyear">Víceletý NDVI trend · stejná sezóna</option>
    </select></label>
   </div>
   <div class="toolbar" aria-label="Časové porovnání NDVI">
@@ -117,6 +118,25 @@ a{color:#9cd1fc}
     <p id="season-scenes" class="small">Zatím nejsou vybrané žádné původní družicové scény.</p>
     <p id="season-summary" class="small" aria-live="polite">Výsledek bude ΔNDVI (novější rok − starší rok), s počtem platných pixelů, počtem opakovaných měření a varováním při nízkém pokrytí.</p>
     <p class="small">Zelená = vyšší NDVI, červená = nižší NDVI, šedá = menší rozdíl než ±0,15. Nejde o statistický důkaz změny využití krajiny. I stejný měsíc se může v počasí a vegetační fázi mezi roky lišit.</p>
+  </div>
+  <div aria-label="Víceleté sledování skutečného Sentinel-2 NDVI">
+    <strong>Víceletá analýza · 3–5 stejných sezón</strong>
+    <div class="small">Dvě datovaná pozorování Sentinel-2 za rok; společná maska oblačnosti všech let, roční mediány a robustní tempo NDVI za rok. Rozsah při vynechání jednotlivého roku ukazuje citlivost výsledku, nikoli interval statistické spolehlivosti.</div>
+    <div class="toolbar">
+      <label>Od roku <input id="multi-from" type="number" min="2017" max="2100" value="2023" style="width:78px"></label>
+      <label>Do roku <input id="multi-to" type="number" min="2017" max="2100" value="2025" style="width:78px"></label>
+      <label>Stejný měsíc <select id="multi-month">
+        <option value="5">Květen</option><option value="6">Červen</option><option value="7">Červenec</option><option value="8" selected>Srpen</option><option value="9">Září</option>
+      </select></label>
+      <label>Max. oblačnost scény <input id="multi-cloud" type="number" min="0" max="100" value="50" style="width:62px"> %</label>
+      <button id="multi-search">Najít meziroční pozorování</button>
+      <button id="multi-load" disabled>Vypočítat víceletý trend</button>
+      <button id="multi-export" disabled>Export trendu a citlivosti CSV</button>
+    </div>
+    <p id="multi-scenes" class="small">Zatím nejsou ověřené zdrojové scény pro všechny roky.</p>
+    <p id="multi-summary" class="small" aria-live="polite">U výsledku zobrazím skutečné pokrytí, podíl pixelů se dvěma měřeními za každý rok a citlivost na vynechání roku.</p>
+    <canvas id="multi-chart" width="900" height="165" aria-label="Roční mediány Sentinel NDVI na skutečně společných geografických pixelech" style="max-width:100%;height:165px;background:#0c2335;border-radius:7px"></canvas>
+    <p class="small">Barvy: zelená růst NDVI ≥0,04 za rok, červená pokles ≤−0,04 za rok, šedá menší změna. Jde o ilustrační prahovou hodnotu. Nižší průhlednost znamená jen jedno platné měření v některém roce.</p>
   </div>
   <p id="obs-note" class="small">Vyber výřez pohybem kamery a klikni na „Najít scény“. Stahuje se pouze jedna dlaždice (~0,7 km), nikoli celá Praha. Sentinel-2 má 10m spektrální rozlišení.</p>
   <p class="small">NDVI: tmavě zelená = vyšší vegetační aktivita, béžová = nižší, modrá = záporné hodnoty.
@@ -164,6 +184,7 @@ let buildingsEnabled=true;
 let observationTile=null,observationActive=null,observationRequest=null;
 let comparisonData=null,trendData=null,trendSceneIds=[];
 let seasonalSelection=null,seasonalData=null;
+let multiSelection=null,multiData=null;
 let observationEpoch=0;
 const observationCatalog=new Map();
 const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
@@ -395,6 +416,7 @@ function disposeObservation(o){
  if(o?.changeTexture)gl?.deleteTexture(o.changeTexture);
  if(o?.trendTexture)gl?.deleteTexture(o.trendTexture);
  if(o?.seasonalTexture)gl?.deleteTexture(o.seasonalTexture);
+ if(o?.multiTexture)gl?.deleteTexture(o.multiTexture);
 }
 function observationTexture(bitmap,width,height){
  if(!gl||bitmap.width!==width||bitmap.height!==height||
@@ -1172,7 +1194,8 @@ function draw(){
      kind==="ndvi"?active?.ndviTexture:
      kind==="change"?active?.changeTexture:
      kind==="trend"?active?.trendTexture:
-     kind==="seasonal"?active?.seasonalTexture:null;
+     kind==="seasonal"?active?.seasonalTexture:
+     kind==="multiyear"?active?.multiTexture:null;
    const validObservation=!!observed&&active.key===parentKey;
    gl.uniform1i(uni.uOverlayMode,validObservation?1:0);
    if(validObservation){
@@ -1367,6 +1390,9 @@ $("trend-export").onclick=exportTrend;
 $("season-search").onclick=searchSeasonal;
 $("season-load").onclick=loadSeasonal;
 $("season-export").onclick=exportSeasonal;
+$("multi-search").onclick=searchMultiYear;
+$("multi-load").onclick=loadMultiYear;
+$("multi-export").onclick=exportMultiYear;
 $("obs-mode").onchange=requestDraw;
 $("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
 $("buildings").onclick=()=>{
@@ -1456,7 +1482,8 @@ canvas.addEventListener("webglcontextrestored",()=>{
    startGpu();
    $("error").textContent="";
    if(config&&planner)update();
-   if($("obs-mode").value==="seasonal"&&seasonalSelection)loadSeasonal();
+   if($("obs-mode").value==="multiyear"&&multiSelection)loadMultiYear();
+   else if($("obs-mode").value==="seasonal"&&seasonalSelection)loadSeasonal();
    else if(observationTile&&observationCatalog.has($("obs-scene").value)){
      if($("obs-mode").value==="trend"&&trendSceneIds.length>=3)
        loadTrend(trendSceneIds);
