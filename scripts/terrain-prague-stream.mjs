@@ -772,7 +772,7 @@ async function streamRegionalMultiyear(req,res,params){
    res.writeHead(200,{"Content-Type":"application/x-ndjson; charset=utf-8",
      "Cache-Control":"no-store","X-Content-Type-Options":"nosniff",
      "Cross-Origin-Resource-Policy":"same-origin"});
-   const emit=event=>{if(!res.destroyed)res.write(JSON.stringify(event)+"\\n");};
+   const emit=event=>{if(!res.destroyed)res.write(JSON.stringify(event)+"\n");};
    emit({type:"start",status:"real-sentinel-region-started",
      from,to,month,cloud,x,y,cols,rows,
      tiles:specs.map(t=>({key:t.key,x:t.x,y:t.y,
