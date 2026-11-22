@@ -136,3 +136,31 @@ test("stage 14: median acquisition day mismatch and partial coverage are made ex
  assert.throws(()=>compareSentinelSeasonalNdvi(tooSmall,tooFew,
    {minOverlapPixels:4}),/Insufficient real/);
 });
+
+test("stage 14: four genuine coincident pixels among 25 flag limited sampling without inventing others",()=>{
+ const pixel=Array.from({length:25},(_,i)=>i<4?.2+i*.1:NaN);
+ const make=(year,day,id,shift=0)=>{
+   const array=Float32Array.from(pixel,v=>Number.isFinite(v)?v+shift:NaN);
+   return scene(year+"-08-"+day+"T10:00:00Z",id,pixel,{
+     width:5,height:5,ndviValues:array,
+     statistics:{validPixels:4,maskedPixels:21,ndviMean:null,ndviMin:null,ndviMax:null}
+   });
+ };
+ const a=[
+   make("2024","05","S2A_LOW_20240805"),
+   make("2024","20","S2B_LOW_20240820")
+ ],b=[
+   make("2025","06","S2A_LOW_20250806",.1),
+   make("2025","21","S2B_LOW_20250821",.1)
+ ];
+ const result=compareSentinelSeasonalNdvi(a,b,{minOverlapPixels:4});
+ assert.equal(result.statistics.overlapPixels,4);
+ assert.equal(result.statistics.overlapPercent,16);
+ assert.equal(result.statistics.lowCoverageWarning,true);
+ assert.equal(result.statistics.missingEitherPixels,21);
+ assert.equal(result.statistics.robustTwoPerYearPixels,4);
+ assert.equal(result.deltaRgba[0*4+3],255);
+ assert.equal(result.deltaRgba[4*4+3],0);
+ assert.ok(Number.isNaN(result.deltaValues[24]));
+ approx(result.statistics.meanDeltaNdvi,.1);
+});
