@@ -72,9 +72,9 @@ test("Stage 20: timing, RSS peaks, count, cache provenance and source denominato
   {...runtime,elapsedMs:-1},
   {...runtime,catalogCacheHitYears:4},
   {...runtime,tileMeasurements:runtime.tileMeasurements.map((v,i)=>i? v:
-    {...v,key:"0-9-9"}}},
+    {...v,key:"0-9-9"})},
   {...runtime,tileMeasurements:runtime.tileMeasurements.map((v,i)=>i? v:
-    {...v,sourceCache:"miss",rssBytes:200*1048576}}},
+    {...v,sourceCache:"miss",rssBytes:200*1048576})},
  ];
  for(const invalid of corrupted)
    assert.throws(()=>assessSentinelRegionQuality(cover,invalid),
