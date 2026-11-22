@@ -10,7 +10,7 @@ import {readCogWindowUrl,type CogReadResult} from "../eo/cog.js";
 import {reprojectRasterTo,lonLatToGridCrs,ndviRaster,rasterStatistics,
   validateRaster,type RasterGrid} from "../eo/raster.js";
 
-export const SENTINEL_TERRAIN_OVERLAY_VERSION=1;
+export const SENTINEL_TERRAIN_OVERLAY_VERSION=2;
 const BAND_NAMES=["red","green","blue","nir","scl"] as const;
 type BandName=typeof BAND_NAMES[number];
 export interface SentinelTerrainScene{
@@ -32,6 +32,10 @@ export interface SentinelTerrainOverlay{
   width:number;
   height:number;
   groundSamplingM:number;
+  /** Exact 10m target grid used for both geometry and numerical NDVI comparison. */
+  grid:{crs:"EPSG:3857";transform:RasterGrid["transform"]};
+  /** Calibrated NDVI for scientific comparison; NaN for cloud/SCL-invalid pixels. */
+  ndviValues:Float32Array;
   rgbRgba:Uint8Array;
   ndviRgba:Uint8Array;
   statistics:{validPixels:number;maskedPixels:number;ndviMean:number|null;
@@ -256,7 +260,9 @@ export async function loadSentinelTerrainOverlay(o:SentinelTerrainLoadOptions):
    source:"Element84 Earth Search STAC / Copernicus Sentinel-2 L2A public COG",
    collection:"sentinel-2-l2a",
    area:o.area.bbox,width:target.width,height:target.height,
-   groundSamplingM:o.resolutionM??10,rgbRgba,ndviRgba,
+   groundSamplingM:o.resolutionM??10,
+   grid:{crs:"EPSG:3857",transform:target.transform},
+   ndviValues:Float32Array.from(resultNdvi.values),rgbRgba,ndviRgba,
    statistics:{validPixels:valid,maskedPixels:masked,
      ndviMean:stats.mean,ndviMin:stats.min,ndviMax:stats.max},
    qa:{sclMask:true,maskClasses:[4,5,6,7],invalidReflectanceMasked:true,
