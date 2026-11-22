@@ -5,48 +5,67 @@ on:
     paths:
       - scripts/generate-readme-gallery.mjs
       - tools/readme-gallery/package.json
+      - docs/README_GALLERY.md
       - .github/workflows/readme-gallery.yml
   workflow_dispatch:
     inputs:
-      offline:
-        description: "Skip live NASA GIBS tiles"
-        type: boolean
-        default: false
+      modes:
+        description: "Comma-separated layers: nasa-modis,sentinel2,ndvi,radar"
+        type: string
+        default: "nasa-modis,sentinel2,ndvi"
       date:
-        description: "Requested NASA GIBS date (YYYY-MM-DD)"
+        description: "NASA GIBS requested date YYYY-MM-DD"
         type: string
         default: "2026-08-15"
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  gallery:
-    runs-on: ubuntu-latest
+  real-browser-screenshots:
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.ref || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
-      - name: Install SDK dependencies
-        run: npm ci
-      - name: Generate offline gallery and check SDK renderers
-        if: ${{ github.event_name == 'pull_request' || inputs.offline == true }}
-        run: npm run gallery -- --offline
-      - name: Generate full gallery including NASA imagery
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.offline != true }}
+      - name: Install isolated screenshot dependencies
+        run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
+      - name: Install Chromium
+        run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Capture actual website
         env:
-          GALLERY_DATE: ${{ inputs.date }}
-        run: npm run gallery -- --date "$GALLERY_DATE"
-      - name: Upload PNG gallery
+          LAYERS: ${{ github.event_name == 'workflow_dispatch' && inputs.modes || 'nasa-modis,sentinel2,ndvi' }}
+          GALLERY_DATE: ${{ github.event_name == 'workflow_dispatch' && inputs.date || '2026-08-15' }}
+        run: node scripts/generate-readme-gallery.mjs --only "$LAYERS" --date "$GALLERY_DATE"
+      - name: Commit verified real screenshots to PR branch
+        if: always() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        run: |
+          if ! compgen -G "docs/images/live/*-real-ui.png" > /dev/null; then
+            echo "No real images were captured; nothing to commit."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/images/live/*-real-ui.png docs/images/live/capture-manifest.json
+          if git diff --cached --quiet; then
+            echo "Gallery unchanged."
+            exit 0
+          fi
+          git commit -m "docs: capture real OpenLaunch website map UI"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+      - name: Upload actual website screenshots
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: openlaunch-readme-gallery
+          name: openlaunch-real-website-screenshots
           path: |
-            docs/images/*.png
-            docs/images/gallery-manifest.json
-          if-no-files-found: error
+            docs/images/live/*.png
+            docs/images/live/capture-manifest.json
+            docs/images/live/diagnostic-not-for-readme.png
           retention-days: 30
+          if-no-files-found: warn

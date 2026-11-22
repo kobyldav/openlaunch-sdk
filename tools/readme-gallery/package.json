@@ -1,9 +1,9 @@
 {
   "private": true,
-  "name": "openlaunch-readme-gallery-tools",
+  "name": "openlaunch-real-demo-capture",
   "version": "1.0.0",
-  "description": "Isolated renderer for reproducible OpenLaunch SDK README screenshots",
+  "description": "Real browser screenshots of MyWeb powered by OpenLaunch SDK",
   "dependencies": {
-    "sharp": "0.34.5"
+    "playwright": "1.55.0"
   }
 }

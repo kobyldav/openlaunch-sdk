@@ -26,11 +26,18 @@ Use the complete SDK or install just the packages your project requires.
 
 ## Live example: satellite imagery viewer
 
-[Explore the satellite map on kobylkadavid.cz](https://www.kobylkadavid.cz/)
+The [interactive satellite viewer on kobylkadavid.cz](https://www.kobylkadavid.cz/) is a real application using OpenLaunch SDK behind its Earth-observation APIs. These screenshots were captured from the running website in Chromium after the browser had loaded imagery from the selected source.
 
-The public website is a working application built around OpenLaunch SDK. Its satellite explorer offers selectable Earth-observation layers, pan and zoom controls, and satellite imagery served by backend APIs. Unlike the previously published illustrative gallery, this is an actual interactive implementation.
+[![Real Sentinel-2 true-color satellite map of the Czech Republic shown in a website using OpenLaunch SDK](docs/images/live/sentinel2-real-ui.png)](https://www.kobylkadavid.cz/)
 
-The viewer includes NASA MODIS and VIIRS daily imagery, Copernicus Sentinel-2 optical scenes, Sentinel-1 radar and derived NDVI/NDWI displays. Availability varies by provider, date and deployment configuration. The independent airspace viewer on the same page is not presented as an SDK demo.
+*Sentinel-2 RGB — actual Copernicus imagery shown in the web application, with layer controls and the Czech Republic boundary.*
+
+| NASA Terra MODIS | Sentinel-2 vegetation index (NDVI) |
+| --- | --- |
+| [![Real NASA MODIS daily imagery in the OpenLaunch-backed application](docs/images/live/nasa-modis-real-ui.png)](https://www.kobylkadavid.cz/) | [![Real Copernicus NDVI analysis in the OpenLaunch-backed application](docs/images/live/ndvi-real-ui.png)](https://www.kobylkadavid.cz/) |
+| Daily NASA GIBS imagery for the requested date 2026-08-15 (acquisition time not independently verified). | NDVI layer calculated by the site's Copernicus processing service; not a synthetic raster. |
+
+The viewer also offers NASA VIIRS, Sentinel-1 radar and NDWI layers. Availability varies by provider and current credentials or processing quotas. The separate airspace viewer on the same page is not presented as an OpenLaunch SDK demonstration.
 
 To capture **real browser screenshots of the live satellite viewer**, see the [reproducible capture tool](docs/README_GALLERY.md). Screenshots must only be published when real provider imagery has loaded; placeholder illustrations and synthetic map compositions are not acceptable substitutes.
 
