@@ -548,10 +548,83 @@ try{
      "No fictitious historical series or screenshot generated.");
  }
 
+ // Stage 17: prove that the new *regional* WebGL path projects a real,
+ // independently verified Sentinel tile onto the existing measured 3D mesh.
+ // Other region tiles are deliberately UNAVAILABLE, not fabricated imagery.
+ let actualRegional3dView=null;
+ if(actualMultiYearView){
+   const proof=JSON.parse(await readFile(join(cache,"multiyear-live-report.json"),"utf8"));
+   assert.equal(proof.status,"real-sentinel-multiyear-verified");
+   const chosen=proof.selection;
+   const base=origin+"/api/observations/multiyear/0/3/3/"+
+     chosen.from+"/"+chosen.to+"/"+chosen.month+".json?cloud="+chosen.cloud;
+   const reply=await fetch(base);
+   assert.equal(reply.status,200,"Only real cached source products qualify for regional GPU test");
+   const meta=await reply.json();
+   assert.equal(meta.key,"0-3-3");assert.equal(meta.qa.allSourceSclMasked,true);
+   assert.equal(meta.statistics.commonValidPixels,proof.statistics.commonValidPixels);
+   const sourceReport={
+     key:"0-3-3",status:"analyzed",
+     commonValidPixels:meta.statistics.commonValidPixels,
+     robustAllYearsPixels:meta.statistics.robustAllYearsPixels,
+     sourceScenes:meta.years.map(group=>({
+       year:group.year,scenes:group.scenes.map(s=>({
+         sceneId:s.sceneId,acquiredAt:s.acquiredAt
+       }))
+     }))
+   };
+   const prepare='(()=>{'+
+     'const center=tileCenter(0,3,3);'+
+     'panX=center[0];panNorth=center[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;'+
+     '$("obs-mode").value="ortho";update();'+
+     'const cells=[];for(let y=3;y<=4;y++)for(let x=3;x<=4;x++){'+
+     'const b=boundsFor(0,x,y);cells.push({key:"0-"+x+"-"+y,x,y,'+
+     'bounds:{west:b[0],south:b[1],east:b[2],north:b[3]}});}'+
+     'regionPlan={x:3,y:3,cols:2,rows:2,cloud:'+chosen.cloud+',tiles:cells};'+
+     'regionResult={fromYear:'+chosen.from+',toYear:'+chosen.to+
+     ',month:'+chosen.month+',analyzedTiles:1,requestedTiles:4,regionFullyAnalyzed:false};'+
+     'regionTiles.clear();regionTiles.set("0-3-3",'+JSON.stringify(sourceReport)+');'+
+     'for(const cell of cells)if(cell.key!=="0-3-3")regionTiles.set(cell.key,'+
+     '{key:cell.key,status:"insufficient",commonValidPixels:null});'+
+     '$("region-3d").disabled=false;return true;})()';
+   await evalJs(c.send,prepare);
+   const baseline=await evalJs(c.send,inspectPixels);
+   await evalJs(c.send,'toggleRegion3d()');
+   await until(async()=>await evalJs(c.send,
+     'regionGpu.has("0-3-3")&&$("obs-mode").value==="region"'),
+     "real source-bound regional NDVI uploaded to Edge WebGL1",30000);
+   const observed=await evalJs(c.send,inspectPixels);
+   assert.equal(observed.glError,0);
+   assert.notEqual(observed.checksum,baseline.checksum,
+     "Regional WebGL path must change real measured terrain pixels");
+   const count=await evalJs(c.send,
+     '({gpu:regionGpu.size,keys:[...regionGpu.keys()],max:MAX_REGION_GPU,'+
+     'invalid:[...regionGpu.keys()].some(k=>regionTiles.get(k)?.status!=="analyzed")})');
+   assert.equal(count.gpu,1);
+   assert.deepEqual(count.keys,["0-3-3"]);
+   assert.equal(count.invalid,false);
+   assert.ok(count.gpu<=count.max);
+   const screenshotBytes=await capture("prague-real-sentinel-regional-3d-one-source-tile.png");
+   await evalJs(c.send,'toggleRegion3d()');
+   assert.equal(await evalJs(c.send,'regionGpu.size'),0);
+   actualRegional3dView={
+     status:"one-original-source-tile-only-partial-region",
+     tile:"0-3-3",verifiedPixels:meta.statistics.commonValidPixels,
+     originalSceneIds:meta.years.flatMap(y=>y.scenes.map(s=>s.sceneId)),
+     baselineChecksum:baseline.checksum,regionalChecksum:observed.checksum,
+     screenshotBytes,loadedGpuTextures:count.gpu,unsourcedTiles:3
+   };
+   console.log("PASS real source-backed regional NDVI path in Edge WebGL1, "+
+     "one genuine 3-year Sentinel tile and three explicitly unobserved tiles: "+
+     baseline.checksum+" => "+observed.checksum+
+     ", "+screenshotBytes+" authentic PNG bytes; GPU texture released");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,actualMultiYearView,
+   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,actualMultiYearView,actualRegional3dView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
