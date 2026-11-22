@@ -7,6 +7,7 @@ import {mkdir,readFile,rename,writeFile} from "node:fs/promises";
 import {resolve,join} from "node:path";
 import {deflateSync} from "node:zlib";
 import {spawn} from "node:child_process";
+import {createHash} from "node:crypto";
 import {OpenLaunch} from "../dist/index.js";
 import {bbox} from "../dist/geo/types.js";
 import {tileSpec,tileOriginOffset,pragueStreamManifest} from "./terrain-prague-stream-grid.mjs";
@@ -16,6 +17,8 @@ import {fetchOsmFootprints,fetchGroundDmr,buildBuildings,BUILDING_LAYER_VERSION}
 import {SENTINEL_TERRAIN_OVERLAY_VERSION,validateObservationDates}
   from "../dist/terrain/sentinel-overlay.js";
 import {SENTINEL_NDVI_CHANGE_VERSION} from "../dist/terrain/sentinel-change.js";
+import {SENTINEL_NDVI_TREND_VERSION,SENTINEL_TREND_MAX_SCENES}
+  from "../dist/terrain/sentinel-trend.js";
 
 const args=process.argv.slice(2);
 const getArg=(name,def)=>{const i=args.indexOf("--"+name);return i<0?def:args[i+1];};
@@ -30,7 +33,7 @@ const inspectionScript=await readFile(new URL("./terrain-prague-stream-inspect.j
 const sdk=new OpenLaunch();
 const buildingTasks=new Map();
 const observationCatalog=new Map(),observationTasks=new Map();
-const changeTasks=new Map();
+const changeTasks=new Map(),trendTasks=new Map();
 const MAX_OBSERVATION_JOBS=2;
 const OBS_SCENE_ID=/^[A-Za-z0-9_-]{5,120}$/;
 const tasks=new Map();
@@ -379,6 +382,92 @@ function obtainChange(spec,beforeId,afterId){
  const p=generateChange(spec,beforeId,afterId).finally(()=>changeTasks.delete(key));
  changeTasks.set(key,p);return p;
 }
+/** A single user-selected time series is an explicit 3..6-source operation.
+ * No arbitrary provider URL is accepted; observation metadata comes from
+ * the server-side STAC-qualified / cached scene catalog only.
+ */
+function trendPath(spec,sceneIds){
+ if(!Array.isArray(sceneIds)||sceneIds.length<3||
+    sceneIds.length>SENTINEL_TREND_MAX_SCENES||
+    new Set(sceneIds).size!==sceneIds.length||
+    sceneIds.some(id=>!OBS_SCENE_ID.test(id)))
+   throw RangeError("Trend requires 3..6 different qualified Sentinel scene IDs");
+ const digest=createHash("sha256").update(sceneIds.join("\n")).digest("hex").slice(0,24);
+ return join(cacheRoot,"trends-v"+SENTINEL_NDVI_TREND_VERSION+"-"+
+   spec.key+"-"+digest);
+}
+async function generateTrend(spec,sceneIds){
+ const path=trendPath(spec,sceneIds);
+ try{
+   const [json,png]=await Promise.all([readFile(path+".json"),readFile(path+".png")]);
+   const doc=JSON.parse(json.toString("utf8"));
+   if(doc.status==="real-sentinel-ndvi-time-series"&&
+      doc.version===SENTINEL_NDVI_TREND_VERSION&&doc.key===spec.key&&
+      JSON.stringify(doc.requestedSceneIds)===JSON.stringify(sceneIds)&&
+      doc.qa?.allSclMasked===true&&doc.qa?.fixedCommonPixelPopulation===true&&
+      Buffer.from(doc.slopeF32LE??"","base64").byteLength===
+        doc.width*doc.height*4&&png.byteLength>100)
+     return {json,png};
+ }catch{}
+ const measures=[];
+ // Bounded sequential COG access: no storm of >2 simultaneous raster
+ // jobs while the flight viewer streams real DEM tiles separately.
+ for(const sceneId of sceneIds){
+   const product=await obtainObservation(spec,sceneId);
+   const d=JSON.parse(product.json.toString("utf8"));
+   if(d.status!=="real-sentinel2-observation"||d.version!==SENTINEL_TERRAIN_OVERLAY_VERSION||
+      d.key!==spec.key||d.sceneId!==sceneId||
+      d.grid?.crs!=="EPSG:3857"||d.qa?.sclMask!==true||
+      d.terrainElevationUnchanged!==true||typeof d.ndviF32LE!=="string"||
+      !Number.isInteger(d.width)||!Number.isInteger(d.height)||
+      d.width*d.height>50000)
+     throw Error("Temporal source is not a verified SCL-masked Sentinel L2A observation");
+   const bytes=Buffer.from(d.ndviF32LE,"base64");
+   if(bytes.byteLength!==d.width*d.height*4)
+     throw Error("Temporal source numerical NDVI is missing/invalid");
+   const values=new Float32Array(bytes.buffer.slice(bytes.byteOffset,
+     bytes.byteOffset+bytes.byteLength));
+   measures.push({...d,ndviValues:values});
+ }
+ const analysis=sdk.terrain.analyzeSentinelNdviTrend(measures,{
+   thresholdNdviPer30Days:.12,minCommonPixels:16
+ });
+ const result={status:analysis.status,version:analysis.version,key:spec.key,
+   requestedSceneIds:sceneIds,scenes:analysis.scenes,
+   source:analysis.source,area:analysis.area,grid:analysis.grid,
+   width:analysis.width,height:analysis.height,
+   groundSamplingM:analysis.groundSamplingM,
+   statistics:analysis.statistics,qa:analysis.qa,caveats:analysis.caveats,
+   slopeF32LE:Buffer.from(analysis.slopePer30Days.buffer,
+     analysis.slopePer30Days.byteOffset,
+     analysis.slopePer30Days.byteLength).toString("base64"),
+   image:"/api/observations/trend/0/"+spec.x+"/"+spec.y+"/"+
+     sceneIds.join(",")+".png",
+   terrainElevationUnchanged:true};
+ const json=Buffer.from(JSON.stringify(result));
+ const png=rgbaPng({width:analysis.width,height:analysis.height,rgba:analysis.trendRgba});
+ const temporary=path+"."+process.pid+"-"+Date.now();
+ await writeFile(temporary+".png",png);
+ await rename(temporary+".png",path+".png");
+ await writeFile(temporary+".json",json);
+ await rename(temporary+".json",path+".json");
+ console.log("PASS genuine "+sceneIds.length+"-date Sentinel trend "+
+   spec.key+" with "+analysis.statistics.commonValidPixels+
+   " pixels valid in every scene; Theil-Sen NDVI/30d "+
+   analysis.statistics.meanSlopePer30Days);
+ return {json,png};
+}
+function obtainTrend(spec,sceneIds){
+ const key=spec.key+"/"+sceneIds.join(",");
+ if(trendTasks.has(key))return trendTasks.get(key);
+ if(trendTasks.size>=1){
+   const error=Error("One time-series computation is already running");
+   error.code="OBSERVATION_BUSY";throw error;
+ }
+ const promise=generateTrend(spec,sceneIds).finally(()=>trendTasks.delete(key));
+ trendTasks.set(key,promise);return promise;
+}
+
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -417,6 +506,15 @@ const server=createServer(async(req,res)=>{
       const maxCloud=Number(incoming.searchParams.get("cloud")??"35");
       const catalog=await observationScenes(spec,from,to,maxCloud);
       send(res,200,JSON.stringify(catalog),"application/json; charset=utf-8");return;
+    }
+    const trendMatch=/^\/api\/observations\/trend\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_,-]{16,760})\.(json|png)$/.exec(pathname);
+    if(trendMatch){
+      const spec=tileSpec(0,Number(trendMatch[1]),Number(trendMatch[2]));
+      const sceneIds=trendMatch[3].split(",");
+      const result=await obtainTrend(spec,sceneIds);
+      send(res,200,trendMatch[4]==="json"?result.json:result.png,
+        trendMatch[4]==="json"?"application/json; charset=utf-8":"image/png");
+      return;
     }
     const changeMatch=/^\/api\/observations\/compare\/0\/([0-9]{1,2})\/([0-9]{1,2})\/([A-Za-z0-9_-]{5,120})\/([A-Za-z0-9_-]{5,120})\.(json|png)$/.exec(pathname);
     if(changeMatch){
@@ -466,7 +564,7 @@ server.listen(port,"127.0.0.1",()=>{
   console.log("OpenLaunch live real 3D Prague: "+url);
   console.log("Region: ~4×4 km, coarse 12m and detailed 2m real DMP OK tiles.");
   console.log("Optional honest building LOD1 layer: OSM footprints + ČÚZK DMR 5G/DMP OK; never synthetic heights.");
-  console.log("Sentinel-2 analytical layer: real dated RGB, calibrated NDVI and two-scene ΔNDVI on common 10m grid with dual SCL masks.");
+  console.log("Sentinel-2 analytical layer: real RGB, calibrated NDVI, paired ΔNDVI, and 3..6-acquisition fixed-pixel Theil-Sen NDVI trend.");
   console.log("Tiles are requested only as needed; repeat visits use "+cacheRoot);
   if(offline)console.log("Offline mode: serving only genuine ČÚZK tiles already on disk; no Internet requests.");
   if(!args.includes("--no-open")&&process.platform==="win32"){
