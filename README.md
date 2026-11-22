@@ -39,6 +39,8 @@ The SDK supplies data and geometry for visual applications; it does not require 
 
 For runnable recipes, input requirements, and more advanced workflows, see the [complete example catalog](examples/README.md).
 
+To generate six README-ready PNG previews from the SDK, see the [gallery generator](docs/README_GALLERY.md).
+
 ## Quick start
 
 **Requirements:** Node.js 18 or newer and npm.

@@ -1,0 +1,52 @@
+name: Generate README gallery
+
+on:
+  pull_request:
+    paths:
+      - scripts/generate-readme-gallery.mjs
+      - tools/readme-gallery/package.json
+      - .github/workflows/readme-gallery.yml
+  workflow_dispatch:
+    inputs:
+      offline:
+        description: "Skip live NASA GIBS tiles"
+        type: boolean
+        default: false
+      date:
+        description: "Requested NASA GIBS date (YYYY-MM-DD)"
+        type: string
+        default: "2026-08-15"
+
+permissions:
+  contents: read
+
+jobs:
+  gallery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - name: Install SDK dependencies
+        run: npm ci
+      - name: Generate offline gallery and check SDK renderers
+        if: ${{ github.event_name == 'pull_request' || inputs.offline == true }}
+        run: npm run gallery -- --offline
+      - name: Generate full gallery including NASA imagery
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.offline != true }}
+        env:
+          GALLERY_DATE: ${{ inputs.date }}
+        run: npm run gallery -- --date "$GALLERY_DATE"
+      - name: Upload PNG gallery
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: openlaunch-readme-gallery
+          path: |
+            docs/images/*.png
+            docs/images/gallery-manifest.json
+          if-no-files-found: error
+          retention-days: 30
