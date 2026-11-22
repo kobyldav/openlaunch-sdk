@@ -17,8 +17,12 @@ export async function loadSentinelSourcePair<T,V>(
    const second=await loader(scenes[1]);
    return [first,second];
  }
- // Promise.all retains original STAC scene ordering; concurrent source
- // completion is never interpreted as acquisition chronology.
- const values=await Promise.all([loader(scenes[0]),loader(scenes[1])]);
- return [values[0],values[1]];
+ // Wait for BOTH genuine COG jobs to finish even when one fails.
+ // Promise.all alone rejects early and would let the next tile start while
+ // an old acquisition was still consuming the global two-job source budget.
+ // Promise.allSettled keeps the original STAC chronology for results/errors.
+ const settled=await Promise.allSettled([loader(scenes[0]),loader(scenes[1])]);
+ if(settled[0].status==="rejected")throw settled[0].reason;
+ if(settled[1].status==="rejected")throw settled[1].reason;
+ return [settled[0].value,settled[1].value];
 }
