@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>OpenLaunch SDK — 3D engineering showcase</title>
+<style>
+*{box-sizing:border-box}
+html,body{width:100%;height:100%;margin:0;overflow:hidden;background:#030b15;color:#f0f7fe;font-family:Inter,system-ui,Segoe UI,sans-serif}
+canvas{display:block;width:100%;height:100%}
+.overlay{position:absolute;inset:0;pointer-events:none}
+.masthead{position:absolute;left:4.8%;top:6%;max-width:600px}
+.brand{font-size:16px;letter-spacing:3px;font-weight:750;color:#9ed5e5}
+.micro{margin:36px 0 8px;letter-spacing:2.6px;font-size:15px;font-weight:720;color:#58d3e3}
+h1{font-size:52px;line-height:1.06;letter-spacing:-2px;margin:0 0 16px;font-weight:780}
+.description{font-size:20px;line-height:1.5;max-width:530px;color:#b2c8d8}
+.readings{position:absolute;bottom:9%;left:4.8%;display:flex;gap:40px;background:#081827dc;border:1px solid #274456;border-radius:12px;padding:22px 28px}
+.reading{min-width:135px}.reading small{display:block;color:#8badbe;text-transform:uppercase;font-size:12px;font-weight:700;letter-spacing:1.3px;margin-bottom:9px}
+.reading strong{font-size:26px;font-variant-numeric:tabular-nums}
+.source{position:absolute;right:3.5%;bottom:3%;font-size:14px;text-align:right;color:#a4c2d2;max-width:640px}
+.controls{position:absolute;right:3.5%;top:6%;font-size:13px;color:#92b4c6;line-height:2;text-align:right}
+.accent{color:#63dce8}
+#loading{position:absolute;inset:0;display:grid;place-items:center;color:#b8d4e6;font-size:20px;letter-spacing:2px;background:#041321}
+</style></head>
+<body>
+<div id="loading">RENDERING SDK COMPUTED 3D SCENE</div>
+<div class="overlay">
+  <section class="masthead">
+    <div class="brand">OPENLAUNCH <span class="accent">SDK</span> / TECHNICAL DEMO</div>
+    <div class="micro" id="eyebrow"></div>
+    <h1 id="title"></h1>
+    <div class="description" id="description"></div>
+  </section>
+  <div class="controls">Drag to orbit · Scroll to zoom<br>Browser WebGL / actual SDK sample positions</div>
+  <div class="readings">
+    <div class="reading"><small id="metric1-label"></small><strong id="metric1-value"></strong></div>
+    <div class="reading"><small id="metric2-label"></small><strong id="metric2-value"></strong></div>
+    <div class="reading"><small id="metric3-label"></small><strong id="metric3-value"></strong></div>
+  </div>
+  <div class="source" id="source"></div>
+</div>
+<script type="module">
+import * as THREE from "/three.module.js";
+const mode=new URLSearchParams(location.search).get("mode")||"orbit";
+const data=await (await fetch("/scene.json",{cache:"no-store"})).json();
+const $=id=>document.getElementById(id);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,preserveDrawingBuffer:true});
+renderer.setSize(window.innerWidth,window.innerHeight);
+renderer.setPixelRatio(Math.min(1.2,devicePixelRatio));
+renderer.setClearColor("#030a13");
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.22;
+document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene();
+scene.background=new THREE.Color("#030a13");
+const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.05,1000);
+const world=new THREE.Group();scene.add(world);
+const ambient=new THREE.AmbientLight(0x90c3ec,1.25);scene.add(ambient);
+const sun=new THREE.DirectionalLight(0xffe9cd,3.7);sun.position.set(-8,8,13);scene.add(sun);
+const light=new THREE.DirectionalLight(0x78beff,1.8);light.position.set(10,-2,-10);scene.add(light);
+function text(id,value){$(id).textContent=value;}
+function dotCloud(){
+ const values=[],count=400;
+ for(let i=0;i<count;i++){
+  const phi=(i*2.3999632)% (Math.PI*2),z=1-2*(i+.5)/count,r=Math.sqrt(1-z*z);
+  const distance=60+(i%9)*4;values.push(Math.cos(phi)*r*distance,z*distance,Math.sin(phi)*r*distance);
+ }
+ const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.Float32BufferAttribute(values,3));
+ const m=new THREE.PointsMaterial({color:0x87b2cb,size:.14,sizeAttenuation:true,transparent:true,opacity:.54});
+ scene.add(new THREE.Points(g,m));
+}
+dotCloud();
+function vecECEF(v,radius=5){return new THREE.Vector3(v[0],v[2],-v[1]).multiplyScalar(radius/6371)}
+function onGlobe(lat,lon,r=5.027){
+ const a=lat*Math.PI/180,b=lon*Math.PI/180;
+ return new THREE.Vector3(r*Math.cos(a)*Math.cos(b),r*Math.sin(a),-r*Math.cos(a)*Math.sin(b));
+}
+function curveLine(points,color,radius=.02){
+ if(points.length<2)throw Error("Not enough SDK points for 3D trace");
+ const c=new THREE.CatmullRomCurve3(points);
+ return new THREE.Mesh(new THREE.TubeGeometry(c,Math.max(points.length*2,120),radius,5,false),
+  new THREE.MeshBasicMaterial({color,transparent:true,opacity:.98}));
+}
+function marker(where,color,size=.09){
+ const g=new THREE.Group();
+ const glow=new THREE.Mesh(new THREE.SphereGeometry(size*2.5,20,14),
+  new THREE.MeshBasicMaterial({color,transparent:true,opacity:.12,depthWrite:false}));
+ const core=new THREE.Mesh(new THREE.SphereGeometry(size,16,12),
+  new THREE.MeshBasicMaterial({color}));
+ g.add(glow,core);g.position.copy(where);world.add(g);
+ return g;
+}
+async function orbit(){
+ text("eyebrow","01 / ORBITAL MECHANICS");
+ text("title","ISS orbital propagation");
+ text("description","A real 3D visualization of Earth-fixed positions computed by the SDK SGP4 engine. Orbit and ground track are sampled from historical ISS two-line elements.");
+ text("metric1-label","Propagator");text("metric1-value","SGP4");
+ text("metric2-label","Catalog object");text("metric2-value","25544");
+ text("metric3-label","Model altitude");text("metric3-value",data.orbit.altitudeKm.toFixed(1)+" km");
+ text("source","Orbit: OpenLaunch SGP4 from historical 2019 TLE · Earth surface: NASA Blue Marble (2002). Not a live ISS location.");
+ const earthMap=await new Promise((resolve,reject)=>{
+  new THREE.TextureLoader().load("/earth.jpg",t=>{t.colorSpace=THREE.SRGBColorSpace;resolve(t)},undefined,reject);
+ });
+ const earth=new THREE.Mesh(new THREE.SphereGeometry(5,128,80),
+  new THREE.MeshStandardMaterial({map:earthMap,roughness:1,metalness:0}));
+ earth.rotation.y=Math.PI/2;
+ world.add(earth);
+ const atmo=new THREE.Mesh(new THREE.SphereGeometry(5.13,96,64),
+  new THREE.MeshBasicMaterial({color:0x4aa8ef,transparent:true,opacity:.055,side:THREE.BackSide,depthWrite:false}));
+ world.add(atmo);
+ const positions=data.orbit.positions.map(p=>vecECEF(p));
+ const surface=data.orbit.ground.map(p=>onGlobe(p[0],p[1]));
+ world.add(curveLine(positions,0x5df5f1,.018));
+ const ground=curveLine(surface,0xf0d2a2,.010);
+ ground.material.opacity=.65;world.add(ground);
+ const m=marker(positions[Math.floor(positions.length*.6)],0xffc36b,.055);
+ const halo=new THREE.Mesh(new THREE.TorusGeometry(.16,.012,6,60),
+  new THREE.MeshBasicMaterial({color:0xffc36b,side:THREE.DoubleSide}));
+ m.add(halo);
+ world.rotation.y=-.45;world.rotation.x=.05;
+ camera.position.set(11,7,12);camera.lookAt(0,0,0);
+}
+function pathVectors(){
+ const samples=data.launch.path,lat0=samples[0].lat,lon0=samples[0].lon;
+ const raw=samples.map(p=>{
+  const east=(p.lon-lon0)*111.32*Math.cos(lat0*Math.PI/180);
+  const north=(p.lat-lat0)*111.32;
+  return new THREE.Vector3(east,p.altKm,north);
+ });
+ const distance=Math.max(...raw.map(v=>Math.hypot(v.x,v.z)));
+ const altitude=Math.max(...raw.map(v=>v.y));
+ const scale=9/Math.max(1,distance,altitude);
+ return {samples,raw,positions:raw.map(v=>v.clone().multiplyScalar(scale)),scale,distance,altitude};
+}
+function launch(){
+ const {samples,positions,scale,distance,altitude}=pathVectors();
+ text("eyebrow","02 / AEROSPACE ENGINEERING");
+ text("title","Multistage ascent model");
+ text("description","Spatial flight path calculated by the OpenLaunch 3DOF solver. Positions, Max-Q and stage separation are direct outputs of a generic engineering model.");
+ text("metric1-label","Max altitude");text("metric1-value",data.launch.maxAltitudeKm.toFixed(1)+" km");
+ text("metric2-label","Max dynamic pressure");text("metric2-value",data.launch.maxQkPa.toFixed(1)+" kPa");
+ text("metric3-label","Max inertial speed");text("metric3-value",(data.launch.maxSpeedMps/1000).toFixed(2)+" km/s");
+ text("source","Generic two-stage 3DOF simulation / NOT observed launch telemetry. 3D coordinates scaled uniformly; no terrain texture is claimed.");
+ const grid=new THREE.GridHelper(32,32,0x346879,0x173546);
+ grid.position.y=-.03;world.add(grid);
+ const ground=new THREE.Mesh(new THREE.PlaneGeometry(32,32),
+  new THREE.MeshStandardMaterial({color:0x0c2535,roughness:1,metalness:0,transparent:true,opacity:.78}));
+ ground.rotation.x=-Math.PI/2;ground.position.y=-.05;world.add(ground);
+ const traj=curveLine(positions,0x5df3e6,.035);world.add(traj);
+ const pad=new THREE.Mesh(new THREE.CylinderGeometry(.19,.22,.08,20),
+  new THREE.MeshStandardMaterial({color:0xe9a76b,metalness:.2}));
+ pad.position.set(0,.02,0);world.add(pad);
+ for(const ev of data.launch.events.filter(x=>["max-q","stage-separation","fairing-jettison"].includes(x.kind))){
+  const index=samples.reduce((best,p,i)=>Math.abs(p.t-ev.t)<Math.abs(samples[best].t-ev.t)?i:best,0);
+  marker(positions[index],ev.kind==="max-q"?0xffb16a:0x90cfff,.085);
+ }
+ const idx=Math.min(positions.length-1,Math.floor(positions.length*.8));
+ const tip=marker(positions[idx],0xffe4b0,.09);
+ const plume=new THREE.Mesh(new THREE.ConeGeometry(.12,.32,14),
+   new THREE.MeshBasicMaterial({color:0xffba69,transparent:true,opacity:.8}));
+ plume.position.set(0,-.19,0);tip.add(plume);
+ // Real length ratios are preserved; no cinematic altitude exaggeration.
+ const center=positions[Math.floor(positions.length/2)].clone().multiplyScalar(.55);
+ world.position.set(-center.x,-center.y*.65,-center.z);
+ world.rotation.y=-.52;
+ camera.position.set(11,8,14);camera.lookAt(0,1.4,0);
+}
+if(mode==="orbit")await orbit();else if(mode==="launch")launch();else throw Error("Unsupported mode");
+const center=new THREE.Vector3(0,mode==="orbit"?0:1.4,0);
+let dragging=false,lastX=0,lastY=0;
+renderer.domElement.addEventListener("pointerdown",e=>{dragging=true;lastX=e.clientX;lastY=e.clientY});
+window.addEventListener("pointerup",()=>dragging=false);
+window.addEventListener("pointermove",e=>{if(!dragging)return;
+ world.rotation.y+=(e.clientX-lastX)*.004;
+ world.rotation.x=Math.max(-1.2,Math.min(1.2,world.rotation.x+(e.clientY-lastY)*.002));
+ lastX=e.clientX;lastY=e.clientY;
+});
+window.addEventListener("wheel",e=>{camera.position.multiplyScalar(e.deltaY>0?1.08:.93);e.preventDefault()},{passive:false});
+window.addEventListener("resize",()=>{
+ camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
+});
+function animate(){
+ renderer.render(scene,camera);
+ requestAnimationFrame(animate);
+}
+$("loading").remove();animate();
+window.__showcaseReady=true;
+</script>
+</body></html>
