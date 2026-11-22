@@ -34,6 +34,9 @@ jobs:
       - name: Validate real OSM Prague building footprints and ČÚZK DMR 5G ground source
         run: node scripts/terrain-prague-buildings-live-smoke.mjs
         continue-on-error: true
+      - name: Verify real dated Sentinel STAC scene, 5 original COG bands, calibrated NDVI and SCL mask
+        run: node scripts/terrain-prague-observation-live-smoke.mjs
+        continue-on-error: true
       - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
         run: node scripts/terrain-prague-browser-smoke.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
@@ -77,3 +80,10 @@ jobs:
             test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png
             test-results/terrain-prague-browser-ci/prague-real-3d-after-flight.png
             test-results/terrain-prague-browser-ci/prague-real-3d-with-buildings.png
+            test-results/terrain-prague-stream-ci/observations-scenes-v1-*.json
+            test-results/terrain-prague-stream-ci/observations-v1-*.json
+            test-results/terrain-prague-stream-ci/observations-v1-*.rgb.png
+            test-results/terrain-prague-stream-ci/observations-v1-*.ndvi.png
+            test-results/terrain-prague-stream-ci/observations-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-rgb.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi.png
