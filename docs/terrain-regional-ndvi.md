@@ -406,3 +406,87 @@ verified, without claiming that this covers 4×4.
   pixels is a successful NoData handling test, **not** an observation of
   Prague's vegetation. Similarly, Theil–Sen remains descriptive;
   no statistical confidence or causal claim is added.
+
+
+## Stage 21 — bounded dual-original-acquisition COG loading and cold-source A/B
+
+The source bottleneck in Stage 20 was measurable: cold 4×4 input had
+**16 source raster cache misses** for 2023–2025, and Stage 15 processed
+both selected original acquisitions **serially** per historical year.
+Each `observeSentinel2()` already fetches **all five original
+red/green/blue/NIR/SCL COG assets** with independent HTTPS byte-range
+requests. Stage 21 permits the *two independently selected and
+validated original scenes for a single year and tile* to be loaded
+together, without increasing the number of regional tiles in flight.
+
+- New reusable SDK `loadSentinelSourcePair()` helper (in
+  `src/terrain/sentinel-source-pair.ts`), with concurrency exactly
+  **1 (serial baseline) or 2 (bounded original source pair)**.
+  `Promise.allSettled` drains **both** scene requests before reporting
+  a source failure, so the next regional tile never starts while a
+  rejected prior source is still consuming the two-job global budget.
+- The two true STAC scene IDs and timestamps **retain their original
+  ordered placement**, even when one source COG finishes earlier.
+  The original calibrations, exact 10 m EPSG:3857 grid, pixel SCL
+  masks, two annual source medians, Theil–Sen, original ČÚZK 3D
+  geometry, source lock and Stage 20 numeric output remain unchanged.
+- Only **one regional 3D/source tile** is computed at a time; only the
+  two original acquisitions within its current year overlap.
+  The global `MAX_OBSERVATION_JOBS=2` guard remains in place.
+  This is *not* a 16-tile unbounded parallel downloader.
+- Original 3D viewer and exported Stage 20 JSON now disclose
+  `quality.scenePairConcurrency` and
+  `quality.maxObservedConcurrentSourceJobs` from the actual
+  local server, not an estimate of internet transfer parallelism.
+
+### Select original source mode
+
+```powershell
+# Normal real 3D Prague server: two original acquisitions overlap.
+node scripts/terrain-prague-stream.mjs --scene-pair-concurrency 2
+
+# Previous Stage 20 behavior, for scientifically identical baseline.
+node scripts/terrain-prague-stream.mjs --scene-pair-concurrency 1
+
+# Normal example command still defaults to mode 2.
+npm run example:terrain-prague-stream
+```
+
+### Reproducible genuine cold 4×4 benchmark
+
+```powershell
+npm run build
+node --test tests/terrain-sentinel-source-pair.test.mjs
+node scripts/terrain-prague-region-source-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --timeout-ms 1000000
+```
+
+The dedicated GitHub Action
+`.github/workflows/terrain-prague-stage21-source-ab.yml`
+also runs the same **real Sentinel-2 L2A STAC/COG A/B** independently
+of the routine CI. The serial and dual-acquisition treatments each
+start with separate **empty disk caches** and must retrieve all
+16 source-backed tiles, with two fresh Node server processes per
+treatment (cold and persistent-cache replay). The benchmark rejects
+non-empty cold caches, invalid source identity, incomplete 4×4,
+or a changed original scientific SHA-256 fingerprint.
+
+The resulting report
+`test-results/terrain-prague-region-stage21-ab.json`
+contains both **actual** cold times, whole-Node RSS peaks, cache
+hits/misses, observed active source jobs, and an exact comparison of
+the historical scientific output. The speed change **may be
+negative** if two parallel COG requests saturate or are throttled by
+a public source. Run results need explicit measurement; Stage 20's
+47.7 s cold result is a historical reference, not a controlled A/B
+benchmark on an unchanged network.
+
+### Remaining resource limitations
+
+Two scenes, each with five original COG bands requested, can increase
+short-lived HTTP concurrency. Per-process RSS remains under the
+observed soft ceiling if sources cooperate, but the 100 ms sampler
+does not guarantee a hard memory bound; there is no automatic
+parallelism adjustment to enforce a cap during an active COG read.
+Missing SCL pixels, source scenes or tile coverage are still not
+inferred or replaced. Browser GPU residency remains separately
+limited to six measured regional textures.
