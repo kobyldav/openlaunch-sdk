@@ -271,10 +271,70 @@ try{
      "are fabricated; existing real ČÚZK GPU regression still passed.");
  }
 
+ // Stage 12: a live-verified TWO-scene pair is the only acceptable input.
+ // If third-party historical COGs fail, no comparison screenshot exists.
+ let actualChangeView=null;
+ try{
+   const realPair=JSON.parse(await readFile(join(cache,"changes-live-report.json"),"utf8"));
+   assert.equal(realPair.status,"real-sentinel-change-verified");
+   const before=realPair.before,after=realPair.after;
+   for(const scene of [before,after])assert.match(scene.sceneId,/^[A-Za-z0-9_-]{5,120}$/);
+   await evalJs(c.send,'(()=>{const p=tileCenter(0,3,3);'+
+     'panX=p[0];panNorth=p[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;$("obs-mode").value="ortho";'+
+     'update();return true;})()');
+   const clearTerrain=await evalJs(c.send,inspectPixels);
+   const expression='(()=>{observationTile=planner.tileLevels[0]'+
+     '.find(t=>t.key==="0-3-3");'+
+     'observationCatalog.set('+JSON.stringify(before.sceneId)+
+     ',{id:'+JSON.stringify(before.sceneId)+',acquiredAt:'+
+     JSON.stringify(before.acquiredAt)+'});'+
+     'observationCatalog.set('+JSON.stringify(after.sceneId)+
+     ',{id:'+JSON.stringify(after.sceneId)+',acquiredAt:'+
+     JSON.stringify(after.acquiredAt)+'});'+
+     '$("compare-before").replaceChildren(new Option("before",'+
+     JSON.stringify(before.sceneId)+'));$("compare-before").disabled=false;'+
+     '$("obs-scene").replaceChildren(new Option("after",'+
+     JSON.stringify(after.sceneId)+'));$("obs-scene").disabled=false;'+
+     '$("compare-load").disabled=false;return true;})()';
+   await evalJs(c.send,expression);
+   await evalJs(c.send,'loadComparison()');
+   await until(async()=>await evalJs(c.send,
+     '!!observationActive&&!!observationActive.changeTexture&&'+
+     '$("obs-mode").value==="change"&&!!comparisonData'),
+     "two real source dates feeding one Edge WebGL change layer",20000);
+   const actual=await evalJs(c.send,inspectPixels);
+   assert.equal(actual.glError,0);
+   assert.equal(actual.loaded,true);
+   assert.notEqual(actual.checksum,clearTerrain.checksum,
+     "Paired source ΔNDVI must change actual framebuffer values");
+   const compare=await evalJs(c.send,
+     '({overlap:comparisonData.meta.statistics.overlapPixels,'+
+     'increased:comparisonData.meta.statistics.increasedPixels,'+
+     'decreased:comparisonData.meta.statistics.decreasedPixels,'+
+     'stable:comparisonData.meta.statistics.stablePixels,'+
+     'csvEnabled:!$("compare-export").disabled})');
+   assert.equal(compare.overlap,realPair.statistics.overlapPixels);
+   assert.equal(compare.increased+compare.decreased+compare.stable,compare.overlap);
+   assert.equal(compare.csvEnabled,true);
+   const screenshotBytes=await capture("prague-real-sentinel-delta-ndvi.png");
+   actualChangeView={before,after,statistics:realPair.statistics,
+     source:realPair.source,checksum:actual.checksum,
+     terrainChecksum:clearTerrain.checksum,screenshotBytes};
+   console.log("PASS real two-date Sentinel NDVI difference in actual Edge WebGL1: "+
+     compare.overlap+" common SCL-valid pixels, GPU checksum "+
+     clearTerrain.checksum+" -> "+actual.checksum+
+     "; "+screenshotBytes+" PNG screenshot bytes");
+ }catch(error){
+   if(existsSync(join(cache,"changes-live-report.json")))throw error;
+   console.log("NOTICE historical Sentinel dual-source download unavailable; "+
+     "no synthetic two-date comparison or fabricated screenshot created.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,
+   actualBuildingView,actualSentinelView,actualChangeView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
