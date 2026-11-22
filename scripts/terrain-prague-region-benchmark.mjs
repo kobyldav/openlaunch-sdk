@@ -19,6 +19,7 @@ const x=numeric("x",1),y=numeric("y",1),cols=numeric("cols",4),rows=numeric("row
  month=numeric("month",8),cloud=numeric("cloud",50),
  repeat=numeric("repeat",2),rssLimitMiB=numeric("rss-limit-mib",1536),
  scenePairConcurrency=numeric("scene-pair-concurrency",2),
+ cogRangeCacheMiB=numeric("cog-range-cache-mib",16),
  timeoutMs=numeric("timeout-ms",live?900000:60000);
 const cache=resolve(arg("cache","test-results/terrain-prague-stream-cache"));
 const output=resolve(arg("output","test-results/terrain-prague-region-4x4-benchmark.json"));
@@ -31,12 +32,13 @@ if(!Number.isInteger(x)||!Number.isInteger(y)||!Number.isInteger(cols)||!Number.
  !Number.isInteger(repeat)||repeat<1||repeat>4||
  !Number.isInteger(rssLimitMiB)||rssLimitMiB<256||rssLimitMiB>8192||
  ![1,2].includes(scenePairConcurrency)||
+ !Number.isInteger(cogRangeCacheMiB)||cogRangeCacheMiB<0||cogRangeCacheMiB>32||
  !Number.isInteger(timeoutMs)||timeoutMs<10000||timeoutMs>3600000)
  throw new RangeError("Benchmark requires 1..4x1..4 Prague tiles, 3..5 years, repeat 1..4, bounded memory/time");
 
 const report={status:"incomplete",mode:live?"live-original-STAC-COG":"offline-original-cache-only",
  area:{x,y,cols,rows},season:{from,to,month,cloud},
- repeat,rssLimitMiB,timeoutMs,scenePairConcurrency,
+ repeat,rssLimitMiB,timeoutMs,scenePairConcurrency,cogRangeCacheMiB,
  note:"All timing and Node RSS/heap counters are actual measured values, not reference numbers. Missing original source tiles never count as valid observations.",
  runs:[]};
 await mkdir(dirname(output),{recursive:true});
@@ -58,6 +60,7 @@ async function withServer(fn){
    fileURLToPath(new URL("./terrain-prague-stream.mjs",import.meta.url)),
    "--port","0","--no-open","--cache",cache,
    "--scene-pair-concurrency",String(scenePairConcurrency),
+   "--cog-range-cache-mib",String(cogRangeCacheMiB),
    ...(offline?["--offline"]:[])
  ],{windowsHide:true,stdio:["ignore","pipe","pipe"]});
  let stdout="",stderr="";
@@ -103,6 +106,13 @@ try{
    assert.equal(complete.quality?.status,"real-sentinel-region-runtime-quality");
    assert.equal(complete.quality?.measuredTileCount,cols*rows);
    assert.equal(complete.quality?.scenePairConcurrency,scenePairConcurrency);
+   const range=complete.quality?.cogRangeCache;
+   assert.ok(range&&range.maxResidentMiB===cogRangeCacheMiB);
+   assert.ok(range.residentMiB<=cogRangeCacheMiB);
+   assert.ok(Number.isInteger(range.httpRequests)&&range.httpRequests>=0);
+   assert.ok(Number.isInteger(range.rangeCacheHits)&&range.rangeCacheHits>=0);
+   assert.ok(Number.isInteger(range.httpBytesRead)&&range.httpBytesRead>=0);
+   assert.ok(range.rangeCacheHits===0||cogRangeCacheMiB>0);
    assert.ok(complete.quality.maxObservedConcurrentSourceJobs<=2);
    assert.ok(complete.quality.maxObservedConcurrentSourceJobs>=0);
    assert.ok(complete.quality.peakRssMiB>0);
@@ -139,7 +149,7 @@ try{
   await persist();
   console.log("Stage 20 "+iteration+"/"+repeat+": "+
    record.coverage.analyzedTiles+"/"+record.coverage.requestedTiles+
-   " source-backed tiles, source concurrency "+scenePairConcurrency+", "+record.coverage.commonValidPixels+
+   " source-backed tiles, source concurrency "+scenePairConcurrency+", COG range cache "+cogRangeCacheMiB+"MiB, "+record.coverage.commonValidPixels+
    " truly observed common pixels; "+record.fullRequestWallMs.toFixed(0)+
    "ms wall, "+record.metrics.peakRssMiB.toFixed(1)+
    " MiB sampled server RSS; raster cache "+record.metrics.rasterCacheHits+
