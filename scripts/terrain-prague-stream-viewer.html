@@ -1551,6 +1551,17 @@ async function runRegionCoverage(){
          !Number.isInteger(q.maxObservedConcurrentSourceJobs)||
          q.maxObservedConcurrentSourceJobs<0||
          q.maxObservedConcurrentSourceJobs>2||
+         !q.cogRangeCache||
+         !Number.isFinite(q.cogRangeCache.maxResidentMiB)||
+         !Number.isFinite(q.cogRangeCache.residentMiB)||
+         q.cogRangeCache.residentMiB<0||
+         q.cogRangeCache.residentMiB>q.cogRangeCache.maxResidentMiB||
+         !Number.isInteger(q.cogRangeCache.httpRequests)||
+         q.cogRangeCache.httpRequests<0||
+         !Number.isInteger(q.cogRangeCache.httpBytesRead)||
+         q.cogRangeCache.httpBytesRead<0||
+         !Number.isInteger(q.cogRangeCache.rangeCacheHits)||
+         q.cogRangeCache.rangeCacheHits<0||
          !Number.isFinite(q.elapsedMs)||q.elapsedMs<0||
          !Number.isFinite(q.peakRssMiB)||q.peakRssMiB<=0||
          !Number.isFinite(q.peakHeapUsedMiB)||q.peakHeapUsedMiB<=0||
@@ -1561,7 +1572,7 @@ async function runRegionCoverage(){
          throw Error("Skutečné provozní údaje regionu nejsou úplné nebo odpovídající zdrojům");
        regionResult=r;completed=true;
        $("region-quality-export").disabled=false;
-       $("region-quality").textContent="ETAPY 20–21 · "+
+       $("region-quality").textContent="ETAPY 20–22 · "+
          r.analyzedTiles+"/"+cells.length+" doložených dlaždic ("+
          q.analyzedTilePercent.toFixed(1)+" %) · "+
          q.elapsedMs.toFixed(0)+" ms serverový výpočet · špička Node RSS "+
@@ -1571,6 +1582,13 @@ async function runRegionCoverage(){
          q.rasterCacheUnavailable+"× nedostupné · "+
          "Načítání původních scén: "+q.scenePairConcurrency+
          " současně (pozorováno max. "+q.maxObservedConcurrentSourceJobs+") · "+
+         "Původní COG HTTP 206: "+q.cogRangeCache.httpRequests+
+         " požadavků / "+(q.cogRangeCache.httpBytesRead/1048576).toFixed(2)+
+         " MiB staženo · znovu použito "+
+         q.cogRangeCache.rangeCacheHits+" rozsahů / "+
+         (q.cogRangeCache.reusedBytes/1048576).toFixed(2)+
+         " MiB · cache "+q.cogRangeCache.residentMiB.toFixed(1)+
+         "/"+q.cogRangeCache.maxResidentMiB.toFixed(0)+" MiB · "+
          "Celoregionální SCL pokrytí: "+
          (q.wholeRegionSclPixelCoveragePercent===null?
            "nelze spočítat – chybí skutečné dlaždice":
