@@ -39,19 +39,25 @@ test("Stage 16: offline regional NDJSON has bounded ordered tile events and hone
    assert.match(response.headers.get("content-type"),/ndjson/);
    const txt=await response.text();
    const items=txt.trim().split("\n").map(line=>JSON.parse(line));
-   assert.equal(items.length,6);
+   assert.equal(items.length,7);
    assert.equal(items[0].type,"start");
-   assert.deepEqual(items.slice(1,5).map(e=>e.type),Array(4).fill("tile"));
-   assert.deepEqual(items.slice(1,5).map(e=>e.tile.key),
+   assert.equal(items[1].type,"source-lock");
+   assert.equal(items[1].status,"unavailable");
+   assert.match(items[1].reason,/No real Sentinel catalog is cached/);
+   assert.deepEqual(items.slice(2,6).map(e=>e.type),Array(4).fill("tile"));
+   assert.deepEqual(items.slice(2,6).map(e=>e.tile.key),
      ["0-2-2","0-3-2","0-2-3","0-3-3"]);
-   for(const event of items.slice(1,5)){
+   for(const event of items.slice(2,6)){
      assert.equal(event.tile.status,"error");
      assert.match(event.tile.reason,/No real Sentinel catalog is cached/);
      assert.equal(event.tile.commonValidPixels,null);
    }
-   const finished=items[5];
+   const finished=items[6];
    assert.equal(finished.type,"complete");
    assert.equal(finished.result.regionFullyAnalyzed,false);
+   assert.equal(finished.result.sourceLockId,null);
+   assert.equal(finished.result.sourceSelectionStatus,"unavailable");
+   assert.deepEqual(finished.result.lockedSourceYears,[]);
    assert.equal(finished.result.commonValidPixels,0);
    assert.equal(finished.result.analyzedPixels,0);
    assert.equal(finished.result.requestedTiles,4);
