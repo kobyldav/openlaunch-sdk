@@ -818,6 +818,188 @@ function exportTrend(){
  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
+/** Two-year same-month source discovery never accepts guessed scene IDs.
+ * Each dated source is validated by the local SDK/Element84 STAC adapter.
+ */
+async function searchSeasonal(){
+ const tile=chosenObservationTile();
+ if(!tile){$("season-summary").textContent="Nejprve načti mapu Prahy.";return;}
+ const beforeYear=Number($("season-before").value),
+   afterYear=Number($("season-after").value),
+   month=Number($("season-month").value),
+   cloud=Number($("season-cloud").value);
+ if(!Number.isInteger(beforeYear)||!Number.isInteger(afterYear)||
+    beforeYear<2017||beforeYear>=afterYear||afterYear>2100||
+    afterYear-beforeYear>15||!Number.isInteger(month)||month<1||month>12||
+    !Number.isFinite(cloud)||cloud<0||cloud>100){
+   $("season-summary").textContent="Zadej dva vzestupné roky, jeden měsíc a oblačnost 0–100 %.";
+   return;
+ }
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ seasonalSelection=null;seasonalData=null;
+ $("season-load").disabled=true;$("season-export").disabled=true;
+ $("season-search").disabled=true;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();
+ $("season-scenes").textContent="Ověřuji skutečný STAC katalog pro "+beforeYear+
+   " a "+afterYear+"…";
+ $("season-summary").textContent="Výsledek není zatím k dispozici; žádné barvy nejsou odhadované.";
+ try{
+   const query=new URLSearchParams({before:String(beforeYear),
+     after:String(afterYear),month:String(month),cloud:String(cloud)});
+   const url="/api/observations/seasonal/scenes/0/"+tile.x+"/"+tile.y+
+     ".json?"+query;
+   const response=await fetch(url,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,225));
+   const found=await response.json();
+   if(found.status!=="real-sentinel-seasonal-catalog"||found.key!==tile.key||
+      found.month!==month||found.before?.year!==beforeYear||
+      found.after?.year!==afterYear||found.before.scenes.length!==2||
+      found.after.scenes.length!==2||
+      ![...found.before.scenes,...found.after.scenes].every(x=>
+        validSceneId(x.id)&&Number.isFinite(Date.parse(x.acquiredAt))))
+     throw Error("STAC nevrátil čtyři ověřená zdrojová pozorování");
+   if(epoch!==observationEpoch)return;
+   seasonalSelection={tile,beforeYear,afterYear,month,cloud,catalog:found};
+   $("season-scenes").textContent="Vybrané reálné scény: "+
+     [found.before,found.after].map(group=>
+       group.year+": "+group.scenes.map(x=>x.acquiredAt.slice(0,10)+
+         " ("+(x.cloudPercent??"neznámá")+" % oblačnost celé scény)").join(" + ")
+     ).join(" · ");
+   $("season-summary").textContent="Připraveno: 2 nezávislé scény v každém roce. "+
+     "Kliknutím na Porovnat sezónní NDVI se načtou původní spektrální rastry (4× RGB/NIR/SCL).";
+   $("season-load").disabled=false;
+   observationMessage("Nalezeny čtyři původní scény Sentinel-2, jedna srovnatelná měsíční oblast.");
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("season-scenes").textContent="Nebyly získány čtyři použitelné scény.";
+   $("season-summary").textContent="Nelze doložit sezónní zdroje: "+
+     String(error?.message||error).slice(0,250)+
+     ". Vyzkoušej jiný měsíc, rok či větší maximální oblačnost.";
+ }finally{
+   if(observationRequest===controller)observationRequest=null;
+   $("season-search").disabled=false;
+ }
+}
+async function loadSeasonal(){
+ const selection=seasonalSelection;
+ if(!selection)return;
+ const {tile,beforeYear,afterYear,month,cloud}=selection;
+ observationRequest?.abort();
+ const controller=new AbortController(),epoch=++observationEpoch;
+ observationRequest=controller;
+ $("season-load").disabled=true;$("season-export").disabled=true;
+ seasonalData=null;
+ disposeObservation(observationActive);observationActive=null;
+ $("obs-mode").value="ortho";requestDraw();
+ $("season-summary").textContent="Načítám kalibrované zdrojové Sentinel-2 rastry z obou roků. "+
+   "Mediány vzniknou pouze z platných skutečných pixelů; chybějící hodnoty se nedopočítávají.";
+ let seasonalTexture=null;
+ try{
+   const url="/api/observations/seasonal/0/"+tile.x+"/"+tile.y+"/"+
+     beforeYear+"/"+afterYear+"/"+month+"?cloud="+cloud;
+   const prefix=url.replace("?cloud=", ".json?cloud=");
+   const response=await fetch(prefix,{signal:controller.signal});
+   if(!response.ok)throw Error((await response.text()).slice(0,220));
+   const meta=await response.json();
+   if(meta.status!=="real-sentinel-interannual-ndvi"||meta.version!==1||
+      meta.key!==tile.key||meta.before?.year!==beforeYear||
+      meta.after?.year!==afterYear||meta.before.month!==month||
+      meta.after.month!==month||meta.grid?.crs!=="EPSG:3857"||
+      meta.terrainElevationUnchanged!==true||
+      meta.qa?.sameMonth!==true||meta.qa?.pixelSclMasked!==true||
+      meta.qa?.medianPerYear!==true||
+      !Number.isInteger(meta.width)||!Number.isInteger(meta.height)||
+      meta.width<2||meta.height<2||meta.width*meta.height>50000||
+      meta.statistics?.overlapPixels<16||
+      typeof meta.deltaF32LE!=="string"||
+      typeof meta.beforeCountB64!=="string"||
+      typeof meta.afterCountB64!=="string")
+     throw Error("Meziroční NDVI nemá ověřené měsíční zdroje nebo rastr");
+   const matches=(actual,selected)=>actual.length===selected.length&&
+     actual.every((scene,i)=>scene.sceneId===selected[i].id&&
+       scene.acquiredAt===selected[i].acquiredAt);
+   if(!matches(meta.before.scenes,selection.catalog.before.scenes)||
+      !matches(meta.after.scenes,selection.catalog.after.scenes))
+     throw Error("Změnil se výběr původních scén; načti sezónní katalog znovu");
+   const delta=binary(meta.deltaF32LE,Float32Array),
+     countBefore=binary(meta.beforeCountB64,Uint8Array),
+     countAfter=binary(meta.afterCountB64,Uint8Array);
+   const n=meta.width*meta.height;
+   if(delta.length!==n||countBefore.length!==n||countAfter.length!==n||
+      delta.filter(Number.isFinite).length!==meta.statistics.overlapPixels||
+      delta.some(v=>!Number.isNaN(v)&&(!Number.isFinite(v)||Math.abs(v)>2.001))||
+      countBefore.some(v=>v>meta.before.scenes.length)||
+      countAfter.some(v=>v>meta.after.scenes.length))
+     throw Error("Číselná data nebo počty skutečných pozorování jsou poškozené");
+   const png=await fetch(prefix.replace(".json?cloud=",".png?cloud="),
+     {signal:controller.signal});
+   if(!png.ok)throw Error("Chybí ověřená skutečná rastrová vrstva");
+   const bitmap=await createImageBitmap(await png.blob());
+   try{
+     if(epoch!==observationEpoch||!gl||controller.signal.aborted)return;
+     seasonalTexture=observationTexture(bitmap,meta.width,meta.height);
+   }finally{bitmap.close?.();}
+   if(epoch!==observationEpoch||controller.signal.aborted)return;
+   observationActive={key:tile.key,meta,seasonalTexture};
+   seasonalTexture=null;
+   seasonalData={meta,delta,countBefore,countAfter};
+   observationTile=tile;
+   $("season-export").disabled=false;$("obs-mode").value="seasonal";
+   const stats=meta.statistics;
+   const quality=stats.lowCoverageWarning?" POZOR: nízké pokrytí (<25 %).":"";
+   const date=stats.dateShiftWarning?" POZOR: rozdíl dnů pořízení >10.":"";
+   $("season-summary").textContent=beforeYear+" → "+afterYear+
+     ": "+stats.overlapPixels+" platných pixelů ("+
+     stats.overlapPercent.toFixed(1)+" % plochy), "+
+     stats.robustTwoPerYearPixels+" pixelů se dvěma měřeními v obou letech. "+
+     "Průměrné ΔNDVI "+stats.meanDeltaNdvi.toFixed(4)+
+     ". Nárůst "+stats.increasedPixels+", pokles "+stats.decreasedPixels+
+     ", menší rozdíl "+stats.stablePixels+"."+quality+date+
+     " Jde o meziroční spektrální rozdíl, nikoli o potvrzení jeho příčiny.";
+   observationMessage("Zobrazuji skutečný meziroční mediánový rozdíl NDVI na "+
+     "stejném ČÚZK 3D terénu. Žádné chybějící údaje nejsou domalované.");
+   requestDraw();
+ }catch(error){
+   if(controller.signal.aborted)return;
+   $("season-summary").textContent="Meziroční analýzu nelze doložit: "+
+     String(error.message||error).slice(0,260)+
+     ". Žádný náhradní snímek či trend nebyl vytvořen.";
+ }finally{
+   if(seasonalTexture)gl?.deleteTexture(seasonalTexture);
+   if(observationRequest===controller)observationRequest=null;
+   $("season-load").disabled=!seasonalSelection;
+ }
+}
+function exportSeasonal(){
+ if(!seasonalData)return;
+ const {meta,delta,countBefore,countAfter}=seasonalData;
+ const t=meta.grid.transform;
+ if(!Array.isArray(t)||t.length!==6)return;
+ const lines=["year_before,year_after,month,longitude_deg,latitude_deg,delta_ndvi,count_before,count_after,valid_both"];
+ const R=6378137;
+ for(let row=0;row<meta.height;row++)for(let col=0;col<meta.width;col++){
+   const index=row*meta.width+col,
+     x=t[0]+t[1]*(col+.5)+t[2]*(row+.5),
+     y=t[3]+t[4]*(col+.5)+t[5]*(row+.5);
+   const longitude=x/R*180/Math.PI,
+     latitude=(2*Math.atan(Math.exp(y/R))-Math.PI/2)*180/Math.PI;
+   const v=delta[index];
+   lines.push([meta.before.year,meta.after.year,meta.before.month,
+     longitude.toFixed(8),latitude.toFixed(8),
+     Number.isFinite(v)?v.toFixed(7):"",countBefore[index],countAfter[index],
+     Number.isFinite(v)?"1":"0"].join(","));
+ }
+ const url=URL.createObjectURL(new Blob([lines.join("\r\n")+"\r\n"],{
+   type:"text/csv;charset=utf-8"}));
+ const a=document.createElement("a");a.href=url;
+ a.download="praha-sentinel-mezirocni-ndvi-"+meta.before.year+"-"+meta.after.year+".csv";
+ document.body.append(a);a.click();a.remove();
+ setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
 function dispose(t){
  gl.deleteBuffer(t.positions);gl.deleteBuffer(t.uvs);
  gl.deleteBuffer(t.faces);gl.deleteTexture(t.texture);
