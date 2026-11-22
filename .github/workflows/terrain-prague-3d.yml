@@ -59,6 +59,9 @@ jobs:
       - name: Verify three historical years and six true Sentinel-2 same-month COG acquisitions
         run: node scripts/terrain-prague-multiyear-live-smoke.mjs
         continue-on-error: true
+      - name: Stage 18 verify original Sentinel-2 L2A COGs on two adjacent tiles and real edge QA
+        run: node scripts/terrain-prague-region-live-smoke.mjs
+        continue-on-error: true
       - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
         run: node scripts/terrain-prague-browser-smoke.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
@@ -124,5 +127,7 @@ jobs:
             test-results/terrain-prague-stream-ci/multiyear-v1-*.json
             test-results/terrain-prague-stream-ci/multiyear-v1-*.png
             test-results/terrain-prague-stream-ci/multiyear-live-report.json
+            test-results/terrain-prague-stream-ci/region-adjacent-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-multiyear-3-annual-trend.png
             test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-one-source-tile.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-two-real-tiles.png
