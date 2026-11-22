@@ -111,7 +111,7 @@ export function compareSentinelNdviScenes(
  const rgba=new Uint8Array(n*4);
  let overlap=0,increased=0,decreased=0,stable=0,sum=0,min=Infinity,max=-Infinity;
  for(let i=0;i<n;i++){
-   const b=before.ndviValues[i],a=after.ndviValues[i];
+   const b=before.ndviValues[i]!,a=after.ndviValues[i]!;
    if(!Number.isFinite(a)||!Number.isFinite(b))continue;
    const delta=a-b;deltas[i]=delta;overlap++;
    if(delta>=threshold)increased++;
