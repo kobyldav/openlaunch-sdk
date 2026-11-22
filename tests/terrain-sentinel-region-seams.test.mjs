@@ -114,3 +114,24 @@ test("Stage 18: invalid radiometric values, dates, nodata and missing origin fai
    ...source(),years:[{year:2025,scenes:[]}]
  }),/source-verified/);
 });
+
+test("Stage 18: real 3D viewer and localhost stream use no source edge extrapolation",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const {Script}=await import("node:vm");
+ const page=await readFile(new URL("../scripts/terrain-prague-stream-viewer.html",import.meta.url),"utf8");
+ const js=page.match(/<script>\s*"use strict";([\s\S]+?)<\/script>/)?.[1];
+ assert.ok(js);
+ assert.doesNotThrow(()=>new Script(js));
+ assert.match(page,/id="region-seam-export"/);
+ assert.match(page,/id="region-seam-note"/);
+ assert.match(page,/regionSeams\.push\(seam\)/);
+ assert.match(page,/ctx\.setLineDash\(seam\.warning/);
+ assert.match(page,/function exportRegionSeamsCsv\(/);
+ assert.match(page,/vUv\.x>=0\.0 && vUv\.x<=1\.0/);
+ assert.match(page,/vUv\.y>=0\.0 && vUv\.y<=1\.0/);
+ const server=await readFile(new URL("../scripts/terrain-prague-stream.mjs",import.meta.url),"utf8");
+ assert.match(server,/captureSentinelRegionSeamEdges\(/);
+ assert.match(server,/compareSentinelRegionSeamEdges\(/);
+ assert.match(server,/emit\(\{type:"seam",seam\}\)/);
+ assert.match(server,/seamWarningCount:seams\.filter/);
+});
