@@ -64,7 +64,8 @@ const cogRangeMemory=new AdaptiveCogRangeMemory(cogRangeCache,{
  mode:cogMemoryMode,processLimitBytes:cogRssTargetMiB*1048576
 });
 const checkCogPressure=()=>cogRangeMemory.observe({
- rssBytes:process.memoryUsage().rss,systemFreeBytes:freemem()
+ rssBytes:process.memoryUsage().rss,systemFreeBytes:freemem(),
+ sampledAtMs:performance.now()
 });
 const readOriginalCog=async(url,area,options)=>{
  checkCogPressure();
@@ -934,7 +935,9 @@ async function streamRegionalMultiyear(req,res,params){
    const m=process.memoryUsage();
    peakRssBytes=Math.max(peakRssBytes,m.rss);
    peakHeapUsedBytes=Math.max(peakHeapUsedBytes,m.heapUsed);
-   cogRangeMemory.observe({rssBytes:m.rss,systemFreeBytes:freemem()});
+   cogRangeMemory.observe({
+     rssBytes:m.rss,systemFreeBytes:freemem(),sampledAtMs:performance.now()
+   });
    return m;
  };
  const sampler=setInterval(sampleMemory,samplingIntervalMs);
