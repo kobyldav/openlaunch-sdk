@@ -77,6 +77,18 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/id="obs-to"/);
   assert.match(page,/id="obs-scene"/);
   assert.match(page,/id="obs-mode"/);
+  assert.match(page,/id="season-before"/);
+  assert.match(page,/id="season-after"/);
+  assert.match(page,/id="season-month"/);
+  assert.match(page,/id="season-cloud"/);
+  assert.match(page,/id="season-scenes"/);
+  assert.match(page,/id="season-search"/);
+  assert.match(page,/id="season-load"/);
+  assert.match(page,/id="season-export"/);
+  assert.match(page,/value="seasonal"/);
+  assert.match(page,/\/api\/observations\/seasonal\/0\//);
+  assert.match(page,/loadSeasonal\(/);
+  assert.match(page,/searchSeasonal\(/);
   assert.match(page,/id="trend-scenes"/);
   assert.match(page,/id="trend-load"/);
   assert.match(page,/id="trend-export"/);
@@ -165,6 +177,22 @@ test("local streaming server starts without any terrain download, accepts only v
       "/api/observations/scenes/0/3/3.json?from=2025-06-01&to=2025-09-30");
     assert.equal(noScenes.status,404,
       "Offline server never fetches an uncached Sentinel STAC catalog");
+    const noSeasons=await fetch(origin+
+      "/api/observations/seasonal/scenes/0/3/3.json?before=2024&after=2025&month=8&cloud=50");
+    assert.equal(noSeasons.status,404,
+      "Offline discovery must not invent any un-cached annual STAC scenes");
+    const invalidSeason=await fetch(origin+
+      "/api/observations/seasonal/scenes/0/3/3.json?before=2025&after=2024&month=8&cloud=50");
+    assert.equal(invalidSeason.status,400,
+      "Reverse annual chronology is explicitly invalid");
+    const invalidMonth=await fetch(origin+
+      "/api/observations/seasonal/scenes/0/3/3.json?before=2024&after=2025&month=13&cloud=50");
+    assert.equal(invalidMonth.status,400,
+      "Malformed month must not enter source search");
+    const noSeasonalRaster=await fetch(origin+
+      "/api/observations/seasonal/0/3/3/2024/2025/8.json?cloud=50");
+    assert.equal(noSeasonalRaster.status,404,
+      "A missing cached observation must not be replaced with fake annual NDVI");
     const noTrend=await fetch(origin+
       "/api/observations/trend/0/3/3/S2A_TREND_20250801,S2B_TREND_20250811,S2C_TREND_20250831.json");
     assert.equal(noTrend.status,404,"Uncached temporal trend has no artificial offline result");
