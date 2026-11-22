@@ -46,7 +46,10 @@ try{
        (await res.text()).slice(0,300));
      const data=await res.json();
      assert.equal(data.status,"real-sentinel2-observation");
-     assert.equal(data.version,1);
+     assert.equal(data.version,2);
+     assert.equal(data.grid.crs,"EPSG:3857");
+     assert.equal(Buffer.from(data.ndviF32LE,"base64").byteLength,
+       data.width*data.height*4);
      assert.equal(data.key,"0-3-3");
      assert.equal(data.sceneId,scene.id);
      assert.equal(data.terrainElevationUnchanged,true);

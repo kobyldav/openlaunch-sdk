@@ -27,6 +27,8 @@ jobs:
         run: node --test tests/terrain-prague-buildings.test.mjs
       - name: Validate SDK single-scene Sentinel-2 calibrated reflectance, NDVI and SCL masks (deterministic fixtures)
         run: node --test tests/terrain-sentinel-overlay.test.mjs
+      - name: Verify two real Sentinel dates on common 10m grid, paired clouds and NDVI delta (source-backed fixtures)
+        run: node --test tests/terrain-sentinel-overlay.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
@@ -80,10 +82,10 @@ jobs:
             test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png
             test-results/terrain-prague-browser-ci/prague-real-3d-after-flight.png
             test-results/terrain-prague-browser-ci/prague-real-3d-with-buildings.png
-            test-results/terrain-prague-stream-ci/observations-scenes-v1-*.json
-            test-results/terrain-prague-stream-ci/observations-v1-*.json
-            test-results/terrain-prague-stream-ci/observations-v1-*.rgb.png
-            test-results/terrain-prague-stream-ci/observations-v1-*.ndvi.png
+            test-results/terrain-prague-stream-ci/observations-scenes-v2-*.json
+            test-results/terrain-prague-stream-ci/observations-v2-*.json
+            test-results/terrain-prague-stream-ci/observations-v2-*.rgb.png
+            test-results/terrain-prague-stream-ci/observations-v2-*.ndvi.png
             test-results/terrain-prague-stream-ci/observations-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-rgb.png
             test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi.png

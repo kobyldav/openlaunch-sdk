@@ -558,3 +558,55 @@ also review the SCL classes, actual scene processing baseline, scale
 and offset QA and temporal consistency; Stage 11 is not a fully
 atmospherically cross-calibrated time-series or a certified urban
 vegetation survey.
+
+## Stage 12 — observed Sentinel-2 temporal NDVI change on real 3D Prague
+
+**Data engine, not a 3D photo program:**
+`OpenLaunch().terrain.compareSentinelNdvi(before,after,{thresholdNdvi:.15})`
+is a pure, reusable SDK function. It takes **calibrated numeric NDVI**
+from two previous `observeSentinel2` results. It requires identical
+EPSG:3857 pixel-center affine grids, dimensions, WGS84 tile bounds and
+ground resolution, distinct chronological STAC acquisition timestamps,
+and the recorded SCL valid-pixel masks on **both** scenes.
+
+The numerical output is `deltaValues:Float32Array` with real
+`NDVI_after - NDVI_before` values. Any source cloud, cloud shadow, snow,
+sensor NoData or invalid reflectance in *either* date remains NaN.
+The visualization-only `deltaRgba:Uint8Array` draws high positive
+differences in green, high negative in red, differences below the
+**0.15 NDVI unit** illustrative threshold in grey and source-invalid
+pixels transparent above the unchanged ČÚZK orthophoto.
+
+`statistics` separately reports the intersection (two-scene valid
+pixel count, percentage of nominal grid with genuine overlap),
+increase/decrease/stable pixel counts, mean/min/max delta and the
+explicit threshold. **Fewer than 16 valid shared pixels fail closed**:
+never fill missing NDVI with zero or fabricate a comparison.
+
+### UI
+
+In the Earth Intelligence panel, use the scene search from Stage 11.
+Select the **older** scene under `Starší snímek`, the **newer** scene
+in the existing upper scene picker, then click `Porovnat ΔNDVI`.
+Switch to the ΔNDVI visualization or export the actual numerical pixel
+data to CSV with original WGS84 pixel center coordinates and an explicit
+valid/invalid flag. The original height-mesh, terrain texture, building
+geometry, inspector and Bpv vertical datum are unchanged.
+
+### Source cache and safety
+
+The Stage 11 observed-scene cache moves to `observations-v2-*` because
+it now includes the original calibrated NDVI float32 pixel data plus
+exact source-aligned EPSG:3857 grid transform. Each pair is computed
+only from those verified numeric rasters and cached as `changes-v1-*`
+(metadata + source-derived transparent PNG).
+Local APIs: `/api/observations/compare/0/X/Y/OLDER_SCENE/NEWER_SCENE.json`
+and `.png`; remote data is never fetched in `--offline` mode.
+
+**Limits:** a spatial/spectral ΔNDVI is **not evidence of the cause**
+of vegetation loss/gain; differences can be seasonal, atmospheric,
+sun-angle or misclassification artifacts. This is not a validated
+land-use change detector, deforestation inventory, pixel-size upgrade,
+or annual matched-phenology time series. Only one explicitly selected
+~700m observation tile is compared at a time. Calibration and source
+attribution are preserved in both source scene metadata.
