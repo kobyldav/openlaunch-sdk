@@ -20,6 +20,7 @@ import {SENTINEL_NDVI_CHANGE_VERSION} from "../dist/terrain/sentinel-change.js";
 import {SENTINEL_NDVI_TREND_VERSION,SENTINEL_TREND_MAX_SCENES}
   from "../dist/terrain/sentinel-trend.js";
 import {SENTINEL_SEASONAL_COMPOSITE_VERSION} from "../dist/terrain/sentinel-seasonal.js";
+import {SentinelMultiYearRegionAccumulator} from "../dist/terrain/sentinel-region.js";
 import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js";
 
 const args=process.argv.slice(2);
@@ -741,6 +742,67 @@ function obtainMultiyear(spec,from,to,month,cloud){
  multiYearTasks.set(key,promise);return promise;
 }
 
+/** Stage 16: bounded regional source processing. Only one large regional
+ * job runs at once; every sequential tile can be released after summarizing.
+ * NDJSON events carry honest coverage/no-data and terminal regional statistics.
+ */
+let regionalJobActive=false;
+async function streamRegionalMultiyear(req,res,params){
+ if(regionalJobActive){
+   const err=Error("A regional source analysis is already running");
+   err.code="OBSERVATION_BUSY";throw err;
+ }
+ const numeric=(name,def)=>Number(params.get(name)??def);
+ const x=numeric("x",2),y=numeric("y",2),
+   cols=numeric("cols",2),rows=numeric("rows",2),
+   from=numeric("from",2023),to=numeric("to",2025),
+   month=numeric("month",8),cloud=numeric("cloud",50);
+ multiyearArguments(from,to,month,cloud);
+ if(![x,y,cols,rows].every(Number.isInteger)||
+   x<0||y<0||cols<1||rows<1||cols>4||rows>4||
+   cols*rows>16||x+cols>6||y+rows>6)
+   throw RangeError("Regional selection must be 1..4 by 1..4 inside the Prague overview grid");
+ const specs=[];
+ for(let iy=y;iy<y+rows;iy++)
+   for(let ix=x;ix<x+cols;ix++)specs.push(tileSpec(0,ix,iy));
+ const aggregate=new SentinelMultiYearRegionAccumulator(
+   from,to,month,specs.map(t=>t.key));
+ regionalJobActive=true;
+ try{
+   res.writeHead(200,{"Content-Type":"application/x-ndjson; charset=utf-8",
+     "Cache-Control":"no-store","X-Content-Type-Options":"nosniff",
+     "Cross-Origin-Resource-Policy":"same-origin"});
+   const emit=event=>{if(!res.destroyed)res.write(JSON.stringify(event)+"\\n");};
+   emit({type:"start",status:"real-sentinel-region-started",
+     from,to,month,cloud,x,y,cols,rows,
+     tiles:specs.map(t=>({key:t.key,x:t.x,y:t.y,
+       bounds:{west:t.west,south:t.south,east:t.east,north:t.north}}))});
+   for(const spec of specs){
+     if(res.destroyed)break;
+     const bounds={west:spec.west,south:spec.south,east:spec.east,north:spec.north};
+     try{
+       // The same genuine Stage 15 STAC/COG/SCL pipeline; no alternate raster sources.
+       const product=await obtainMultiyear(spec,from,to,month,cloud);
+       const doc=JSON.parse(product.json.toString("utf8"));
+       aggregate.addResult(spec.key,bounds,doc);
+     }catch(err){
+       const reason=String(err?.message??err).slice(0,180);
+       const insufficient=err?.code==="OBSERVATION_INSUFFICIENT"||
+         /Insufficient real common SCL-valid pixels/.test(reason);
+       aggregate.addUnavailable(spec.key,bounds,
+         insufficient?"insufficient":"error",reason);
+     }
+     const snapshot=aggregate.snapshot();
+     emit({type:"tile",tile:snapshot.tiles[snapshot.tiles.length-1],
+       processed:snapshot.processedTiles,total:snapshot.requestedTiles});
+   }
+   if(!res.destroyed){
+     emit({type:"complete",result:aggregate.finish()});
+     res.end();
+   }
+ }finally{regionalJobActive=false;}
+}
+
 function send(res,status,data,contentType){
   const bytes=typeof data==="string"?Buffer.from(data):data;
   res.writeHead(status,{"Content-Type":contentType,
@@ -770,6 +832,9 @@ const server=createServer(async(req,res)=>{
     }
     if(pathname==="/api/config"){
       send(res,200,JSON.stringify({...pragueStreamManifest(),offlineMode:offline}),"application/json; charset=utf-8");return;
+    }
+    if(pathname==="/api/observations/multiyear/region.ndjson"){
+      await streamRegionalMultiyear(req,res,incoming.searchParams);return;
     }
     const obsCatalogPath=/^\/api\/observations\/scenes\/0\/([0-9]{1,2})\/([0-9]{1,2})\.json$/.exec(pathname);
     if(obsCatalogPath){
