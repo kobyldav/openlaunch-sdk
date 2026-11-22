@@ -157,8 +157,10 @@ a{color:#9cd1fc}
       <button id="region-export" disabled>Pokrytí CSV</button>
       <button id="region-geojson" disabled>Pokrytí GeoJSON</button>
       <button id="region-seam-export" disabled>Kontrola hranic CSV</button>
+      <button id="region-quality-export" disabled>Měření provozu JSON</button>
       <button id="region-3d" disabled>Zobrazit regionální trend ve 3D</button>
     </div>
+    <p id="region-quality" class="small" aria-live="polite">Etapa 20: během skutečné analýzy měřím čas, RAM procesu Node a cache. Paměť GPU prohlížeče se neměří. Nedoložené oblasti se nezapočítávají do celoregionálního pokrytí pixelů.</p>
     <p id="region-source-status" class="small" aria-live="polite">Etapa 19: před výpočtem regionu vyberu stejné dvě původní scény Sentinel-2 pro každý rok a všechny dlaždice. Pokud společné zdroje chybí, výpočet nepoužije náhradní snímky.</p>
     <p id="region-seam-note" class="small" aria-live="polite">Hranice dlaždic: zatím bez porovnání původních pixelů. Oranžové hranice znamenají nesrovnatelná měření nebo výraznější rozdíl mezi sousedními pixelovými středy – nikoli automaticky chybu terénu.</p>
     <p id="region-3d-status" class="small" aria-live="polite">3D vrstva: vypnutá. Po dokončení skutečné regionální analýzy lze promítnout ověřené pixely na původní ČÚZK terén. Načítají se jen právě potřebné textury (nejvýše 6 v GPU).</p>
@@ -1355,6 +1357,19 @@ function exportRegionCsv(){
  downloadRegion("praha-sentinel-ndvi-regional-coverage-"+regionResult.fromYear+
    "-"+regionResult.toYear+".csv","text/csv;charset=utf-8",rows.join("\r\n")+"\r\n");
 }
+function exportRegionQuality(){
+ if(!regionResult?.quality)return;
+ const data={status:"real-sentinel-region-quality-export",
+   sourceLockId:regionResult.sourceLockId??null,
+   sourceSelectionStatus:regionResult.sourceSelectionStatus,
+   fromYear:regionResult.fromYear,toYear:regionResult.toYear,
+   month:regionResult.month,
+   originalAnnualScenes:regionResult.lockedSourceYears,
+   regionFullyAnalyzed:regionResult.regionFullyAnalyzed,
+   quality:regionResult.quality};
+ downloadRegion("praha-sentinel-regionalni-provoz-"+regionResult.fromYear+"-"+
+   regionResult.toYear+".json","application/json",JSON.stringify(data,null,2));
+}
 function exportRegionSeamsCsv(){
  if(!regionResult?.seams)return;
  const quote=x=>'"'+String(x??"").replace(/"/g,'""')+'"';
@@ -1424,6 +1439,9 @@ async function runRegionCoverage(){
  regionPlan={x,y,cols:size,rows:size,tiles:cells,cloud,sourceLockId:null,lockedSourceYears:[]};
  regionTiles.clear();regionSeams=[];regionResult=null;drawRegionCoverage();
  $("region-seam-export").disabled=true;
+ $("region-quality-export").disabled=true;
+ $("region-quality").textContent="Měřím celý region "+cells.length+
+   " dlaždic: časy po dlaždicích, vzorkovaná RAM procesu Node a využití původní zdrojové cache. GPU není měřeno.";
  $("region-source-status").textContent="Nejprve ověřuji dvě stejné původní scény pro každý rok v celém regionu. Pokud společná scéna chybí, nic nenahradím.";
  $("region-seam-note").textContent="Kontroluji nativní okraje každé dvojice sousedních skutečných Sentinel dlaždic. Žádné mezery automaticky nevyhlazuji.";
  const controller=new AbortController();regionRun=controller;
@@ -1476,6 +1494,16 @@ async function runRegionCoverage(){
        $("region-status").textContent=event.processed+"/"+event.total+
          " dlaždic prověřeno; úplná skutečná data: "+ok+
          ". Nepokrytá místa zůstávají nevyplněná.";
+       const m=event.metrics;
+       if(m&&Number.isFinite(m.durationMs)&&m.durationMs>=0&&
+         Number.isFinite(m.rssBytes)&&m.rssBytes>=0&&
+         ["hit","miss","unavailable"].includes(m.sourceCache)){
+         $("region-quality").textContent="Zpracováno "+event.processed+"/"+event.total+
+           " dlaždic · poslední "+m.durationMs.toFixed(0)+" ms · "+
+           (m.rssBytes/1048576).toFixed(1)+" MiB aktuální RSS Node · "+
+           "zdrojová cache: "+m.sourceCache+
+           ". Zatím nejde o finální maximum ani o GPU paměť.";
+       }
        drawRegionCoverage();
      }else if(event.type==="seam"){
        const seam=event.seam;
@@ -1515,7 +1543,36 @@ async function runRegionCoverage(){
        if(!Array.isArray(r.seams)||r.seams.length!==regionSeams.length||
          r.seamWarningCount!==regionSeams.filter(s=>s.warning).length)
          throw Error("Regionální kontrola skutečných hranic není úplná");
+       const q=r.quality;
+       if(q?.status!=="real-sentinel-region-runtime-quality"||q.version!==1||
+         q.requestedTiles!==cells.length||q.measuredTileCount!==cells.length||
+         q.analyzedTiles!==r.analyzedTiles||
+         !Number.isFinite(q.elapsedMs)||q.elapsedMs<0||
+         !Number.isFinite(q.peakRssMiB)||q.peakRssMiB<=0||
+         !Number.isFinite(q.peakHeapUsedMiB)||q.peakHeapUsedMiB<=0||
+         q.rasterCacheHits+q.rasterCacheMisses+
+           q.rasterCacheUnavailable!==cells.length||
+         q.wholeRegionSclPixelCoveragePercent!==(
+           r.regionFullyAnalyzed?r.percentValidWithinAnalyzedTiles:null))
+         throw Error("Skutečné provozní údaje regionu nejsou úplné nebo odpovídající zdrojům");
        regionResult=r;completed=true;
+       $("region-quality-export").disabled=false;
+       $("region-quality").textContent="ETAPA 20 · "+
+         r.analyzedTiles+"/"+cells.length+" doložených dlaždic ("+
+         q.analyzedTilePercent.toFixed(1)+" %) · "+
+         q.elapsedMs.toFixed(0)+" ms serverový výpočet · špička Node RSS "+
+         q.peakRssMiB.toFixed(1)+" MiB · špička V8 heap "+
+         q.peakHeapUsedMiB.toFixed(1)+" MiB · zdrojová cache "+
+         q.rasterCacheHits+"× hit / "+q.rasterCacheMisses+"× miss / "+
+         q.rasterCacheUnavailable+"× nedostupné · "+
+         "Celoregionální SCL pokrytí: "+
+         (q.wholeRegionSclPixelCoveragePercent===null?
+           "nelze spočítat – chybí skutečné dlaždice":
+           q.wholeRegionSclPixelCoveragePercent.toFixed(1)+" %")+
+         (q.memorySoftLimitExceeded?
+           " · UPOZORNĚNÍ: překročen měkký limit procesové RAM!":"")+
+         ". RAM je vzorkována po "+q.samplingIntervalMs+
+         " ms, GPU není měřeno.";
        $("region-seam-export").disabled=r.seams.length===0;
        $("region-seam-note").textContent="Mezi "+r.analyzedTiles+
          " doloženými dlaždicemi porovnáno "+r.seams.length+
@@ -2110,6 +2167,7 @@ $("region-stop").onclick=()=>regionRun?.abort();
 $("region-export").onclick=exportRegionCsv;
 $("region-geojson").onclick=exportRegionGeoJson;
 $("region-seam-export").onclick=exportRegionSeamsCsv;
+$("region-quality-export").onclick=exportRegionQuality;
 $("region-3d").onclick=toggleRegion3d;
 $("obs-mode").onchange=()=>{
  if($("obs-mode").value!=="region"){
