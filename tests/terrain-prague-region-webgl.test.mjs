@@ -174,7 +174,7 @@ test("Stage 20: actual viewer presents server-measured quality, not invented GPU
  assert.match(html,/id="region-quality-export"/);
  assert.match(html,/function exportRegionQuality\(/);
  assert.match(html,/quality:q|quality:regionResult\.quality/);
- assert.match(html,/q\.status!=="real-sentinel-region-runtime-quality"/);
+ assert.match(html,/q\?\.status!=="real-sentinel-region-runtime-quality"/);
  assert.match(html,/q\.wholeRegionSclPixelCoveragePercent===null/);
  assert.match(html,/q\.memorySoftLimitExceeded/);
  assert.match(html,/GPU není měřeno/);
