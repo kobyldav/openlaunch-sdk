@@ -54,6 +54,7 @@ test("Stage 16: source-proven tiles aggregate only common observed pixels",()=>{
  assert.equal("slopePerYear" in result.tiles[0],false);
  assert.equal("ndviValues" in result.tiles[0],false);
  assert.equal(typeof new OpenLaunch().terrain.analyzeSentinelMultiYear,"function");
+ assert.equal(typeof new OpenLaunch().terrain.createSentinelMultiYearRegion,"function");
 });
 
 test("Stage 16: missing & errored source tiles are explicit, never counted as zero values",()=>{
