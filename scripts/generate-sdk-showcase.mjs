@@ -118,8 +118,16 @@ async function main(){
    const page=await ctx.newPage();
    const errors=[];
    page.on("pageerror",e=>errors.push(e.message));
+   page.on("console",m=>{if(m.type()==="error")errors.push("console: "+m.text().slice(0,600));});
+   page.on("requestfailed",req=>errors.push("request: "+req.url()+" "+req.failure()?.errorText));
    await page.goto(url+"?mode="+mode,{waitUntil:"load",timeout:35000});
-   await page.waitForFunction(()=>window.__showcaseReady===true,{timeout:30000});
+   try{await page.waitForFunction(()=>window.__showcaseReady===true,null,{timeout:12000});}
+   catch(e){
+    console.error("WebGL page did not initialize:",mode,JSON.stringify(errors));
+    console.error("DOM:",(await page.locator("body").innerText()).slice(0,900));
+    await page.screenshot({path:join(OUT,"sdk-"+mode+"-diagnostic.png"),timeout:10000}).catch(()=>{});
+    throw e;
+   }
    if(errors.length)throw Error("Browser error: "+errors.join("; "));
    const gl=await page.evaluate(()=>{
     const canvas=document.querySelector("canvas");
