@@ -1,5 +1,10 @@
 name: Prague Sentinel-2 actual 4x4 regional quality benchmark
 on:
+  push:
+    branches:
+      - feature/terrain-prague-real-dem
+    paths:
+      - .github/workflows/terrain-prague-region-4x4-benchmark.yml
   workflow_dispatch:
 jobs:
   original-4x4-quality:
