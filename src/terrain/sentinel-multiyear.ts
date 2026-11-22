@@ -149,8 +149,8 @@ export function analyzeSentinelMultiYearSeasons(
      throw new RangeError("Annual Sentinel sources do not share identical 10m georeferenced pixel grids");
  }
  const yearDays=seasons.map(s=>{
-   const d=s.observations.map(o=>new Date(o.acquiredAt).getUTCDate());
-   const times=s.observations.map(o=>Date.parse(o.acquiredAt));
+   const d=s.observations.map((o:SentinelNdviEvidence)=>new Date(o.acquiredAt).getUTCDate());
+   const times=s.observations.map((o:SentinelNdviEvidence)=>Date.parse(o.acquiredAt));
    if(Math.abs(times[0]!-times[1]!)<4*86400000)
      throw new RangeError("A year requires independent acquisitions separated by at least four days");
    return median(d);
@@ -165,7 +165,7 @@ export function analyzeSentinelMultiYearSeasons(
  let common=0,robust=0,up=0,down=0,stable=0,signSensitive=0;
  let sumSlope=0,min=Infinity,max=-Infinity,sumWidth=0;
  for(let pixel=0;pixel<n;pixel++){
-   const samples=seasons.map(s=>s.observations.map(o=>o.ndviValues[pixel]!)
+   const samples=seasons.map(s=>s.observations.map((o:SentinelNdviEvidence)=>o.ndviValues[pixel]!)
      .filter(Number.isFinite));
    if(samples.some(a=>a.length<minPerYear))continue;
    const annual=samples.map(values=>median(values));
@@ -185,7 +185,7 @@ export function analyzeSentinelMultiYearSeasons(
    min=Math.min(min,slope);max=Math.max(max,slope);
    sumWidth+=high-low;
    if(low<=0&&high>=0)signSensitive++;
-   for(let i=0;i<annual.length;i++)yearTotals[i]+=annual[i]!;
+   for(let i=0;i<annual.length;i++)yearTotals[i]=(yearTotals[i]??0)+annual[i]!;
    if(slope>=threshold)up++;
    else if(slope<=-threshold)down++;
    else stable++;
