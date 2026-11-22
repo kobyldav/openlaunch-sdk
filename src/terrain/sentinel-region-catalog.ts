@@ -35,7 +35,7 @@ export function selectSharedSentinelRegionSources(
    const year=from+index;
    if(catalog.year!==year||!Array.isArray(catalog.scenes))
      throw new RangeError("Shared Sentinel regional years must match ordered source catalogs");
-   const valid=catalog.scenes.filter(scene=>
+   const valid=catalog.scenes.filter((scene:SentinelRegionalSceneCandidate)=>
      typeof scene?.id==="string"&&/^[A-Za-z0-9_-]{5,120}$/.test(scene.id)&&
      goodDate(scene.acquiredAt)&&
      new Date(scene.acquiredAt).getUTCFullYear()===year&&
@@ -43,7 +43,7 @@ export function selectSharedSentinelRegionSources(
      (scene.cloudPercent===null||
        (typeof scene.cloudPercent==="number"&&Number.isFinite(scene.cloudPercent)&&
         scene.cloudPercent>=0&&scene.cloudPercent<=cloud))
-   ).sort((a,b)=>(a.cloudPercent??101)-(b.cloudPercent??101)||
+   ).sort((a:SentinelRegionalSceneCandidate,b:SentinelRegionalSceneCandidate)=>(a.cloudPercent??101)-(b.cloudPercent??101)||
      Math.abs(new Date(a.acquiredAt).getUTCDate()-16)-
        Math.abs(new Date(b.acquiredAt).getUTCDate()-16)||
      a.acquiredAt.localeCompare(b.acquiredAt)||a.id.localeCompare(b.id));
@@ -80,7 +80,7 @@ export function verifySharedSentinelRegionSourceYears(
  return Array.isArray(years)&&years.length===lock.to-lock.from+1&&
    years.every((group,i)=>group.year===lock.from+i&&
      group.scenes.length===2&&
-     group.scenes.every((scene,j)=>
+     group.scenes.every((scene:{sceneId:string;acquiredAt:string},j:number)=>
        scene.sceneId===lock.seasons[i]?.scenes[j]?.id&&
        scene.acquiredAt===lock.seasons[i]?.scenes[j]?.acquiredAt));
 }
