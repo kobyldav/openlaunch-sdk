@@ -59,7 +59,7 @@ try{
  let accepted=null,lastError=null;
  for(const third of compatible.slice(0,4)){
    const ids=[...base,third.id].sort((a,b)=>{
-     const byId=new Map([...pair.before?[pair.before]:[],pair.after,third].map(s=>[
+     const byId=new Map([pair.before,pair.after,third].map(s=>[
        s.sceneId??s.id,s.acquiredAt
      ]));
      return Date.parse(byId.get(a))-Date.parse(byId.get(b));
