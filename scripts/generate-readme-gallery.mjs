@@ -19,7 +19,7 @@ const C={bg:"#06121e",panel:"#102436",line:"#2d4657",white:"#f1f7fc",mute:"#9cb3
 const ISS1="1 25544U 98067A   19156.50900463  .00003075  00000-0  59442-4 0  9992";
 const ISS2="2 25544  51.6433  59.2583 0008217  16.4489 347.6017 15.51174618173442";
 const TEST1="1 25545U 98067B   19156.50900463  .00003075  00000-0  59442-4 0  9991";
-const TEST2="2 25545  51.6433  59.2583 0008217  16.4489 347.7017 15.51174618173443";
+const TEST2="2 25545  51.6433  59.2583 0008217  16.4489 346.1017 15.61174618173448";
 const START=new Date("2019-06-05T12:00:00Z");
 const clamp=(v,a,b)=>Math.min(b,Math.max(a,v));
 const n=(v,p=1)=>Number(v).toFixed(p);
@@ -69,7 +69,7 @@ function optsParse(args){
 async function emit(out,name,svg){
   if(svg.length>22_000_000)throw Error("SVG exceeds safety limit");
   const filename=path.join(out,name+".png");
-  await sharp(Buffer.from(svg),{density:96,limitInputPixels:W*H*4}).png({compressionLevel:9}).toFile(filename);
+  await sharp(Buffer.from(svg),{density:96,limitInputPixels:W*H*4}).resize(W,H).png({compressionLevel:9}).toFile(filename);
   console.log("Created",filename);
   return name+".png";
 }
@@ -201,7 +201,7 @@ async function terrainImage(o){
   const sc=Math.max(Math.abs(raster.transform[1]*raster.width),Math.abs(raster.transform[5]*raster.height));
   for(let i=0;i<mesh.positions.length;i+=3){
     const x=mesh.positions[i],y=mesh.positions[i+1],z=mesh.positions[i+2];
-    points.push([820+(x-y)/sc*515,545+(x+y)/sc*158-(z-lo)/range*245,z,x+y]);
+    points.push([800+((x-y)/sc-1)*510,600+(x+y)/sc*110-(z-lo)/range*260,z,x+y]);
   }
   const polygons=[];
   for(let i=0;i<mesh.triangles.length;i+=3){
