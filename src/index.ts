@@ -21,6 +21,7 @@ export * from "./terrain/sentinel-region.js";
 export * from "./terrain/sentinel-region-seams.js";
 export * from "./terrain/sentinel-region-catalog.js";
 export * from "./terrain/sentinel-region-quality.js";
+export * from "./terrain/sentinel-source-pair.js";
 export * from "./intelligence/index.js";
 export * from "./orbit/index.js";
 export * from "./traffic/index.js";
