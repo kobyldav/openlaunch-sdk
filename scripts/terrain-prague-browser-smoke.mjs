@@ -473,10 +473,85 @@ try{
      "no interannual screenshot or derived scientific claim fabricated.");
  }
 
+ // Stage 15 real source: six original dated Sentinel COGs in 3 seasons.
+ let actualMultiYearView=null;
+ try{
+   const proof=JSON.parse(await readFile(join(cache,"multiyear-live-report.json"),"utf8"));
+   assert.equal(proof.status,"real-sentinel-multiyear-verified");
+   const {years,selection:chosen}=proof;
+   assert.ok(years.length>=3&&years.length<=5);
+   const catalog={seasons:years.map(group=>({
+     year:group.year,scenes:group.scenes.map(s=>({
+       id:s.sceneId,acquiredAt:s.acquiredAt,cloudPercent:null
+     }))
+   }))};
+   await evalJs(c.send,'(()=>{const center=tileCenter(0,3,3);'+
+     'panX=center[0];panNorth=center[1];yaw=0;pitch=1.28;distance=420;'+
+     'enableDetail=false;buildingsEnabled=false;'+
+     '$("obs-mode").value="ortho";update();return true;})()');
+   const baseline=await evalJs(c.send,inspectPixels);
+   const setup='(()=>{multiSelection={tile:planner.tileLevels[0]'+
+     '.find(t=>t.key==="0-3-3"),from:'+chosen.from+
+     ',to:'+chosen.to+',month:'+chosen.month+',cloud:'+chosen.cloud+
+     ',catalog:'+JSON.stringify(catalog)+'};'+
+     '$("multi-from").value='+JSON.stringify(String(chosen.from))+';'+
+     '$("multi-to").value='+JSON.stringify(String(chosen.to))+';'+
+     '$("multi-month").value='+JSON.stringify(String(chosen.month))+';'+
+     '$("multi-cloud").value='+JSON.stringify(String(chosen.cloud))+';'+
+     '$("multi-scenes").textContent='+JSON.stringify(
+       years.map(y=>y.year+": "+y.scenes.map(s=>
+         s.acquiredAt.slice(0,10)+" "+s.sceneId).join(", ")).join(" | "))+ ';'+
+     '$("multi-load").disabled=false;return true;})()';
+   await evalJs(c.send,setup);
+   await evalJs(c.send,'loadMultiYear()');
+   await until(async()=>await evalJs(c.send,
+     '!!multiData&&!!observationActive?.multiTexture&&'+
+     '$("obs-mode").value==="multiyear"'),
+     "true 3-year Sentinel SCL masked observations in Edge WebGL1",30000);
+   const render=await evalJs(c.send,inspectPixels);
+   assert.equal(render.glError,0);assert.equal(render.loaded,true);
+   assert.notEqual(render.checksum,baseline.checksum);
+   const quality=await evalJs(c.send,
+     '({years:multiData.meta.years.length,'+
+     'common:multiData.meta.statistics.commonValidPixels,'+
+     'valid:multiData.slope.filter(Number.isFinite).length,'+
+     'robust:multiData.robust.filter(x=>x===1).length,'+
+     'scenes:multiData.meta.years.reduce((n,x)=>n+x.scenes.length,0),'+
+     'csv:!$("multi-export").disabled,'+
+     'summary:$("multi-summary").textContent,'+
+     'sources:$("multi-scenes").textContent})');
+   assert.equal(quality.years,years.length);
+   assert.equal(quality.scenes,years.length*2);
+   assert.equal(quality.common,proof.statistics.commonValidPixels);
+   assert.equal(quality.valid,proof.statistics.commonValidPixels);
+   assert.equal(quality.robust,proof.statistics.robustAllYearsPixels);
+   assert.equal(quality.csv,true);
+   assert.match(quality.summary,/Theil/);
+   assert.match(quality.summary,/citlivost|Citlivost/);
+   assert.match(quality.sources,/S2[A-C]/);
+   await evalJs(c.send,'(()=>{drawMultiYearChart();window.scrollTo(0,'+
+     'Math.max(0,$("multi-chart").getBoundingClientRect().top+window.scrollY-120));'+
+     'return true;})()');
+   const screenshotBytes=await capture("prague-real-sentinel-multiyear-3-annual-trend.png");
+   actualMultiYearView={years,statistics:proof.statistics,
+     source:proof.source,checksum:render.checksum,
+     terrainChecksum:baseline.checksum,screenshotBytes};
+   console.log("PASS genuine multi-year "+years[0].year+".."+
+     years[years.length-1].year+" original Sentinel-2 Edge WebGL1: "+
+     quality.common+" common SCL-qualified pixels; "+
+     quality.robust+" with two actual observations every year; "+
+     baseline.checksum+" -> "+render.checksum+
+     ", CSV and "+screenshotBytes+" genuine PNG bytes");
+ }catch(error){
+   if(existsSync(join(cache,"multiyear-live-report.json")))throw error;
+   console.log("NOTICE actual multi-year COG data not available. "+
+     "No fictitious historical series or screenshot generated.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
-   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,
+   actualBuildingView,actualSentinelView,actualChangeView,actualTrendView,actualSeasonalView,actualMultiYearView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
