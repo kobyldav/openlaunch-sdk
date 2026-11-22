@@ -33,6 +33,8 @@ jobs:
         run: node --test tests/terrain-sentinel-multiyear.test.mjs
       - name: Stage 16 source-proven bounded regional coverage and offline NDJSON stream
         run: node --test tests/terrain-sentinel-region.test.mjs tests/terrain-prague-region-stream.test.mjs
+      - name: Stage 17 validate source-locked regional GPU tile selection and no-data handling
+        run: node --test tests/terrain-prague-region-webgl.test.mjs
       - name: Verify new streaming GLSL also compiles in actual Edge WebGL1
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
@@ -121,3 +123,4 @@ jobs:
             test-results/terrain-prague-stream-ci/multiyear-v1-*.png
             test-results/terrain-prague-stream-ci/multiyear-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-multiyear-3-annual-trend.png
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-regional-3d-one-source-tile.png
