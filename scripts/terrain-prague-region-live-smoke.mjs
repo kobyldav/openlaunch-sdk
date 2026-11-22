@@ -49,9 +49,21 @@ try{
  assert.equal(events[0].type,"start");
  assert.deepEqual(events[0].tiles.map(t=>t.key),["0-3-3","0-4-3"]);
  assert.equal(events.at(-1).type,"complete");
+ const lockEvent=events.find(e=>e.type==="source-lock");
+ assert.equal(lockEvent.status,"real-sentinel-region-shared-scenes",
+   "Live adjacent tiles require one genuine regional STAC source selection");
+ assert.match(lockEvent.id,/^[a-f0-9]{32}$/);
+ assert.equal(lockEvent.seasons.length,selection.to-selection.from+1);
+ assert.ok(lockEvent.seasons.every(y=>y.scenes.length===2));
+ assert.ok(lockEvent.seasons.every(y=>y.scenes.every(scene=>
+   scene.id.startsWith("S2")&&
+   new Date(scene.acquiredAt).getUTCFullYear()===y.year)));
  const result=events.at(-1).result;
  assert.equal(result.requestedTiles,2);
  assert.equal(result.processedTiles,2);
+ assert.equal(result.sourceSelectionStatus,"shared");
+ assert.equal(result.sourceLockId,lockEvent.id);
+ assert.deepEqual(result.lockedSourceYears,lockEvent.seasons);
  terminalReport={...terminalReport,coverage:result,
    sourceEvents:events.filter(e=>e.type==="tile"||e.type==="seam")};
  await writeFile(join(folder,"region-adjacent-live-report.json"),
@@ -71,15 +83,20 @@ try{
  assert.equal(seam.state==="comparable",seam.pairedPixels>0,
    "A seam can claim numeric pairs only for original comparable source measurements");
  const authentic=[];
+ const lockSuffix="?cloud="+selection.cloud+"&lock="+result.sourceLockId;
  for(const item of result.tiles){
    const [,x,y]=item.key.split("-").map(Number);
    const base=origin+"/api/observations/multiyear/0/"+x+"/"+y+"/"+
      selection.from+"/"+selection.to+"/"+selection.month+".";
-   const jsonReply=await fetch(base+"json?cloud="+selection.cloud,{
+   const jsonReply=await fetch(base+"json"+lockSuffix,{
      signal:AbortSignal.timeout(60000)});
    assert.equal(jsonReply.status,200);
    const original=await jsonReply.json();
    assert.equal(original.key,item.key);
+   assert.equal(original.sourceLockId,result.sourceLockId);
+   assert.equal(original.regionSourceLocked,true);
+   assert.deepEqual(original.years.map(y=>y.scenes.map(s=>s.sceneId)),
+     result.lockedSourceYears.map(y=>y.scenes.map(s=>s.id)));
    assert.equal(original.statistics.commonValidPixels,item.commonValidPixels);
    assert.equal(original.statistics.robustAllYearsPixels,item.robustAllYearsPixels);
    assert.equal(original.statistics.yearCount,selection.to-selection.from+1);
@@ -91,7 +108,7 @@ try{
      item.sourceScenes.map(y=>y.scenes.map(s=>s.sceneId)));
    const slopes=Buffer.from(original.slopeF32LE,"base64");
    assert.equal(slopes.length,original.width*original.height*4);
-   const png=await fetch(base+"png?cloud="+selection.cloud,
+   const png=await fetch(base+"png"+lockSuffix,
      {signal:AbortSignal.timeout(60000)});
    assert.equal(png.status,200);
    const header=Buffer.from(await png.arrayBuffer());
