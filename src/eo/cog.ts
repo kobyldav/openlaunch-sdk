@@ -1,5 +1,5 @@
 import { decodeTiffLzw } from "./tiff-lzw.js";
-import type { CogRangeCache } from "./cog-range-cache.js";
+import {isStrongCogEtag,type CogRangeCache} from "./cog-range-cache.js";
 import type { AreaOfInterest } from "../geo/types.js";
 import type { RasterCrs, RasterGrid, RasterTransform } from "./raster.js";
 import {
@@ -69,6 +69,9 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),timeoutMs);
   let metadataBytesRead=0,tileBytesRead=0,totalSourceBytes=0;
+  // Pin a strong original ETag within ONE TIFF read even if its shared
+  // range cache is disabled or adaptively reduced to 0 MiB.
+  let sourceEtag:string|null=null;
   try {
     const fetchRange=async(start:number,length:number):Promise<Uint8Array>=>{
       if(!Number.isSafeInteger(start)||start<0||!Number.isSafeInteger(length)||length<1||length>maxBlockBytes)
@@ -78,6 +81,9 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       if(hit){
         if(totalSourceBytes&&hit.total!==totalSourceBytes)
           throw new RangeError("Cached COG source length differs from previously validated TIFF data");
+        if(sourceEtag&&sourceEtag!==hit.etag)
+          throw new RangeError("Original COG strong ETag changed between cached TIFF ranges");
+        sourceEtag=hit.etag;
         totalSourceBytes=hit.total;
         return hit.bytes;
       }
@@ -85,12 +91,15 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       // If-Range with a STRONG source validator guarantees that a later
       // version cannot be combined with bytes from the previously cached one.
       // A source change normally yields HTTP 200, which fails closed below.
-      const pinned=options.rangeCache?.validatorFor(sourceUrl);
+      const pinned=options.rangeCache?.validatorFor(sourceUrl)??null;
+      if(sourceEtag&&pinned&&sourceEtag!==pinned)
+        throw new RangeError("Original COG strong ETag differs from verified shared cache source");
+      const requiredEtag=sourceEtag??pinned;
       const headers:Record<string,string>={
         Range:`bytes=${start}-${end}`,
         Accept:"application/octet-stream,image/tiff;q=0.9"
       };
-      if(pinned)headers["If-Range"]=pinned;
+      if(requiredEtag)headers["If-Range"]=requiredEtag;
       const response=await fetchImpl(sourceUrl,{
         method:"GET",redirect:"error",signal:controller.signal,headers,
       });
@@ -109,8 +118,11 @@ export async function readCogWindowUrl(href:string,area:AreaOfInterest,options:C
       const bytes=new Uint8Array(await response.arrayBuffer());
       if(bytes.length!==last-first+1||bytes.length>length)
         throw new RangeError("Incorrect HTTP COG ranged response length");
-      options.rangeCache?.accept(sourceUrl,start,length,bytes,total,
-        response.headers.get("etag"));
+      const etag=response.headers.get("etag");
+      if(requiredEtag&&etag!==requiredEtag)
+        throw new RangeError("Original COG strong ETag changed between HTTP TIFF ranges");
+      if(!sourceEtag&&isStrongCogEtag(etag))sourceEtag=etag;
+      options.rangeCache?.accept(sourceUrl,start,length,bytes,total,etag);
       return bytes;
     };
 
