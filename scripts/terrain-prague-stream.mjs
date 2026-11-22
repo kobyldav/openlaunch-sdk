@@ -21,6 +21,8 @@ import {SENTINEL_NDVI_TREND_VERSION,SENTINEL_TREND_MAX_SCENES}
   from "../dist/terrain/sentinel-trend.js";
 import {SENTINEL_SEASONAL_COMPOSITE_VERSION} from "../dist/terrain/sentinel-seasonal.js";
 import {SentinelMultiYearRegionAccumulator} from "../dist/terrain/sentinel-region.js";
+import {captureSentinelRegionSeamEdges,compareSentinelRegionSeamEdges}
+  from "../dist/terrain/sentinel-region-seams.js";
 import {SENTINEL_MULTIYEAR_VERSION} from "../dist/terrain/sentinel-multiyear.js";
 
 const args=process.argv.slice(2);
@@ -767,6 +769,8 @@ async function streamRegionalMultiyear(req,res,params){
    for(let ix=x;ix<x+cols;ix++)specs.push(tileSpec(0,ix,iy));
  const aggregate=new SentinelMultiYearRegionAccumulator(
    from,to,month,specs.map(t=>t.key));
+ // Only source edge strips (not 16 whole rasters) remain in RAM.
+ const edgeCache=new Map(),seams=[];
  regionalJobActive=true;
  try{
    res.writeHead(200,{"Content-Type":"application/x-ndjson; charset=utf-8",
@@ -784,7 +788,28 @@ async function streamRegionalMultiyear(req,res,params){
        // The same genuine Stage 15 STAC/COG/SCL pipeline; no alternate raster sources.
        const product=await obtainMultiyear(spec,from,to,month,cloud);
        const doc=JSON.parse(product.json.toString("utf8"));
+       const bytes=Buffer.from(doc.slopeF32LE??"","base64");
+       if(bytes.byteLength!==doc.width*doc.height*4)
+         throw Error("Regional seam refuses malformed numeric source NDVI/year");
+       const slopes=new Float32Array(bytes.buffer.slice(
+         bytes.byteOffset,bytes.byteOffset+bytes.byteLength));
+       const strips=captureSentinelRegionSeamEdges({
+         key:spec.key,bounds,grid:doc.grid,
+         width:doc.width,height:doc.height,
+         slopePerYear:slopes,years:doc.years
+       });
        aggregate.addResult(spec.key,bounds,doc);
+       edgeCache.set(spec.key,strips);
+       // Current row-major tile has at most two previously measured neighbors.
+       // Compare ONLY original adjacent pixel-center slopes; no blending.
+       for(const key of ["0-"+(spec.x-1)+"-"+spec.y,
+         "0-"+spec.x+"-"+(spec.y-1)]){
+         const neighbor=edgeCache.get(key);
+         if(!neighbor)continue;
+         const seam=compareSentinelRegionSeamEdges(neighbor,strips);
+         seams.push(seam);
+         if(!res.destroyed)res.write(JSON.stringify({type:"seam",seam})+"\\n");
+       }
      }catch(err){
        const reason=String(err?.message??err).slice(0,180);
        const insufficient=err?.code==="OBSERVATION_INSUFFICIENT"||
@@ -797,7 +822,9 @@ async function streamRegionalMultiyear(req,res,params){
        processed:snapshot.processedTiles,total:snapshot.requestedTiles});
    }
    if(!res.destroyed){
-     emit({type:"complete",result:aggregate.finish()});
+     emit({type:"complete",result:{...aggregate.finish(),
+       seams,seamWarningCount:seams.filter(s=>s.warning).length,
+       seamDiagnostics:"Native adjacent source pixel centers; no interpolation, no seam blending, not proof of terrain or ecological change."}});
      res.end();
    }
  }finally{regionalJobActive=false;}
