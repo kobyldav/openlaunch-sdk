@@ -15,6 +15,8 @@ export interface CogRangeCacheStats{
 }
 type RangeEntry={bytes:Uint8Array;total:number;etag:string;url:string;metadata:boolean};
 const STRONG_ETAG=/^"[^"\r\n]{1,256}"$/;
+export const isStrongCogEtag=(etag:string|null):etag is string=>
+ typeof etag==="string"&&STRONG_ETAG.test(etag);
 export class CogRangeCache{
  private readonly ranges=new Map<string,RangeEntry>();
  private readonly validators=new Map<string,{total:number;etag:string}>();
@@ -78,7 +80,10 @@ export class CogRangeCache{
      throw new RangeError("COG cache requires exact authenticated HTTPS URL and bounded byte offset");
  }
  validatorFor(url:string):string|null{
-   return this.maxResidentBytes>0?(this.validators.get(url)?.etag??null):null;
+   // Even a temporary 0 MiB budget retains SOURCE IDENTITY. An original
+   // strong ETag pin prevents mixing earlier validated bytes with later
+   // network responses when pressure forces all TIFF blocks out of RAM.
+   return this.validators.get(url)?.etag??null;
  }
  get(url:string,start:number,length:number):{bytes:Uint8Array;total:number;etag:string}|null{
    this.validRange(url,start,length);
@@ -100,13 +105,15 @@ export class CogRangeCache{
      bytes.byteLength>length||bytes.byteLength>total-start)
      throw new RangeError("Cannot cache invalid original TIFF byte range");
    this.requests++;this.fetched+=bytes.byteLength;
-   if(this.maxResidentBytes===0)return;
    const prior=this.validators.get(url);
    if(prior&&(prior.total!==total||prior.etag!==etag))
      throw new RangeError("Original COG ETag or source size changed: refusing mixed source bytes");
+   // Never silently drop source-version validation under a 0-byte RAM
+   // budget. We only disable STORAGE, not scientific provenance checks.
+   if(this.maxResidentBytes===0)return;
    // A missing or weak HTTP ETag is not a safe version identity. Don't use
    // Last-Modified alone: it has only second precision and can be ambiguous.
-   if(!etag||!STRONG_ETAG.test(etag))return;
+   if(!isStrongCogEtag(etag))return;
    if(!prior){
      this.validators.set(url,{total,etag});
      if(this.validators.size>128){
