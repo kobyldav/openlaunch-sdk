@@ -77,6 +77,19 @@ test("new streamed WebGL viewer has real tile requests, LOD swap and finite GPU 
   assert.match(page,/id="obs-to"/);
   assert.match(page,/id="obs-scene"/);
   assert.match(page,/id="obs-mode"/);
+  assert.match(page,/id="multi-from"/);
+  assert.match(page,/id="multi-to"/);
+  assert.match(page,/id="multi-month"/);
+  assert.match(page,/id="multi-cloud"/);
+  assert.match(page,/id="multi-search"/);
+  assert.match(page,/id="multi-load"/);
+  assert.match(page,/id="multi-export"/);
+  assert.match(page,/id="multi-chart"/);
+  assert.match(page,/value="multiyear"/);
+  assert.match(page,/\/api\/observations\/multiyear\/0\//);
+  assert.match(page,/searchMultiYear\(/);
+  assert.match(page,/loadMultiYear\(/);
+  assert.match(page,/drawMultiYearChart\(/);
   assert.match(page,/id="season-before"/);
   assert.match(page,/id="season-after"/);
   assert.match(page,/id="season-month"/);
@@ -177,6 +190,16 @@ test("local streaming server starts without any terrain download, accepts only v
       "/api/observations/scenes/0/3/3.json?from=2025-06-01&to=2025-09-30");
     assert.equal(noScenes.status,404,
       "Offline server never fetches an uncached Sentinel STAC catalog");
+    const noMulti=await fetch(origin+
+      "/api/observations/multiyear/scenes/0/3/3.json?from=2023&to=2025&month=8&cloud=50");
+    assert.equal(noMulti.status,404,
+      "Source-free offline server cannot invent 3 complete years of Sentinel data");
+    const malformedMulti=await fetch(origin+
+      "/api/observations/multiyear/scenes/0/3/3.json?from=2024&to=2025&month=8&cloud=50");
+    assert.equal(malformedMulti.status,400,"Two years are not a Stage 15 multi-year trend");
+    const gapMulti=await fetch(origin+
+      "/api/observations/multiyear/0/3/3/2023/2025/8.json?cloud=50");
+    assert.equal(gapMulti.status,404,"Absent annual NDVI values cannot be gap-filled");
     const noSeasons=await fetch(origin+
       "/api/observations/seasonal/scenes/0/3/3.json?before=2024&after=2025&month=8&cloud=50");
     assert.equal(noSeasons.status,404,
