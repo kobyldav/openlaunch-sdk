@@ -612,3 +612,45 @@ actual HTTP 206 counts and measured network-body bytes.
   network latency, CDN throttling, or cache-eviction patterns differ.
   Original measured A/B evidence must be consulted before concluding
   any cold-download speedup.
+
+
+### Stage 22 verified original Sentinel 4×4 cold-source A/B (2026-11-22)
+
+The strict real-data Windows A/B **PASSED**:
+[GitHub Actions run 45071306283](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45071306283).
+Original acquisition calendar: 2023–2025 August; all 16 source-backed
+Prague tiles; exactly **62,504 genuine all-year common SCL-qualified pixels**
+in both treatments. Every original annual scene and numeric NDVI trend,
+including all native seam diagnostics, produced the identical source
+SHA-256 result fingerprint `f538be31b4cc079a…`.
+
+| True observed measurement (4×4 cold source) | No COG range cache | 64MiB original ETag range cache |
+|---|---:|---:|
+| Cold 4×4 wall time | 26,811 ms | 18,034 ms |
+| Successful original COG HTTPS 206 byte-range requests | 1,080 | 160 |
+| Actual received COG HTTP response-body bytes | 763,213,144 | 166,600,289 |
+| Strong-ETag-verified exact range cache reuses | 0 | 920 |
+| Sampled peak Node RSS (excludes GPU) | 263.9 MiB | 288.2 MiB |
+| True source-backed tiles | 16/16 | 16/16 |
+| Genuine original SCL-qualified common NDVI pixels | 62,504 | 62,504 |
+| Exact scientific source SHA-256 prefix | `f538be31b4cc079a` | `f538be31b4cc079a` |
+
+Measured **85.2% fewer HTTPS 206 requests** (920 fewer),
+**78.2% fewer received TIFF bytes** (596,612,855 fewer), and
+**32.7% less cold wall time** (8,777 ms less). The additional sampled
+whole-process memory peak was **24.3 MiB**.
+
+An earlier live 16MiB experiment failed to reuse even one range:
+30 strong-ETag-verified original COG assets, 1,058 cache evictions,
+0 hits, 1,080 HTTP 206 requests and 763,213,144 bytes in both
+treatments. Increasing the bounded cache to 64 MiB and protecting
+the small TIFF metadata headers from compressed-block eviction
+eliminated this pathological thrashing, rather than relaxing source
+identity checks or inserting proxy/synthetic pixels.
+
+The complete successful original-source audit is available in the
+[Stage 22 verified source evidence artifact](https://github.com/kobyldav/openlaunch-sdk/actions/runs/45071306283/artifacts/14773622660).
+As with Stage 21, this is a real Windows/network observation, not a
+universal transfer-rate or latency guarantee. RSS excludes Edge GPU
+allocations; the source range cache itself is bounded, but transient
+decompression allocations are additional.
