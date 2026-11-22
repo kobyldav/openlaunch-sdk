@@ -20,6 +20,12 @@ input[type=date],input[type=number],select{background:#193952;color:#eaf3fa;bord
 .observations strong{color:#b8f2de}
 #obs-scene{max-width:min(360px,90vw)}
 #obs-note{color:#ccebdc}
+.trend-scenes{display:flex;gap:9px;align-items:center;flex-wrap:wrap;max-height:145px;
+ overflow:auto;margin:7px 0;padding:8px;border:1px solid #365570;border-radius:7px}
+.trend-scenes label{display:inline-flex;gap:5px;align-items:center;white-space:nowrap;
+ border:1px solid #35556d;padding:5px 8px;border-radius:6px;background:#14344a}
+#trend-chart{display:block;max-width:100%;height:165px;background:#0c2335;border-radius:7px;
+ margin-top:9px}
 label{white-space:nowrap}
 #map{width:100%;height:min(77vh,850px);min-height:380px;display:block;border-radius:12px;background:#112a43;touch-action:none;cursor:grab}
 #map:active{cursor:grabbing}
@@ -71,6 +77,7 @@ a{color:#9cd1fc}
     <option value="rgb">Sentinel-2 RGB</option>
     <option value="ndvi">Sentinel-2 NDVI</option>
     <option value="change">ΔNDVI – změna mezi dvěma snímky</option>
+    <option value="trend">Trend NDVI – 3 až 6 snímků</option>
    </select></label>
   </div>
   <div class="toolbar" aria-label="Časové porovnání NDVI">
@@ -80,6 +87,18 @@ a{color:#9cd1fc}
    <button id="compare-export" disabled>Export ΔNDVI CSV</button>
   </div>
   <div class="small" id="compare-summary" aria-live="polite">ΔNDVI = novější NDVI − starší NDVI. Zobrazují se jen pixely platné v obou snímcích. Zelená = nárůst o 0,15 nebo více, červená = pokles o 0,15 nebo více, šedá = menší změna. Nejde o důkaz kácení nebo výstavby.</div>
+  <div aria-label="Časová řada NDVI">
+    <strong>Časová řada NDVI · 3 až 6 skutečných scén</strong>
+    <div class="small">Vyber skutečná data ze společného období. Graf používá jen pixely platné ve všech scénách. Theil–Sen je popisné tempo NDVI za 30 dní, nikoli předpověď nebo dlouhodobá diagnóza.</div>
+    <div id="trend-scenes" class="trend-scenes"><span class="small">Nejprve vyhledej scény.</span></div>
+    <div class="toolbar">
+      <button id="trend-load" disabled>Vypočítat trend a zobrazit v 3D</button>
+      <button id="trend-export" disabled>Export trendu CSV</button>
+      <span id="trend-summary" class="small" aria-live="polite">Zatím bez analýzy.</span>
+    </div>
+    <canvas id="trend-chart" width="900" height="165" aria-label="Skutečná časová řada průměrného NDVI společné pixelové oblasti"></canvas>
+    <p class="small">Trend: zelená = rostoucí NDVI, červená = klesající, šedá = menší tempo změny. Výrazný trend může být způsoben sezónností nebo jinými podmínkami snímkování.</p>
+  </div>
   <p id="obs-note" class="small">Vyber výřez pohybem kamery a klikni na „Najít scény“. Stahuje se pouze jedna dlaždice (~0,7 km), nikoli celá Praha. Sentinel-2 má 10m spektrální rozlišení.</p>
   <p class="small">NDVI: tmavě zelená = vyšší vegetační aktivita, béžová = nižší, modrá = záporné hodnoty.
    Datum odpovídá skutečné scéně Sentinel-2 L2A. Oblaka, stíny a neplatné pixely jsou průhledné – pod nimi zůstává ortofoto ČÚZK.
@@ -124,7 +143,7 @@ const transitions=new Map();
 let lastRendered=[],measuredPoints=[],currentProfile=null,inspector=null;
 let buildingsEnabled=true;
 let observationTile=null,observationActive=null,observationRequest=null;
-let comparisonData=null;
+let comparisonData=null,trendData=null,trendSceneIds=[];
 let observationEpoch=0;
 const observationCatalog=new Map();
 const validSceneId=id=>/^[A-Za-z0-9_-]{5,120}$/.test(id);
@@ -354,6 +373,7 @@ function disposeObservation(o){
  if(o?.rgbTexture)gl?.deleteTexture(o.rgbTexture);
  if(o?.ndviTexture)gl?.deleteTexture(o.ndviTexture);
  if(o?.changeTexture)gl?.deleteTexture(o.changeTexture);
+ if(o?.trendTexture)gl?.deleteTexture(o.trendTexture);
 }
 function observationTexture(bitmap,width,height){
  if(!gl||bitmap.width!==width||bitmap.height!==height||
@@ -379,6 +399,9 @@ async function searchObservations(){
  const cloud=Number($("obs-cloud").value);
  const selected=$("obs-scene"),older=$("compare-before");
  comparisonData=null;$("compare-export").disabled=true;
+ trendData=null;$("trend-export").disabled=true;
+ trendSceneIds=[];$("trend-load").disabled=true;
+ $("trend-scenes").replaceChildren();drawTrendChart();
  older.replaceChildren(new Option("Hledám scény…",""));
  older.disabled=true;$("compare-load").disabled=true;
  selected.replaceChildren(new Option("Hledám scény…",""));
@@ -398,6 +421,7 @@ async function searchObservations(){
      !Array.isArray(data.scenes))throw Error("STAC nevrátil platný katalog scén");
    if(epoch!==observationEpoch)return;
    selected.replaceChildren();older.replaceChildren();
+   const allScenes=[];
    for(const item of data.scenes){
      if(!validSceneId(item.id))continue;
      observationCatalog.set(item.id,item);
@@ -406,12 +430,33 @@ async function searchObservations(){
        item.cloudPercent+" % oblačnost scény";
      selected.add(new Option(date+" · "+item.id+" · "+cloudText,item.id));
      older.add(new Option(date+" · "+item.id+" · "+cloudText,item.id));
+     allScenes.push(item);
    }
    selected.disabled=!selected.options.length;
    $("obs-load").disabled=selected.disabled;
    older.disabled=selected.options.length<2;
    if(!older.disabled)older.selectedIndex=older.options.length-1;
    $("compare-load").disabled=older.disabled;
+   const section=$("trend-scenes");
+   for(const [i,item] of allScenes.entries()){
+     const label=document.createElement("label");
+     const checked=document.createElement("input");
+     checked.type="checkbox";checked.value=item.id;
+     // Prefer actual observations covering more dates; never fabricate an observation.
+     checked.checked=allScenes.length>=3&&(i===0||
+       i===Math.floor((allScenes.length-1)/2)||i===allScenes.length-1);
+     checked.onchange=()=>{
+       const checkedCount=section.querySelectorAll("input:checked").length;
+       if(checkedCount>6){checked.checked=false;
+         observationMessage("Časová řada nejvýše 6 skutečných scén.");}
+       $("trend-load").disabled=section.querySelectorAll("input:checked").length<3;
+     };
+     label.append(checked,document.createTextNode(" "+item.acquiredAt.slice(0,10)+
+       " · "+item.cloudPercent+" %"));
+     section.append(label);
+   }
+   if(allScenes.length<3)section.textContent="Pro časovou řadu potřebuješ alespoň 3 datované scény. Rozšiř období.";
+   $("trend-load").disabled=allScenes.length<3;
    observationMessage(selected.options.length?
      "Dlaždice "+tile.key+": "+selected.options.length+
      " skutečných scén. Vyber datum a klikni na Načíst RGB + NDVI.":
@@ -767,7 +812,8 @@ function draw(){
    const parentKey=z===0?draw.id:"0-"+Math.floor(x/2)+"-"+Math.floor(y/2);
    const observed=kind==="rgb"?active?.rgbTexture:
      kind==="ndvi"?active?.ndviTexture:
-     kind==="change"?active?.changeTexture:null;
+     kind==="change"?active?.changeTexture:
+     kind==="trend"?active?.trendTexture:null;
    const validObservation=!!observed&&active.key===parentKey;
    gl.uniform1i(uni.uOverlayMode,validObservation?1:0);
    if(validObservation){
@@ -957,6 +1003,8 @@ $("obs-search").onclick=searchObservations;
 $("obs-load").onclick=loadObservation;
 $("compare-load").onclick=loadComparison;
 $("compare-export").onclick=exportComparison;
+$("trend-load").onclick=loadTrend;
+$("trend-export").onclick=exportTrend;
 $("obs-mode").onchange=requestDraw;
 $("reset").onclick=()=>{yaw=-.6;pitch=.78;distance=1550;panX=0;panNorth=0;update();};
 $("buildings").onclick=()=>{
@@ -1047,7 +1095,9 @@ canvas.addEventListener("webglcontextrestored",()=>{
    $("error").textContent="";
    if(config&&planner)update();
    if(observationTile&&observationCatalog.has($("obs-scene").value)){
-     if($("obs-mode").value==="change"&&!$("compare-before").disabled)
+     if($("obs-mode").value==="trend"&&trendSceneIds.length>=3)
+       loadTrend(trendSceneIds);
+     else if($("obs-mode").value==="change"&&!$("compare-before").disabled)
        loadComparison();
      else loadObservation();
    }
