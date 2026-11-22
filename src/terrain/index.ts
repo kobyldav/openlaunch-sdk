@@ -10,6 +10,7 @@ import {compareSentinelNdviScenes} from "./sentinel-change.js";
 import {analyzeSentinelNdviTimeSeries} from "./sentinel-trend.js";
 import {compareSentinelSeasonalNdvi} from "./sentinel-seasonal.js";
 import {analyzeSentinelMultiYearSeasons} from "./sentinel-multiyear.js";
+import {SentinelMultiYearRegionAccumulator} from "./sentinel-region.js";
 export class TerrainReconstructionEngine {
   load = loadRealTerrain;
   discoverObservations = discoverSentinelTerrainScenes;
@@ -18,6 +19,9 @@ export class TerrainReconstructionEngine {
   analyzeSentinelNdviTrend = analyzeSentinelNdviTimeSeries;
   compareSentinelSeasons = compareSentinelSeasonalNdvi;
   analyzeSentinelMultiYear = analyzeSentinelMultiYearSeasons;
+  createSentinelMultiYearRegion = (fromYear:number,toYear:number,month:number,
+    expectedTileKeys:readonly string[]) =>
+    new SentinelMultiYearRegionAccumulator(fromYear,toYear,month,expectedTileKeys);
   reconstruct = reconstructTerrain;
   reconstructFromSource = reconstructTerrainFromSource;
   validate = validateTerrainHeights;
