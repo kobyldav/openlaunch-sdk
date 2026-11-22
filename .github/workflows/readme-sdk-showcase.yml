@@ -1,82 +1,57 @@
-name: Real SDK 3D README showcase
+name: Real OpenLaunch SDK 3D showcase
 
 on:
-  push:
-    branches: [feature/readme-sdk-showcase-v2]
+  workflow_dispatch:
+  pull_request:
     paths:
       - scripts/generate-sdk-showcase.mjs
       - tools/readme-gallery/showcase-viewer.html
       - tools/readme-gallery/package.json
       - .github/workflows/readme-sdk-showcase.yml
-  workflow_dispatch:
 
 permissions:
-  contents: write
-  actions: read
+  contents: read
 
 jobs:
   render:
     runs-on: ubuntu-24.04
-    timeout-minutes: 25
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-      - name: Install SDK
-        run: npm ci --no-audit --no-fund
-      - name: Compile SDK
-        run: npm run build
-      - name: Install browser renderer
-        run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
-      - name: Install Chromium
-        run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
-      - name: Download verified NASA Blue Marble texture (mirrored unchanged)
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm install --prefix tools/readme-gallery --no-audit --no-fund --package-lock=false
+      - run: node tools/readme-gallery/node_modules/playwright/cli.js install --with-deps chromium
+      - name: Download public NASA Blue Marble texture from verified GitHub mirror
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           mkdir -p test-results/showcase-assets
           gh api repos/Depal-Jakub/orbital-bloom/contents/public/assets/earth-day-2048.jpg --jq '.content' | base64 -d > test-results/showcase-assets/nasa-blue-marble.jpg
           test $(stat -c%s test-results/showcase-assets/nasa-blue-marble.jpg) -gt 80000
-      - name: Render real SDK scenes in Chromium
+      - name: Render actual SDK WebGL views
         env:
           OPENLAUNCH_EARTH_TEXTURE: test-results/showcase-assets/nasa-blue-marble.jpg
         run: node scripts/generate-sdk-showcase.mjs
-      - name: Import already-tested measured Prague terrain screenshot
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          mkdir -p test-results/terrain-evidence
-          gh run download 45026036824 --repo kobyldav/openlaunch-sdk --name terrain-prague-real-3d --dir test-results/terrain-evidence
-          test -s test-results/terrain-evidence/terrain-prague-browser-ci/prague-real-3d-with-buildings.png
-          cp test-results/terrain-evidence/terrain-prague-browser-ci/prague-real-3d-with-buildings.png docs/images/live/terrain-prague-real-3d.png
-      - name: Verify screenshot output bytes
+      - name: Validate generated images
         run: |
           python - <<'PY'
           from pathlib import Path
-          for name in ['sdk-orbit-3d.png','sdk-launch-3d.png','terrain-prague-real-3d.png']:
-              f=Path('docs/images/live')/name
-              data=f.read_bytes()
-              assert data[:8]==bytes([137,80,78,71,13,10,26,10]) and len(data)>30000,(name,len(data))
+          for name in ['sdk-orbit-3d.png','sdk-launch-3d.png']:
+              data=(Path('docs/images/live')/name).read_bytes()
+              assert data[:8]==bytes((137,80,78,71,13,10,26,10)) and len(data)>30000,name
               print(name,len(data))
           PY
-      - name: Commit validated 3D images to the showcase branch
-        if: github.event_name == 'push'
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/images/live/sdk-orbit-3d.png docs/images/live/sdk-launch-3d.png docs/images/live/terrain-prague-real-3d.png docs/images/live/sdk-showcase-provenance.json
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m "docs: add actual SDK-derived 3D WebGL screenshots"
-          git push origin HEAD:feature/readme-sdk-showcase-v2
-      - name: Upload verifiable showcase artifact
+      - uses: actions/upload-artifact@v4
         if: always()
-        uses: actions/upload-artifact@v4
         with:
-          name: openlaunch-sdk-real-3d-showcase
+          name: openlaunch-sdk-webgl-showcase
           path: |
-            docs/images/live/sdk-*.png
-            docs/images/live/terrain-prague-real-3d.png
+            docs/images/live/sdk-orbit-3d.png
+            docs/images/live/sdk-launch-3d.png
             docs/images/live/sdk-showcase-provenance.json
           if-no-files-found: warn
