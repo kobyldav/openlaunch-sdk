@@ -22,7 +22,7 @@ await mkdir(root,{recursive:true});await mkdir(dirname(output),{recursive:true})
 const report={status:"incomplete",
  source:"true-Sentinel-2-L2A-STAC-COG-HTTPS-206",
  methodology:"independent EMPTY original source disk caches for both treatments, each with cold and cache replay in fresh Node processes",
- note:"Strong ETag is mandatory for in-process reuse; cache entries are exact STAC full URL + native requested TIFF byte range and expire by LRU within 16 MiB.",
+ note:"Strong ETag is mandatory for in-process reuse; cache entries are exact STAC full URL + native requested TIFF byte range and expire by LRU within 64 MiB.",
  risks:["CDN and public STAC network conditions are not guaranteed identical across sequential A/B treatments",
    "Original scientific source data must match, or benchmark rejects; source catalog can change between treatments",
    "Reported RSS is Node only, sampled at 100ms; actual browser GPU not measured",
@@ -30,8 +30,8 @@ const report={status:"incomplete",
  runs:[]};
 const persist=()=>writeFile(output,JSON.stringify(report,null,2));
 try{
- for(const budget of [0,16]){
-   const mode=budget===0?"no-range-cache":"strong-etag-16mib";
+ for(const budget of [0,64]){
+   const mode=budget===0?"no-range-cache":"strong-etag-64mib";
    const cache=join(root,mode);
    await mkdir(cache,{recursive:true});
    assert.deepEqual(await readdir(cache),[],
