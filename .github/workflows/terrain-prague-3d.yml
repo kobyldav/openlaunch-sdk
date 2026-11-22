@@ -29,6 +29,9 @@ jobs:
         run: node scripts/terrain-webgl-link-smoke.mjs scripts/terrain-prague-stream-viewer.html
       - name: Fetch one real ČÚZK on-demand tile through the local streaming server
         run: node scripts/terrain-prague-stream-smoke.mjs
+      - name: Validate real OSM Prague building footprints and ČÚZK DMR 5G ground source
+        run: node scripts/terrain-prague-buildings-live-smoke.mjs
+        continue-on-error: true
       - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
         run: node scripts/terrain-prague-browser-smoke.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
@@ -66,6 +69,7 @@ jobs:
             test-results/terrain-prague-ortho/report.json
             test-results/terrain-prague-stream-ci/v2-0-3-3.json
             test-results/terrain-prague-stream-ci/v2-0-3-3.png
+            test-results/terrain-prague-stream-ci/buildings-v1-0-3-3.json
             test-results/terrain-prague-browser-ci/report.json
             test-results/terrain-prague-browser-ci/prague-real-3d-initial.png
             test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png
