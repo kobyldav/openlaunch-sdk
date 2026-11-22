@@ -9,7 +9,7 @@
  */
 import {decodeTerrainTiff,TiffDirectory} from "../dist/eo/geotiff.js";
 import {mercatorFromLonLat,PRAGUE_STREAM_REGION} from "./terrain-prague-stream-grid.mjs";
-export const BUILDING_LAYER_VERSION=1;
+export const BUILDING_LAYER_VERSION=2;
 export const CUZK_DMR_5G="https://ags.cuzk.gov.cz/arcgis/rest/services/3D/dmr5g_wm/ImageServer";
 export const OVERPASS_ENDPOINT="https://overpass.private.coffee/api/interpreter";
 export const OSM_MAP_ENDPOINT="https://api.openstreetmap.org/api/0.6/map";
@@ -240,7 +240,13 @@ export function buildBuildings(spec,elements,ground,dsm){
    ground.verticalDatum!=="Bpv (Baltic 1957)"||
    dsm.verticalDatum!=="Bpv (Baltic 1957)")
    throw Error("Buildings need real OSM footprints and both measured Bpv surfaces");
- const pos=[],colors=[],triangles=[];
+ const pos=[],colors=[],uvs=[],wallFaces=[],roofFacesAll=[];
+ const [wMerc,sMerc]=mercatorFromLonLat(spec.west,spec.south),
+   [eMerc,nMerc]=mercatorFromLonLat(spec.east,spec.north);
+ const textureUv=point=>{
+   const [mx,my]=mercatorFromLonLat(point.lon,point.lat);
+   return [(mx-wMerc)/(eMerc-wMerc),(nMerc-my)/(nMerc-sMerc)];
+ };
  let tagged=0,estimated=0,skipped=0;
  const maxBuildings=350;
  for(const el of elements){
@@ -279,28 +285,35 @@ export function buildBuildings(spec,elements,ground,dsm){
      const [x,y]=ring[i];
      pos.push(x,y,base[i]);
      colors.push(.31,.39,.46);
+     uvs.push(...textureUv(coords[i]));
    }
    for(let i=0;i<n;i++){
      const [x,y]=ring[i];
      pos.push(x,y,roofZ);
      colors.push(.66,.69,.68);
+     uvs.push(...textureUv(coords[i]));
    }
    for(let i=0;i<n;i++){
      const j=(i+1)%n;
-     triangles.push(start+i,start+j,start+n+j,
+     wallFaces.push(start+i,start+j,start+n+j,
        start+i,start+n+j,start+n+i);
    }
    for(let i=0;i<roofFaces.length;i+=3)
-     triangles.push(start+n+roofFaces[i],start+n+roofFaces[i+1],start+n+roofFaces[i+2]);
+     roofFacesAll.push(start+n+roofFaces[i],start+n+roofFaces[i+1],start+n+roofFaces[i+2]);
    if(explicit!==null)tagged++;else estimated++;
  }
- if(triangles.some(id=>id>=pos.length/3))throw Error("Building index overflow");
+ const triangles=wallFaces.concat(roofFacesAll);
+ if(triangles.some(id=>id>=pos.length/3)||pos.length/3!==uvs.length/2)
+   throw Error("Building index/orthophoto UV overflow");
  return {status:"real-source-buildings",key:spec.key,
    source:"© OpenStreetMap contributors (ODbL); ground © ČÚZK DMR 5G (Bpv); roof © ČÚZK DMP OK (Bpv) when estimated",
    verticalDatum:"Bpv (Baltic 1957)",roofGeometry:"flat-LOD1-visual-proxy",
    heightMethods:{explicitOsmHeight:tagged,estimatedDsmMinusDmr:estimated,omitted:skipped},
    buildings:tagged+estimated,renderVertices:pos.length/3,
    triangles:triangles.length/3,
+   wallTriangles:wallFaces.length/3,roofTriangles:roofFacesAll.length/3,
+   roofTexture:"real-ČÚZK-ortofoto-reprojected",
+   uvsF32LE:Buffer.from(new Float32Array(uvs).buffer).toString("base64"),
    positionsF32LE:Buffer.from(new Float32Array(pos).buffer).toString("base64"),
    colorsF32LE:Buffer.from(new Float32Array(colors).buffer).toString("base64"),
    trianglesU16LE:Buffer.from(new Uint16Array(triangles).buffer).toString("base64")};
