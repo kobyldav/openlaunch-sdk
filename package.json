@@ -187,7 +187,8 @@
     "examples:live": "npm run build && node scripts/verify-cookbook.mjs --mode=live",
     "test:fedora": "bash scripts/fedora-full-test.sh",
     "api:audit": "npm run build && node scripts/api-surface-audit.mjs",
-    "check:release-metadata": "node scripts/check-release-metadata.mjs"
+    "check:release-metadata": "node scripts/check-release-metadata.mjs",
+    "gallery": "npm run build && npm install --prefix tools/readme-gallery --no-save --package-lock=false --no-audit --no-fund && node scripts/generate-readme-gallery.mjs"
   },
   "engines": {
     "node": ">=18"
