@@ -1,0 +1,23 @@
+{
+  "generator": "OpenLaunch gallery",
+  "generatedAt": "2026-11-22T12:55:48.377Z",
+  "offline": false,
+  "dateRequested": "2026-08-15",
+  "outputs": [
+    "orbital-tracking.png",
+    "launch-simulation.png",
+    "terrain-model.png",
+    "ndvi-analysis.png",
+    "space-traffic.png",
+    "earth-observation.png"
+  ],
+  "errors": [],
+  "notes": [
+    "Orbit uses historical 2019 TLE.",
+    "Traffic secondary TLE is synthetic.",
+    "Rocket model is generic simulation.",
+    "Terrain uses synthetic DEM.",
+    "NDVI uses synthetic bands.",
+    "NASA GIBS confirms binary delivery, not acquisition timing."
+  ]
+}
