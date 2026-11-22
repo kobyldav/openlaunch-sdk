@@ -29,11 +29,12 @@ const NASA_ORIGINAL="https://eoimages.gsfc.nasa.gov/images/imagerecords/57000/57
 const model={
  liftoff:START,
  site:{name:"Generic Atlantic-coast launch pad",latitudeDeg:28.56,longitudeDeg:-80.58,altitudeM:3},
- durationSeconds:170,stepSeconds:1,
+ durationSeconds:240,stepSeconds:1,
  guidance:[{timeSeconds:0,pitchDeg:90,headingDeg:90,throttle:1},
- {timeSeconds:20,pitchDeg:85,headingDeg:90,throttle:1},
- {timeSeconds:80,pitchDeg:50,headingDeg:90,throttle:1},
- {timeSeconds:170,pitchDeg:15,headingDeg:90,throttle:.9}],
+ {timeSeconds:20,pitchDeg:65,headingDeg:90,throttle:1},
+ {timeSeconds:80,pitchDeg:24,headingDeg:90,throttle:1},
+ {timeSeconds:170,pitchDeg:8,headingDeg:90,throttle:.95},
+ {timeSeconds:240,pitchDeg:0,headingDeg:90,throttle:.95}],
  vehicle:{name:"Generic two-stage test vehicle",payloadMassKg:100,fairingMassKg:30,
   fairingJettisonSeconds:25,dragCoefficient:.25,referenceAreaM2:2,stages:[
    {name:"Booster",dryMassKg:1000,propellantMassKg:5000,thrustSeaLevelN:300000,thrustVacuumN:330000,
