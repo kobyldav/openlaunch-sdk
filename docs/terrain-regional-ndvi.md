@@ -654,3 +654,104 @@ As with Stage 21, this is a real Windows/network observation, not a
 universal transfer-rate or latency guarantee. RSS excludes Edge GPU
 allocations; the source range cache itself is bounded, but transient
 decompression allocations are additional.
+
+
+
+## Stage 23 — adaptive RAM protection for VERIFIED original Sentinel COG ranges
+
+Stage 22 proved that one 64 MiB strong-ETag-pinned original TIFF range cache
+reduced the original 4×4 Prague acquisition from **1,080 to 160 actual HTTP
+206 requests**, transferred **763,213,144 to 166,600,289 response-body
+bytes** and preserved **62,504 original SCL-qualified NDVI pixels**.
+Its fixed cache budget nevertheless increased sampled Node RSS from
+263.9 MiB to 288.2 MiB. Stage 23 prioritizes **retaining those benefits
+when enough RAM is available** but safely relinquishing compressed TIFF
+block buffers when other applications or the process need memory.
+
+### How original-source cache protection now works
+
+- Reusable public SDK components:
+  - `CogRangeCache.resizeBudgetBytes(newBytes)` strictly enforces the
+    original immutable configured maximum (default **64 MiB**, absolute
+    constructor bound **128 MiB**). It reclaims verified compressed
+    range buffers by evicting large raster blocks before genuine
+    small TIFF headers, then headers if the budget demands it. It
+    **never changes STAC URLs, HTTP ETags, source validation or rasters**.
+  - `AdaptiveCogRangeMemory` in `src/eo/cog-range-memory.ts` is a
+    **pure, deterministic policy** fed with genuinely sampled Node
+    RSS and `os.freemem()` by the Prague server. The SDK never fakes
+    process RSS or silently probes host resources in the library.
+- The normal Prague server defaults to `--cog-memory-mode adaptive`
+  with a **512 MiB soft RSS target**, and retains a **96 MiB Node RSS
+  safety reserve** plus a **512 MiB host-free-memory reserve**.
+  The allowed cache budget is limited by both remaining headrooms
+  and quantized downward to 4 MiB. The region's existing
+  `rssLimitMiB` limit can lower the effective adaptive target, but
+  cannot silently raise the CLI target.
+- **Pressure relief is immediate** on the next actual sample or
+  original COG read. Expansion is slow: **three consecutive healthy
+  measurements**, then at most **16 MiB** restored per step.
+  This hysteresis avoids repeated allocations and evictions around
+  a marginal host free-memory threshold.
+- A source-loading window is still bound to **two original
+  Sentinel-2 acquisitions** at a time, **one regional source
+  tile at a time**. The original 206/Content-Range/strong ETag +
+  `If-Range` protections continue when the budget goes down,
+  including when it is temporarily **0 MiB**; no other source
+  is substituted or interpolated.
+- Actual regional quality JSON now includes
+  `quality.cogMemory`: policy, configured and effective RSS
+  targets, actual memory-pressure checks, budget shrinks/recoveries,
+  bytes evicted from original compressed TIFF ranges, observed
+  minimum budget, and observed peak Node RSS. The browser shows
+  the current LRU budget and genuine regulation events.
+
+### Reproduce on Windows
+
+```powershell
+npm run build
+node --test tests/terrain-cog-memory.test.mjs tests/terrain-cog-range-cache.test.mjs
+
+# Default on a normal laptop: 64 MiB maximum source cache, adjusts
+# when Node RSS approaches 512 MiB or host free RAM is scarce:
+npm run example:terrain-prague-stream
+
+# Explicit lower-memory mode for a weaker machine:
+node scripts/terrain-prague-stream.mjs --cog-memory-mode adaptive --cog-rss-target-mib 320 --cog-range-cache-mib 64
+
+# Fixed Stage 22 baseline for a controlled comparison:
+node scripts/terrain-prague-stream.mjs --cog-memory-mode fixed --cog-rss-target-mib 320 --cog-range-cache-mib 64
+
+# Actual original Sentinel STAC/COG source test — each treatment has
+# a separate empty disk cache, 16 genuine Prague tiles and cold + replay:
+node scripts/terrain-prague-region-memory-ab.mjs --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --rss-target-mib 320 --require-pressure
+```
+
+The separate Windows workflow
+`.github/workflows/terrain-prague-stage23-memory-ab.yml`
+runs exactly this strictly validated 4×4 source A/B independently
+of routine CI. It requires **identical original annual scene IDs and
+scientific SHA-256 results** across fixed and adaptive memory policies,
+and records genuine RSS measurements, source HTTP 206 counts, transferred
+bytes and any speed penalty. Its test-specific 320 MiB RSS target
+is deliberately tighter than the normal server default so the memory
+policy is exercised during real 16-tile acquisition. Both treatments
+use original source files (not synthetic imagery).
+
+### Limits, costs and scientific correctness
+
+**This is not a hard OS memory limit.** `process.memoryUsage().rss`
+includes the whole Node process, but not browser/WebGL GPU memory.
+100 ms sampling can miss brief allocation peaks, and freeing cached
+`Uint8Array` allocations does not guarantee immediate reclamation
+of operating-system RSS before garbage collection. An active COG
+decode can still allocate memory above the requested soft target.
+Do not confuse the logged *cache budget* with actual peak RSS.
+
+**Low-memory operation may run slower and transfer more bytes.**
+Evicted original compressed COG blocks must be downloaded again,
+under the same immutable-source ETag checks. If the original source
+changes or disappears, the analysis fails closed. Never describe
+cache shrinkage as evidence of all-year SCL coverage or changed
+ecological significance. Stage 23 only manages memory, not the
+original calibrated Sentinel observations or ČÚZK heights.
