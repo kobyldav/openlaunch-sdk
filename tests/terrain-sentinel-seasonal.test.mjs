@@ -161,7 +161,8 @@ test("stage 14: four genuine coincident pixels among 25 flag limited sampling wi
  assert.equal(result.statistics.lowCoverageWarning,true);
  assert.equal(result.statistics.missingEitherPixels,21);
  assert.equal(result.statistics.robustTwoPerYearPixels,4);
- assert.equal(result.deltaRgba[0*4+3],255);
+ assert.equal(result.deltaRgba[0*4+3],90,
+   "Real low-change NDVI remains partially transparent above true ČÚZK imagery");
  assert.equal(result.deltaRgba[4*4+3],0);
  assert.ok(Number.isNaN(result.deltaValues[24]));
  approx(result.statistics.meanDeltaNdvi,.1);
