@@ -1,0 +1,9 @@
+{
+  "private": true,
+  "name": "openlaunch-readme-gallery-tools",
+  "version": "1.0.0",
+  "description": "Isolated renderer for reproducible OpenLaunch SDK README screenshots",
+  "dependencies": {
+    "sharp": "0.34.5"
+  }
+}
