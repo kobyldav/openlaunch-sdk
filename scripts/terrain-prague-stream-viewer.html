@@ -904,7 +904,7 @@ async function loadSeasonal(){
    const response=await fetch(prefix,{signal:controller.signal});
    if(!response.ok)throw Error((await response.text()).slice(0,220));
    const meta=await response.json();
-   if(meta.status!=="real-sentinel-interannual-ndvi"||meta.version!==1||
+   if(meta.status!=="real-sentinel-interannual-ndvi"||meta.version!==2||
       meta.key!==tile.key||meta.before?.year!==beforeYear||
       meta.after?.year!==afterYear||meta.before.month!==month||
       meta.after.month!==month||meta.grid?.crs!=="EPSG:3857"||
@@ -1080,7 +1080,9 @@ function startGpu(){
    " vec4 rgba=texture2D(uTexture,vUv);",
    " if(uOverlayMode==1){",
    "   vec4 observation=texture2D(uOverlayTexture,vUv*uOverlayUv.zw+uOverlayUv.xy);",
-   "   if(observation.a>0.5)rgba=observation;",
+   "   if(observation.a>0.01){",
+   "     rgba=vec4(mix(rgba.rgb,observation.rgb,observation.a),max(rgba.a,observation.a));",
+   "   }",
    " }",
    " float shade=clamp((vElevation-170.0)/120.0,0.0,1.0);",
    " vec3 colour=rgba.a>0.1?rgba.rgb:vec3(.21+shade*.4,.35+shade*.35,.44+shade*.25);",

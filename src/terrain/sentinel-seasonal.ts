@@ -7,7 +7,7 @@
  */
 import type {SentinelNdviEvidence} from "./sentinel-change.js";
 
-export const SENTINEL_SEASONAL_COMPOSITE_VERSION=1;
+export const SENTINEL_SEASONAL_COMPOSITE_VERSION=2;
 const finite=Number.isFinite;
 export interface SentinelSeasonalOptions{
   /** Visualization threshold; not a validated significance test. Default 0.15 NDVI. */
@@ -163,7 +163,10 @@ export function compareSentinelSeasonalNdvi(
    if(delta>=threshold)increased++;
    else if(delta<=-threshold)decreased++;
    else stable++;
-   deltaRgba.set([...palette(delta,threshold),255],p*4);
+   // Stable source-measured pixels retain visible real ČÚZK ortho detail:
+   // tint lightly; strong measured differences stay highly visible.
+   const alpha=Math.abs(delta)>=threshold?245:90;
+   deltaRgba.set([...palette(delta,threshold),alpha],p*4);
  }
  if(overlap<minOverlap)
    throw new Error("Insufficient real SCL-valid interannual overlap: "+overlap+

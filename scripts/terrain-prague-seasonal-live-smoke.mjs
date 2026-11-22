@@ -63,7 +63,7 @@ try{
        ": "+(await response.text()).slice(0,320));
      const data=await response.json();
      assert.equal(data.status,"real-sentinel-interannual-ndvi");
-     assert.equal(data.version,1);
+     assert.equal(data.version,2);
      assert.equal(data.key,"0-3-3");
      assert.equal(data.before.year,attempt.before);
      assert.equal(data.after.year,attempt.after);

@@ -59,7 +59,9 @@ test("stage 14: genuine two-year same-month median source NDVI, quality counts a
  assert.equal(product.afterValidCount[2],1);
  assert.equal(product.beforeValidCount[0],2);
  assert.equal(product.afterValidCount[0],2);
- assert.equal(product.deltaRgba[3],255);
+ assert.equal(product.deltaRgba[3],245);
+ assert.equal(product.deltaRgba[2*4+3],90,
+   "Small verified changes tint rather than obscure real ČÚZK imagery");
  assert.equal(product.qa.medianPerYear,true);
  assert.equal(product.qa.pairedPixelIntersection,true);
  assert.equal(typeof new OpenLaunch().terrain.compareSentinelSeasons,"function");

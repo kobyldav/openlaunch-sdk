@@ -757,7 +757,7 @@ cloud values (which **do not** establish local clear-sky quality).
 `/api/observations/seasonal/0/X/Y/2024/2025/8.json?cloud=50`
 and `.png` return the original-source measured interannual composite.
 Four scenes are read sequentially through the existing source
-COG/mask SDK, and `seasonal-v1-*` real source metadata + image
+COG/mask SDK, and `seasonal-v2-*` real source metadata + image
 are stored on disk with atomic metadata-last writes. One seasonal
 computation can run at a time; the original tile streamer is
 independent. `--offline` never fetches missing original COGs

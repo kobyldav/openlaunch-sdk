@@ -106,7 +106,7 @@ jobs:
             test-results/terrain-prague-stream-ci/trends-v1-*.png
             test-results/terrain-prague-stream-ci/trends-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-3-date-trend.png
-            test-results/terrain-prague-stream-ci/seasonal-v1-*.json
-            test-results/terrain-prague-stream-ci/seasonal-v1-*.png
+            test-results/terrain-prague-stream-ci/seasonal-v2-*.json
+            test-results/terrain-prague-stream-ci/seasonal-v2-*.png
             test-results/terrain-prague-stream-ci/seasonal-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-seasonal-interannual.png
