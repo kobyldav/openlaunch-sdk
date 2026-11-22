@@ -554,9 +554,7 @@ async function generateSeasonal(spec,beforeYear,afterYear,month,cloud){
       Buffer.from(d.deltaF32LE??"","base64").byteLength===d.width*d.height*4&&
       Buffer.from(d.beforeCountB64??"","base64").byteLength===d.width*d.height&&
       Buffer.from(d.afterCountB64??"","base64").byteLength===d.width*d.height&&
-      png.byteLength>100&&
-      (!lock||verifySharedSentinelRegionSourceYears(doc.years,lock)))
-     return reportWithSourceLock({json,png},lock);
+      png.byteLength>100)return {json,png};
  }catch{}
  const values=[];
  for(const group of [meta.before,meta.after]){
@@ -773,7 +771,9 @@ async function generateMultiyear(spec,from,to,month,cloud,lock=null){
       Buffer.from(doc.loF32LE??"","base64").byteLength===doc.width*doc.height*4&&
       Buffer.from(doc.hiF32LE??"","base64").byteLength===doc.width*doc.height*4&&
       Buffer.from(doc.robustB64??"","base64").byteLength===doc.width*doc.height&&
-      png.byteLength>100)return {json,png};
+      png.byteLength>100&&
+      (!lock||verifySharedSentinelRegionSourceYears(doc.years,lock)))
+     return reportWithSourceLock({json,png},lock);
  }catch{}
  const seasons=[];
  for(const sourceYear of catalog.seasons){
