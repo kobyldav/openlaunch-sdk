@@ -610,3 +610,95 @@ land-use change detector, deforestation inventory, pixel-size upgrade,
 or annual matched-phenology time series. Only one explicitly selected
 ~700m observation tile is compared at a time. Calibration and source
 attribution are preserved in both source scene metadata.
+
+## Stage 13 — Multi-scene observed Sentinel-2 NDVI time series on real 3D Prague
+
+### What was built
+
+The Earth Intelligence panel now contains a **3–6 acquisition selection**,
+a genuine **time-series chart** of measured calibrated mean NDVI for **the
+exact same pixels in all selected scenes**, a spatial **Theil–Sen trend
+(NDVI per 30 days)** painted over the unchanged ČÚZK 3D height mesh and
+a **CSV export**. A user searches the local STAC tile catalog, selects
+at least three different acquired dates spanning at least 14 days,
+then clicks `Vypočítat trend a zobrazit v 3D`. Camera navigation, A/B
+Bpv inspector, buildings and all original terrain layers are untouched.
+
+### SDK first; WebGL is only a consumer
+
+`src/terrain/sentinel-trend.ts` exports
+`analyzeSentinelNdviTimeSeries(observations,options)` and the same
+feature is exposed as `new OpenLaunch().terrain.analyzeSentinelNdviTrend`
+and from the public `openlaunch-sdk` root. It accepts **3–6 real Stage 11
+Sentinel-2 L2A observations** including their exact common EPSG:3857
+pixel grid, original calibrated `Float32Array` NDVI, acquisition timestamps
+and SCL validity. Observations must represent distinct chronologically
+ordered dates and share *exactly* the same extent, affine pixel transform,
+dimensions and ground resolution.
+
+**Strict common-source-pixel cohort:** all validity masks are intersected
+across every selected scene. The mean NDVI plotted at each acquisition
+uses those *same* pixels, avoiding apparent changes due to uneven clouds
+and differing source sampling. No gap filling, temporal interpolation,
+replacement with zero, fake colors or upsampled 2m Sentinel details.
+Each valid pixel's trend is the **median of all pairwise NDVI/time slopes
+(Theil–Sen)** over actual acquisition dates, expressed in *NDVI per
+30 days*. The minimum common valid-pixel count is 16; otherwise the
+entire analysis fails explicitly. Source-invalid pixels remain NaN
+and are transparent above the actual ČÚZK ortho in the WebGL1 view.
+
+Results include real `slopePer30Days:Float32Array` and
+`trendRgba:Uint8Array`, actual scene ID/time/valid scene pixels
+and *common-cohort* mean NDVI, total/common/excluded pixel counts,
+coverage %, first-to-last mean change, Theil–Sen mean/min/max slope
+and positive/negative/stable counts using the clearly **illustrative**
+`±0.12 NDVI per 30 days` palette threshold. Values stay numeric and
+independent of the frontend. CSV contains actual scene/date/common
+mean records and actual georeferenced per-pixel slope values with
+original pixel-center WGS84 coordinates and explicit source validity.
+
+### Local server and bounded source cache
+
+`/api/observations/trend/0/X/Y/ID1,ID2,ID3[,ID4..ID6].json`
+and `.png` serve the selected real acquisitions in time-series order.
+New `trends-v1-*` source-derived cached assets are keyed by SHA-256
+of the selected scene IDs (shortened to keep Windows paths bounded),
+and the JSON provenance is written **last** only after its source-derived
+PNG is safely stored. The server reads actual Stage 12
+`observations-v2-*` numeric NDVI metadata (not rendered NDVI PNG colors),
+and downloads only **previously STAC-discovered HTTPS/public-COG-qualified
+source scene metadata** when online. Requests are bounded (maximum
+6 scenes, one active time-series computation, sequential observed
+scene reads). `--offline` only reuses real cached original sources
+or a complete genuine cached trend; missing data yields HTTP 404.
+
+### Actual real-source and Edge verification
+
+Additional deterministic fixtures test robust time slopes, strict
+3–6 scene bounds, ≥14-day range, scene uniqueness, source provenance,
+exact pixel-grid alignment, NaN/NoData, strict scene SCL validity,
+minimum common sample size, fixed-cohort chart means and anomalous
+observation retention. Windows CI also checks actual linkable Edge
+WebGL1 shaders, prior Stage 11/12 outputs and all original ČÚZK DEM
+and standalone examples. A best-effort live test requires at least
+3 **distinct** original Sentinel-2 L2A STAC+COG dates in the same
+Prague sample tile, plus actual GPU pixels and a genuine Edge screenshot
+when original source scenes are available. Network source outages are
+reported explicitly, never silently replaced with fixtures.
+
+### Boundaries and risk
+
+- **Descriptive only.** The reported slope is the observed time-window
+  rate in NDVI per 30 days; it is **not** a predicted future value,
+  scientifically established multi-year vegetation trend or evidence
+  of deforestation / building construction.
+- The 14-day minimum is a basic mathematical screening threshold,
+  not a remedy for phenology/seasonal differences. Proper long-term
+  ecological trend analysis would compare corresponding seasons in
+  multiple years, control atmospheric correction and uncertainty.
+- The SCL classification itself can be wrong, and intersection masks
+  make the sample cover smaller areas: every result reports this
+  selection bias/coverage explicitly.
+- The output remains one camera-selected ~700m Prague tile, never an
+  invented full-city global NDVI mosaic or improved native spatial
+  resolution. Original ČÚZK Bpv 3D measurements are untouched.

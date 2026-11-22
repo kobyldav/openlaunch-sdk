@@ -40,6 +40,9 @@ jobs:
       - name: Verify real chronological Sentinel-2 COG pair and jointly cloud-masked numeric NDVI changes
         run: node scripts/terrain-prague-change-live-smoke.mjs
         continue-on-error: true
+      - name: Verify 3 genuine Sentinel-2 date COG sources and fixed-common-pixel Theil-Sen trend over Prague
+        run: node scripts/terrain-prague-trend-live-smoke.mjs
+        continue-on-error: true
       - name: Actual Edge WebGL1 pixel screenshot and 60-pose Prague camera-flight regression
         run: node scripts/terrain-prague-browser-smoke.mjs
       - name: Fetch actual Sentinel-2 and COP-DEM GLO-30 and render 3D
@@ -94,3 +97,7 @@ jobs:
             test-results/terrain-prague-stream-ci/changes-v1-*.png
             test-results/terrain-prague-stream-ci/changes-live-report.json
             test-results/terrain-prague-browser-ci/prague-real-sentinel-delta-ndvi.png
+            test-results/terrain-prague-stream-ci/trends-v1-*.json
+            test-results/terrain-prague-stream-ci/trends-v1-*.png
+            test-results/terrain-prague-stream-ci/trends-live-report.json
+            test-results/terrain-prague-browser-ci/prague-real-sentinel-ndvi-3-date-trend.png
