@@ -74,3 +74,4 @@ jobs:
             test-results/terrain-prague-browser-ci/prague-real-3d-initial.png
             test-results/terrain-prague-browser-ci/prague-real-3d-orbit.png
             test-results/terrain-prague-browser-ci/prague-real-3d-after-flight.png
+            test-results/terrain-prague-browser-ci/prague-real-3d-with-buildings.png

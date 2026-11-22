@@ -185,9 +185,43 @@ try{
  assert.ok(after.loaded&&after.foreground>300,"Real terrain disappeared after fast flight");
  assert.ok(after.cacheTiles<=40,"GPU tile cache exceeded budget");
  const returnBytes=await capture("prague-real-3d-after-flight.png");
+ // A separate live OSM + ČÚZK real building source is optional: verify it
+ // only when its independent HTTP source test populated the cache.
+ // Synthetic fixture buildings can never satisfy this visual gate.
+ let actualBuildingView=null;
+ const buildingResponse=await fetch(origin+"/api/buildings/0/3/3.json");
+ if(buildingResponse.ok){
+   const buildingDoc=await buildingResponse.json();
+   if(buildingDoc.status==="real-source-buildings"&&buildingDoc.buildings>0){
+     await evalJs(c.send,'(()=>{const p=tileCenter(0,3,3);panX=p[0];panNorth=p[1];'+
+       'yaw=0;pitch=1.24;distance=900;enableDetail=true;buildingsEnabled=true;'+
+       'update();return true;})()');
+     await until(async()=>await evalJs(c.send,'buildingCache.has("0-3-3")'),
+       "cached true-source OSM/ČÚZK building overlay uploading to WebGL",20000);
+     const buildShot=await evalJs(c.send,inspectPixels);
+     const buildingCount=await evalJs(c.send,
+       'Number(document.getElementById("building-count").textContent)');
+     assert.equal(buildShot.glError,0);
+     assert.ok(buildingCount>0,"Real building source must produce visible WebGL mesh");
+     assert.ok(buildShot.faces>first.faces,
+       "Separate building triangles must be drawn over the actual DSM");
+     const screenshotBytes=await capture("prague-real-3d-with-buildings.png");
+     actualBuildingView={buildingCount,screenshotBytes,
+       faces:buildShot.faces,checksum:buildShot.checksum,
+       measuredSource:buildingDoc.source,methods:buildingDoc.heightMethods};
+     console.log("PASS true-source Prague building WebGL1 overlay: "+
+       buildingCount+" OSM building volumes, "+buildShot.faces+
+       " combined triangles, "+screenshotBytes+" real screenshot PNG bytes");
+   }
+ }else{
+   console.log("NOTICE real building source unavailable in offline cache; "+
+     "base terrain GPU test still passed, no building geometry fabricated.");
+ }
+
  const report={tile:"0-3-3",provenance:"genuine ČÚZK DMP OK + Ortofoto ČR",
    measuredVertices:tile.validVertices,measuredTriangles:tile.measuredTriangles,
    screenshotBytes:[initialBytes,orbitBytes,returnBytes],first,orbit,after,flight,
+   actualBuildingView,
    renderer:"actual Edge headless WebGL1 using SwiftShader"};
  await writeFile(join(output,"report.json"),JSON.stringify(report,null,2));
  console.log("PASS real WebGL1 Prague terrain screenshot: "+
