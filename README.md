@@ -10,7 +10,7 @@ OpenLaunch brings together data from space-related providers and tools for worki
 
 Use the complete SDK or install just the packages your project requires.
 
-[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Browse examples](examples/README.md) · [Documentation](#documentation)
+[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Visual gallery](#visual-examples) · [Browse examples](examples/README.md) · [Documentation](#documentation)
 
 ## What you can build
 
@@ -24,22 +24,26 @@ Use the complete SDK or install just the packages your project requires.
 | **Mission engineering** | Combine orbital calculations, spacecraft sizing, sensor geometry, and observation planning. | [Integrated mission examples](examples/11-integrated-missions/) |
 | **Scientific computing** | Work with vectors, matrices, quaternions, numerical methods, controls, atmospheric models, and aerospace formulas. | [Mathematics examples](examples/07-gnc-math/) |
 
-### Examples with visual outputs
+## Visual examples
 
-The SDK supplies data and geometry for visual applications; it does not require a particular frontend or mapping engine.
+These images are rendered from OpenLaunch SDK results. They demonstrate real provider image delivery, satellite propagation, raster processing, and engineering models rather than screenshots of terminal output.
 
-| Output you can render | SDK example | What the example actually does |
-| --- | --- | --- |
-| **Satellite ground track** | [Ground-track sampling](examples/14-orbit-traffic/02-ground-track.ts) | Fetches satellite elements and calculates latitude, longitude, and altitude over time. |
-| **3D satellite orbit** | [CZML scenario](examples/14-orbit-traffic/10-czml-3d-scenario.ts) | Exports propagated orbital positions for a Cesium-compatible viewer. |
-| **Satellite and weather map layers** | [Live Earth layer selector](examples/18-live-earth/01-layer-selector.ts) | Returns layer metadata and provider descriptors for a map UI. |
-| **Vegetation analysis** | [Calibrated NDVI](examples/17-raster/02-calibrated-ndvi.ts) | Calculates NDVI from an explicitly offline raster fixture, including calibration and masking. |
-| **3D terrain geometry** | [DEM terrain mesh](examples/17-raster/04-terrain-mesh.ts) | Converts an illustrative elevation grid into a local triangle mesh. |
-| **Launch telemetry** | [Max-Q telemetry](examples/15-launch-trajectory/02-telemetry-max-q.ts) | Calculates flight telemetry for an illustrative two-stage rocket model. |
+| Earth observation | Satellite tracking |
+| --- | --- |
+| [![NASA GIBS true-color imagery delivered through OpenLaunch](docs/images/earth-observation.png)](scripts/generate-readme-gallery.mjs) | [![ISS orbit propagated with OpenLaunch SGP4](docs/images/orbital-tracking.png)](examples/14-orbit-traffic/02-ground-track.ts) |
+| **NASA Terra MODIS imagery** — Real daily NASA GIBS image tiles; the requested date is not an independently verified acquisition timestamp. [How it works](docs/README_GALLERY.md) | **Orbital propagation** — Earth-fixed ISS orbit from a historical TLE using SGP4. [Ground-track example](examples/14-orbit-traffic/02-ground-track.ts) |
 
-For runnable recipes, input requirements, and more advanced workflows, see the [complete example catalog](examples/README.md).
+| Terrain reconstruction | Launch trajectory |
+| --- | --- |
+| [![3D mesh constructed by OpenLaunch from elevation samples](docs/images/terrain-model.png)](examples/17-raster/04-terrain-mesh.ts) | [![Two-stage rocket simulation telemetry rendered from OpenLaunch](docs/images/launch-simulation.png)](examples/15-launch-trajectory/02-telemetry-max-q.ts) |
+| **3D terrain mesh** — `elevationToLocalMesh()` output; this preview uses a synthetic DEM input. [Terrain example](examples/17-raster/04-terrain-mesh.ts) | **Launch engineering** — Altitude, speed, dynamic pressure, and stage events from a generic 3DOF model. [Max-Q example](examples/15-launch-trajectory/02-telemetry-max-q.ts) |
 
-To generate six README-ready PNG previews from the SDK, see the [gallery generator](docs/README_GALLERY.md).
+| Vegetation analysis | Space traffic |
+| --- | --- |
+| [![NDVI raster analysis computed with OpenLaunch](docs/images/ndvi-analysis.png)](examples/17-raster/02-calibrated-ndvi.ts) | [![SGP4 satellite closest-approach geometry calculated by OpenLaunch](docs/images/space-traffic.png)](examples/14-orbit-traffic/05-closest-approach.ts) |
+| **NDVI** — Red/NIR raster processing; the preview uses synthetic spectral inputs, not a real Sentinel-2 scene. [NDVI example](examples/17-raster/02-calibrated-ndvi.ts) | **Closest approach** — Relative separation calculated for a historical ISS TLE and a synthetic nearby test object. This is not a collision-risk alert. [Traffic example](examples/14-orbit-traffic/05-closest-approach.ts) |
+
+The gallery is reproducible using `npm run gallery`. To use your own GeoTIFF DEM or RED/NIR bands, or to generate a fresh NASA image, follow the [gallery generation guide](docs/README_GALLERY.md). Additional runnable recipes are listed in the [example catalog](examples/README.md).
 
 ## Quick start
 
