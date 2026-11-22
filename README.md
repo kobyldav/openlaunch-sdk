@@ -10,7 +10,7 @@ OpenLaunch brings together data from space-related providers and tools for worki
 
 Use the complete SDK or install just the packages your project requires.
 
-[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Visual gallery](#visual-examples) · [Browse examples](examples/README.md) · [Documentation](#documentation)
+[Get started](#quick-start) · [Explore capabilities](#what-you-can-build) · [Choose a package](#packages) · [Live demo](#live-example-satellite-imagery-viewer) · [Browse examples](examples/README.md) · [Documentation](#documentation)
 
 ## What you can build
 
@@ -24,26 +24,17 @@ Use the complete SDK or install just the packages your project requires.
 | **Mission engineering** | Combine orbital calculations, spacecraft sizing, sensor geometry, and observation planning. | [Integrated mission examples](examples/11-integrated-missions/) |
 | **Scientific computing** | Work with vectors, matrices, quaternions, numerical methods, controls, atmospheric models, and aerospace formulas. | [Mathematics examples](examples/07-gnc-math/) |
 
-## Visual examples
+## Live example: satellite imagery viewer
 
-These images are rendered from OpenLaunch SDK results. They demonstrate real provider image delivery, satellite propagation, raster processing, and engineering models rather than screenshots of terminal output.
+[Explore the satellite map on kobylkadavid.cz](https://www.kobylkadavid.cz/)
 
-| Earth observation | Satellite tracking |
-| --- | --- |
-| [![NASA GIBS true-color imagery delivered through OpenLaunch](docs/images/earth-observation.png)](scripts/generate-readme-gallery.mjs) | [![ISS orbit propagated with OpenLaunch SGP4](docs/images/orbital-tracking.png)](examples/14-orbit-traffic/02-ground-track.ts) |
-| **NASA Terra MODIS imagery** — Real daily NASA GIBS image tiles; the requested date is not an independently verified acquisition timestamp. [How it works](docs/README_GALLERY.md) | **Orbital propagation** — Earth-fixed ISS orbit from a historical TLE using SGP4. [Ground-track example](examples/14-orbit-traffic/02-ground-track.ts) |
+The public website is a working application built around OpenLaunch SDK. Its satellite explorer offers selectable Earth-observation layers, pan and zoom controls, and satellite imagery served by backend APIs. Unlike the previously published illustrative gallery, this is an actual interactive implementation.
 
-| Terrain reconstruction | Launch trajectory |
-| --- | --- |
-| [![3D mesh constructed by OpenLaunch from elevation samples](docs/images/terrain-model.png)](examples/17-raster/04-terrain-mesh.ts) | [![Two-stage rocket simulation telemetry rendered from OpenLaunch](docs/images/launch-simulation.png)](examples/15-launch-trajectory/02-telemetry-max-q.ts) |
-| **3D terrain mesh** — `elevationToLocalMesh()` output; this preview uses a synthetic DEM input. [Terrain example](examples/17-raster/04-terrain-mesh.ts) | **Launch engineering** — Altitude, speed, dynamic pressure, and stage events from a generic 3DOF model. [Max-Q example](examples/15-launch-trajectory/02-telemetry-max-q.ts) |
+The viewer includes NASA MODIS and VIIRS daily imagery, Copernicus Sentinel-2 optical scenes, Sentinel-1 radar and derived NDVI/NDWI displays. Availability varies by provider, date and deployment configuration. The independent airspace viewer on the same page is not presented as an SDK demo.
 
-| Vegetation analysis | Space traffic |
-| --- | --- |
-| [![NDVI raster analysis computed with OpenLaunch](docs/images/ndvi-analysis.png)](examples/17-raster/02-calibrated-ndvi.ts) | [![SGP4 satellite closest-approach geometry calculated by OpenLaunch](docs/images/space-traffic.png)](examples/14-orbit-traffic/05-closest-approach.ts) |
-| **NDVI** — Red/NIR raster processing; the preview uses synthetic spectral inputs, not a real Sentinel-2 scene. [NDVI example](examples/17-raster/02-calibrated-ndvi.ts) | **Closest approach** — Relative separation calculated for a historical ISS TLE and a synthetic nearby test object. This is not a collision-risk alert. [Traffic example](examples/14-orbit-traffic/05-closest-approach.ts) |
+To capture **real browser screenshots of the live satellite viewer**, see the [reproducible capture tool](docs/README_GALLERY.md). Screenshots must only be published when real provider imagery has loaded; placeholder illustrations and synthetic map compositions are not acceptable substitutes.
 
-The gallery is reproducible using `npm run gallery`. To use your own GeoTIFF DEM or RED/NIR bands, or to generate a fresh NASA image, follow the [gallery generation guide](docs/README_GALLERY.md). Additional runnable recipes are listed in the [example catalog](examples/README.md).
+For runnable code that uses OpenLaunch directly, see the [Earth observation examples](examples/13-earth-observation/), [raster examples](examples/17-raster/), and [web integration examples](examples/19-web-integration/).
 
 ## Quick start
 
