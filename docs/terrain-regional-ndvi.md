@@ -311,3 +311,98 @@ does not justify filling gaps or inferring causes of vegetation change.
 For reproducibility, preserve both the source manifest and original
 source caches; a digest is a reproducible content identifier, not a
 cryptographic signature of scientific correctness.
+
+
+## Stage 20 — actual 4×4 region QA, memory and cache-replay benchmark
+
+The region server now measures runtime **from its own running Node process**,
+using a 100 ms sample interval plus per-tile samples:
+
+- End-to-end server analysis time and common-source STAC selection time
+- Elapsed time per original-source tile, and each tile's real source-result
+  status (analyzed, insufficient or unavailable)
+- Observed peak Node process RSS and V8 heap, initial RSS and a configurable
+  **soft** resident-memory ceiling (default 1536 MiB; 256–8192 MiB accepted)
+- Number of real historical result cache hits, misses and unavailable tiles,
+  and number of yearly STAC catalogs reused from the local source cache
+- The exact denominator: number of analyzed source-backed tiles out of the
+  requested 16. **Whole-region SCL-valid pixel percentage is `null` unless
+  every requested tile had genuine validated source data.** The percentage
+  within analyzed tiles is still separate and available
+
+Every tile NDJSON event now includes original runtime `metrics`; the final
+`result.quality` comes from the exported
+`assessSentinelRegionQuality()` SDK module, which rejects missing metrics,
+incorrect source/cache states and invented whole-region denominators.
+
+The Prague browser shows measured elapsed time, RSS/heap peaks, and cache
+hits/misses beside the coverage map and offers **Měření provozu JSON** to
+export the real quality report and source-lock evidence.
+
+### Offline 4×4 repeat audit — safe and deterministic
+
+```powershell
+npm run build
+node --test tests/terrain-sentinel-region-quality.test.mjs tests/terrain-prague-region-benchmark.test.mjs
+node scripts/terrain-prague-region-benchmark.mjs --x 1 --y 1 --cols 4 --rows 4 --repeat 2
+```
+
+By default, the benchmark runs with **no external network**. It creates a
+fresh server process for each attempt and reports only genuine data already
+stored in the local source cache. A fresh empty cache correctly yields
+16 missing tiles and **zero observed Sentinel pixels**; a passing offline
+stability test is *not* scientific validation of all 16 tiles.
+
+The output is a JSON report under
+`test-results/terrain-prague-region-4x4-benchmark.json`. It includes
+measured times and peak RSS separately for each cold process, original
+source provenance, real coverage, source-cache reuse and an SHA-256
+fingerprint of the original numerical/scene results. Repeated runs must
+give identical **scientific results**, but execution times may differ.
+
+### Full 4×4 genuine Sentinel source benchmark — opt-in
+
+```powershell
+node scripts/terrain-prague-region-benchmark.mjs --live --x 1 --y 1 --cols 4 --rows 4 --from 2023 --to 2025 --month 8 --cloud 50 --repeat 2 --rss-limit-mib 1536 --timeout-ms 1000000 --require-complete --require-cached-replay
+```
+
+This retrieves original Sentinel-2 L2A STAC/COG scenes on a bounded 4×4
+area (~2.8 km wide) for three real August seasons. It **requires**
+every tile to have valid data and **requires** the second fresh server
+to reuse genuine cached source products. A missing year, cloud-covered
+tile, network timeout or unavailable COG causes an explicit failure and
+preserves a partial JSON diagnostic; source measurements are never
+interpolated or invented.
+
+There is also a dedicated manual GitHub workflow:
+`.github/workflows/terrain-prague-region-4x4-benchmark.yml`
+(**Actions → Prague Sentinel-2 actual 4x4 regional quality benchmark → Run
+workflow**). This separate workflow deliberately avoids slowing down the
+normal Windows CI by potentially tens of minutes of original remote COG
+traffic. Even when the strict 16-tile benchmark fails, it uploads the
+partial real-data report and the source-selection manifests.
+
+The normal CI always checks strict deterministic 16-tile/no-data behavior
+through three fresh Node server launches. When the earlier live two-tile
+evidence exists, CI additionally measures a **real** source-backed 2×1
+cached replay (first and second process) and checks it is fully source
+verified, without claiming that this covers 4×4.
+
+### Limits and resource risks
+
+- RSS and heap are from the **whole local Node process**. The 100 ms
+  sampler can miss a shorter allocation peak. The *soft* RSS limit
+  avoids starting additional tile downloads after the limit is observed,
+  but cannot interrupt an already-running COG read and is not a
+  hard memory bound.
+- The server's memory numbers **exclude the Edge/browser process, WebGL
+  GPU textures, system file cache, on-disk storage and actual transfer
+  bytes**. GPU residency remains separately limited to six region
+  overlay textures.
+- A cache hit means **reuse of a source-validated historical result**,
+  not evidence that the scientific conclusion is correct. Faster
+  second-run execution is not guaranteed; report actual timings.
+- A successfully completed technical 4×4 stream with zero real source
+  pixels is a successful NoData handling test, **not** an observation of
+  Prague's vegetation. Similarly, Theil–Sen remains descriptive;
+  no statistical confidence or causal claim is added.
