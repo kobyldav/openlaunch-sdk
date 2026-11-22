@@ -73,7 +73,7 @@ a{color:#9cd1fc}
   <div>Vzdálenost kamery<strong id="distance">—</strong></div>
  </div>
  <p class="small">Levé tlačítko / jeden prst: otáčení · pravé tlačítko nebo Shift + tah: posunutí mapy · kolečko / dva prsty: přiblížení · šipky / WASD: posun. Při přiblížení se automaticky stahuje skutečný jemnější výškový model, vzdálené dlaždice se vykreslují hruběji. Server uchovává stažené dlaždice na disku; GPU paměť má omezenou LRU cache.</p>
- <p class="small" id="building-status">Budovy: OSM půdorysy (ODbL), ČÚZK DMR 5G základ, OSM výšky nebo odhad střechy z ČÚZK DMP OK. Plochá střecha je vizuální LOD1 aproximace.</p>
+ <p class="small" id="building-status">Budovy: OSM půdorysy (ODbL), ČÚZK DMR 5G základ, OSM výšky nebo odhad střechy z ČÚZK DMP OK. Plochá střecha je vizuální LOD1 aproximace. Střešní textura je skutečné ortofoto ČÚZK.</p>
  <p class="small" id="source">Výšky: ČÚZK DMP OK, Bpv. Barvy: ČÚZK Ortofoto ČR. Nejpodrobnější geometrie 2 m, textura 0,5 m. Žádné rekonstruované fasády.</p>
  <p id="error" aria-live="polite"></p>
 </main>
@@ -233,10 +233,16 @@ function makeBuildingGpu(d){
     !Number.isInteger(d.renderVertices)||d.renderVertices<0||d.renderVertices>=65536)
    throw Error("Building provenance or limits invalid");
  const positions=binary(d.positionsF32LE,Float32Array),
+   uv=binary(d.uvsF32LE,Float32Array),
    indices=binary(d.trianglesU16LE,Uint16Array);
- if(positions.length!==d.renderVertices*3||indices.length!==d.triangles*3||
-    positions.some(n=>!Number.isFinite(n))||
-    indices.some(id=>id>=d.renderVertices))throw Error("Invalid building mesh");
+ if(d.roofTexture!=="real-ČÚZK-ortofoto-reprojected"||
+    !Number.isInteger(d.wallTriangles)||!Number.isInteger(d.roofTriangles)||
+    d.wallTriangles+d.roofTriangles!==d.triangles||
+    positions.length!==d.renderVertices*3||uv.length!==d.renderVertices*2||
+    indices.length!==d.triangles*3||positions.some(n=>!Number.isFinite(n))||
+    uv.some(n=>!Number.isFinite(n)||Math.abs(n)>2)||
+    indices.some(id=>id>=d.renderVertices))
+    throw Error("Invalid textured building mesh");
  if(indices.length===0)return {count:0,buildings:0,lastUsed:Date.now()};
  const texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);
  gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,
@@ -244,9 +250,10 @@ function makeBuildingGpu(d){
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.NEAREST);
  gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.NEAREST);
  return {positions:makeBuffer(positions,gl.ARRAY_BUFFER),
-   uvs:makeBuffer(new Float32Array(d.renderVertices*2),gl.ARRAY_BUFFER),
+   uvs:makeBuffer(uv,gl.ARRAY_BUFFER),
    faces:makeBuffer(indices,gl.ELEMENT_ARRAY_BUFFER),
-   texture,count:indices.length,buildings:d.buildings,lastUsed:Date.now()};
+   texture,count:indices.length,wallCount:d.wallTriangles*3,
+   roofCount:d.roofTriangles*3,buildings:d.buildings,lastUsed:Date.now()};
 }
 function updateBuildings(){
  if(!gl||!config)return;
@@ -456,11 +463,21 @@ function draw(){
      const t=buildingCache.get(id);
      if(!t?.count)continue;
      t.lastUsed=Date.now();
-     gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,t.texture);
+     gl.activeTexture(gl.TEXTURE0);
      bindAttr(t.positions,attrs.pos,3);bindAttr(t.uvs,attrs.uv,2);
      gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER,t.faces);
-     gl.drawElements(gl.TRIANGLES,t.count,gl.UNSIGNED_SHORT,0);
-     faces+=t.count/3;shownBuildings+=t.buildings;
+     // Real DMR ground supports solid-colored walls, while the simple
+     // flat roof takes its photograph from the same genuine ČÚZK ortho
+     // as the parent DSM tile. No synthetic RGB roof pixels are created.
+     gl.bindTexture(gl.TEXTURE_2D,t.texture);
+     gl.drawElements(gl.TRIANGLES,t.wallCount,gl.UNSIGNED_SHORT,0);
+     const terrainTexture=cache.get(id)?.texture;
+     if(terrainTexture&&t.roofCount){
+       gl.bindTexture(gl.TEXTURE_2D,terrainTexture);
+       gl.drawElements(gl.TRIANGLES,t.roofCount,gl.UNSIGNED_SHORT,t.wallCount*2);
+     }
+     faces+=(t.wallCount+(terrainTexture?t.roofCount:0))/3;
+     shownBuildings+=t.buildings;
    }
  }
  $("building-count").textContent=String(shownBuildings);
